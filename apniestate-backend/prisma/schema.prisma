@@ -1,0 +1,248 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  BUILDER
+  SITE_SUPERVISOR
+  ACCOUNTANT
+  INVENTORY_MANAGER
+}
+
+enum ProjectStatus {
+  PLANNING
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+enum MaterialRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  DELIVERED
+}
+
+enum EquipmentStatus {
+  AVAILABLE
+  IN_USE
+  UNDER_MAINTENANCE
+  RETIRED
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  password_hash String
+  role          Role      @default(SITE_SUPERVISOR)
+  phone         String?
+  is_active     Boolean   @default(true)
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+
+  projects       Project[]       @relation("BuilderProjects")
+  supervised     Site[]          @relation("SupervisorSites")
+  attendances    SiteAttendance[]
+  daily_reports  DailyReport[]
+  material_reqs  MaterialRequest[]
+  notifications  Notification[]
+  refresh_tokens RefreshToken[]
+  documents      Document[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id         String   @id @default(cuid())
+  user_id    String
+  token_hash String
+  expires_at DateTime
+  revoked    Boolean  @default(false)
+  created_at DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id], name: "idx_refresh_tokens_user_id")
+  @@map("refresh_tokens")
+}
+
+model Project {
+  id          String        @id @default(cuid())
+  name        String
+  description String?
+  builder_id  String
+  status      ProjectStatus @default(PLANNING)
+  start_date  DateTime
+  end_date    DateTime?
+  created_at  DateTime      @default(now())
+  updated_at  DateTime      @updatedAt
+
+  builder User   @relation("BuilderProjects", fields: [builder_id], references: [id])
+  sites   Site[]
+
+  @@index([builder_id], name: "idx_projects_builder_id")
+  @@map("projects")
+}
+
+model Site {
+  id            String   @id @default(cuid())
+  project_id    String
+  name          String
+  location      String
+  supervisor_id String?
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  project        Project          @relation(fields: [project_id], references: [id])
+  supervisor     User?            @relation("SupervisorSites", fields: [supervisor_id], references: [id])
+  attendances    SiteAttendance[]
+  daily_reports  DailyReport[]
+  material_reqs  MaterialRequest[]
+  equipment      Equipment[]
+
+  @@index([project_id], name: "idx_sites_project_id")
+  @@map("sites")
+}
+
+model SiteAttendance {
+  id         String    @id @default(cuid())
+  site_id    String
+  worker_id  String
+  date       DateTime  @db.Date
+  check_in   DateTime?
+  check_out  DateTime?
+  notes      String?
+  created_at DateTime  @default(now())
+
+  site   Site @relation(fields: [site_id], references: [id])
+  worker User @relation(fields: [worker_id], references: [id])
+
+  @@index([site_id], name: "idx_attendances_site_id")
+  @@index([worker_id], name: "idx_attendances_worker_id")
+  @@map("site_attendances")
+}
+
+model DailyReport {
+  id           String   @id @default(cuid())
+  site_id      String
+  submitted_by String
+  report_date  DateTime @db.Date
+  summary      String
+  weather      String?
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  site      Site @relation(fields: [site_id], references: [id])
+  submitter User @relation(fields: [submitted_by], references: [id])
+
+  @@index([site_id], name: "idx_daily_reports_site_id")
+  @@map("daily_reports")
+}
+
+model Material {
+  id          String   @id @default(cuid())
+  name        String
+  unit        String
+  description String?
+  created_at  DateTime @default(now())
+
+  requests MaterialRequest[]
+
+  @@map("materials")
+}
+
+model MaterialRequest {
+  id           String                @id @default(cuid())
+  site_id      String
+  material_id  String
+  quantity     Float
+  status       MaterialRequestStatus @default(PENDING)
+  requested_by String
+  notes        String?
+  created_at   DateTime              @default(now())
+  updated_at   DateTime              @updatedAt
+
+  site      Site     @relation(fields: [site_id], references: [id])
+  material  Material @relation(fields: [material_id], references: [id])
+  requester User     @relation(fields: [requested_by], references: [id])
+
+  @@index([site_id], name: "idx_material_requests_site_id")
+  @@map("material_requests")
+}
+
+model Vendor {
+  id             String    @id @default(cuid())
+  name           String
+  contact_person String?
+  phone          String?
+  email          String?
+  address        String?
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
+
+  equipment Equipment[]
+
+  @@map("vendors")
+}
+
+model Equipment {
+  id         String          @id @default(cuid())
+  name       String
+  type       String
+  site_id    String?
+  vendor_id  String?
+  status     EquipmentStatus @default(AVAILABLE)
+  created_at DateTime        @default(now())
+  updated_at DateTime        @updatedAt
+
+  site   Site?   @relation(fields: [site_id], references: [id])
+  vendor Vendor? @relation(fields: [vendor_id], references: [id])
+
+  @@index([site_id], name: "idx_equipment_site_id")
+  @@map("equipment")
+}
+
+model Document {
+  id          String   @id @default(cuid())
+  name        String
+  file_url    String
+  entity_type String
+  entity_id   String
+  uploaded_by String
+  created_at  DateTime @default(now())
+
+  uploader User @relation(fields: [uploaded_by], references: [id])
+
+  @@map("documents")
+}
+
+model Notification {
+  id         String   @id @default(cuid())
+  user_id    String
+  title      String
+  message    String
+  is_read    Boolean  @default(false)
+  created_at DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id], name: "idx_notifications_user_id")
+  @@map("notifications")
+}
+
+model Setting {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       String
+  description String?
+  updated_at  DateTime @updatedAt
+
+  @@map("settings")
+}
