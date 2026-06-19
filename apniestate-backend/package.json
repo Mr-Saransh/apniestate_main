@@ -9,7 +9,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "vercel-build": "prisma generate && tsc && prisma db push && tsx prisma/seed.ts"
+    "vercel-build": "prisma generate && prisma db push && next build"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1070.0",
