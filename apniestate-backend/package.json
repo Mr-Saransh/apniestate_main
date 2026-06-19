@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
     "vercel-build": "prisma generate && tsc && prisma db push && tsx prisma/seed.ts"
   },
   "dependencies": {
