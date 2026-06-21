@@ -1,43 +1,55 @@
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import {
   LayoutDashboard,
   FolderKanban,
   MapPin,
   ClipboardList,
-  Wallet,
+  UserCheck,
+  Package,
+  Boxes,
   Truck,
-  Users,
-  FileBarChart,
+  Wallet,
   FileText,
-  MessageSquare,
+  BarChart3,
   Settings,
   LogOut,
   Building2,
 } from 'lucide-react';
 
-interface SidebarProps {
-  collapsed: boolean;
-  onToggle: () => void;
-}
-
-const navItems = [
+const mainNav = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/projects', icon: FolderKanban, label: 'Projects' },
-  { to: '/site-management', icon: MapPin, label: 'Site Management' },
+  { to: '/sites', icon: MapPin, label: 'Sites' },
   { to: '/tasks', icon: ClipboardList, label: 'Tasks' },
-  { to: '/finance', icon: Wallet, label: 'Finance' },
+  { to: '/attendance', icon: UserCheck, label: 'Attendance' },
+];
+
+const managementNav = [
+  { to: '/inventory', icon: Package, label: 'Inventory' },
+  { to: '/materials', icon: Boxes, label: 'Materials' },
   { to: '/vendors', icon: Truck, label: 'Vendors' },
-  { to: '/clients', icon: Users, label: 'Clients' },
-  { to: '/reports', icon: FileBarChart, label: 'Reports' },
+];
+
+const financeNav = [
+  { to: '/finance', icon: Wallet, label: 'Finance' },
   { to: '/documents', icon: FileText, label: 'Documents' },
-  { to: '/messages', icon: MessageSquare, label: 'Messages' },
+  { to: '/reports', icon: BarChart3, label: 'Reports' },
+];
+
+const adminNav = [
   { to: '/settings', icon: Settings, label: 'Settings' },
 ];
 
-export default function Sidebar({ collapsed }: SidebarProps) {
+const navSections = [
+  { label: 'Main', items: mainNav },
+  { label: 'Management', items: managementNav },
+  { label: 'Finance', items: financeNav },
+  { label: 'Admin', items: adminNav },
+];
+
+export default function Sidebar() {
   const { user, logout } = useAuth();
-  const location = useLocation();
 
   const getInitials = (name: string) =>
     name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
@@ -46,11 +58,11 @@ export default function Sidebar({ collapsed }: SidebarProps) {
     role.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
   return (
-    <aside className={`sidebar ${collapsed ? 'collapsed' : ''}`}>
+    <aside className="sidebar" id="desktop-sidebar">
       {/* Brand */}
       <div className="sidebar-brand">
         <div className="sidebar-logo">
-          <Building2 size={22} />
+          <Building2 size={20} />
         </div>
         <div className="sidebar-brand-text">
           <span className="sidebar-brand-name">APNI ESTATE</span>
@@ -60,20 +72,25 @@ export default function Sidebar({ collapsed }: SidebarProps) {
 
       {/* Navigation */}
       <nav className="sidebar-nav">
-        {navItems.map(({ to, icon: Icon, label }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={to === '/'}
-            className={({ isActive }) =>
-              `sidebar-link ${isActive ? 'active' : ''}`
-            }
-          >
-            <span className="sidebar-link-icon">
-              <Icon size={20} />
-            </span>
-            <span>{label}</span>
-          </NavLink>
+        {navSections.map((section) => (
+          <div key={section.label}>
+            <div className="sidebar-section-label">{section.label}</div>
+            {section.items.map(({ to, icon: Icon, label }) => (
+              <NavLink
+                key={to}
+                to={to}
+                end={to === '/'}
+                className={({ isActive }) =>
+                  `sidebar-link ${isActive ? 'active' : ''}`
+                }
+              >
+                <span className="sidebar-link-icon">
+                  <Icon size={20} />
+                </span>
+                <span className="sidebar-link-text">{label}</span>
+              </NavLink>
+            ))}
+          </div>
         ))}
       </nav>
 
@@ -89,7 +106,7 @@ export default function Sidebar({ collapsed }: SidebarProps) {
               {user ? formatRole(user.role) : ''}
             </div>
           </div>
-          <LogOut size={16} style={{ opacity: 0.6, flexShrink: 0 }} />
+          <LogOut size={16} style={{ opacity: 0.5, flexShrink: 0 }} className="sidebar-link-text" />
         </div>
       </div>
     </aside>

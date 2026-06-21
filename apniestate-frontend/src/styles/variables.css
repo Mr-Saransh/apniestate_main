@@ -1,102 +1,143 @@
 /* ============================================
    APNI ESTATE — Design System Variables
-   Theme: Royal Obsidian & Teal
+   Theme: Premium Blue + Royal Yellow
+   Mobile-first, Outdoor-optimized
    ============================================ */
 
 :root {
-  /* ── Primary Colors ── */
-  --color-primary: #0A2091;
-  --color-primary-light: #1A3BC7;
-  --color-primary-dark: #061460;
-  --color-primary-50: rgba(10, 32, 145, 0.05);
-  --color-primary-100: rgba(10, 32, 145, 0.1);
-  --color-primary-200: rgba(10, 32, 145, 0.2);
+  /* ── Primary Colors (Premium Blue) ── */
+  --color-primary: #1B6EF3;
+  --color-primary-light: #4A90F7;
+  --color-primary-dark: #0B4FCC;
+  --color-primary-50: rgba(27, 110, 243, 0.05);
+  --color-primary-100: rgba(27, 110, 243, 0.10);
+  --color-primary-200: rgba(27, 110, 243, 0.18);
+  --color-primary-hover: #1560D9;
 
-  /* ── Secondary Colors ── */
-  --color-secondary: #004D40;
-  --color-secondary-light: #00695C;
-  --color-secondary-dark: #00332A;
-
-  /* ── Accent / Gold ── */
-  --color-accent: #C5A04E;
-  --color-accent-light: #D4B76A;
-  --color-accent-dark: #A68635;
+  /* ── CTA / Accent (Royal Yellow) ── */
+  --color-cta: #F59E0B;
+  --color-cta-light: #FBBF24;
+  --color-cta-dark: #D97706;
+  --color-cta-text: #1A1A2E;
+  --color-cta-50: rgba(245, 158, 11, 0.08);
+  --color-cta-hover: #E09000;
 
   /* ── Neutrals ── */
-  --color-bg: #F5F6FA;
+  --color-bg: #F8FAFC;
+  --color-bg-warm: #F1F5F9;
   --color-surface: #FFFFFF;
-  --color-surface-hover: #F0F1F5;
-  --color-border: #E2E4EA;
-  --color-border-light: #EDEEF2;
-  --color-text: #1A1A2E;
-  --color-text-secondary: #6B7280;
-  --color-text-muted: #9CA3AF;
+  --color-surface-hover: #F1F5F9;
+  --color-surface-active: #E2E8F0;
+  --color-border: #E2E8F0;
+  --color-border-light: #F1F5F9;
+  --color-text: #0F172A;
+  --color-text-secondary: #475569;
+  --color-text-muted: #94A3B8;
+  --color-text-inverse: #FFFFFF;
 
   /* ── Status Colors ── */
   --color-success: #059669;
+  --color-success-light: #10B981;
   --color-success-bg: #ECFDF5;
   --color-warning: #D97706;
+  --color-warning-light: #F59E0B;
   --color-warning-bg: #FFFBEB;
   --color-danger: #DC2626;
+  --color-danger-light: #EF4444;
   --color-danger-bg: #FEF2F2;
-  --color-info: #2563EB;
-  --color-info-bg: #EFF6FF;
+  --color-info: #0EA5E9;
+  --color-info-light: #38BDF8;
+  --color-info-bg: #F0F9FF;
 
-  /* ── Typography ── */
-  --font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-size-xs: 0.75rem;
-  --font-size-sm: 0.8125rem;
-  --font-size-base: 0.875rem;
-  --font-size-md: 1rem;
-  --font-size-lg: 1.125rem;
-  --font-size-xl: 1.25rem;
-  --font-size-2xl: 1.5rem;
-  --font-size-3xl: 1.875rem;
-  --font-size-4xl: 2.25rem;
+  /* ── Typography (Outdoor-optimized) ── */
+  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 
-  --font-weight-light: 300;
+  /* Mobile-first sizes (larger for outdoor readability) */
+  --font-size-xs: 0.8125rem;   /* 13px */
+  --font-size-sm: 0.875rem;    /* 14px */
+  --font-size-base: 1rem;      /* 16px */
+  --font-size-md: 1.125rem;    /* 18px */
+  --font-size-lg: 1.25rem;     /* 20px */
+  --font-size-xl: 1.5rem;      /* 24px */
+  --font-size-2xl: 1.75rem;    /* 28px */
+  --font-size-3xl: 2rem;       /* 32px */
+  --font-size-4xl: 2.5rem;     /* 40px */
+
   --font-weight-regular: 400;
   --font-weight-medium: 500;
   --font-weight-semibold: 600;
   --font-weight-bold: 700;
 
-  --line-height-tight: 1.25;
+  --line-height-tight: 1.2;
   --line-height-normal: 1.5;
-  --line-height-relaxed: 1.75;
+  --line-height-relaxed: 1.7;
 
   /* ── Spacing ── */
-  --space-1: 0.25rem;
-  --space-2: 0.5rem;
-  --space-3: 0.75rem;
-  --space-4: 1rem;
-  --space-5: 1.25rem;
-  --space-6: 1.5rem;
-  --space-8: 2rem;
-  --space-10: 2.5rem;
-  --space-12: 3rem;
-  --space-16: 4rem;
+  --space-1: 0.25rem;    /* 4px */
+  --space-2: 0.5rem;     /* 8px */
+  --space-3: 0.75rem;    /* 12px */
+  --space-4: 1rem;       /* 16px */
+  --space-5: 1.25rem;    /* 20px */
+  --space-6: 1.5rem;     /* 24px */
+  --space-8: 2rem;       /* 32px */
+  --space-10: 2.5rem;    /* 40px */
+  --space-12: 3rem;      /* 48px */
+  --space-16: 4rem;      /* 64px */
+  --space-20: 5rem;      /* 80px */
+
+  /* ── Touch & Interaction ── */
+  --touch-target-min: 48px;
+  --touch-target-lg: 56px;
 
   /* ── Borders & Radius ── */
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
   --radius-full: 9999px;
 
   /* ── Shadows ── */
   --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
-  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.10);
+  --shadow-xl: 0 16px 40px rgba(0, 0, 0, 0.12);
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(0, 0, 0, 0.02);
+  --shadow-card-hover: 0 4px 16px rgba(27, 110, 243, 0.10);
+  --shadow-bottom-nav: 0 -2px 12px rgba(0, 0, 0, 0.08);
+  --shadow-fab: 0 4px 16px rgba(245, 158, 11, 0.35);
 
   /* ── Transitions ── */
   --transition-fast: 150ms ease;
   --transition-base: 250ms ease;
   --transition-slow: 350ms ease;
+  --transition-spring: 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
 
   /* ── Layout ── */
-  --sidebar-width: 260px;
+  --sidebar-width: 240px;
   --sidebar-collapsed-width: 72px;
   --topbar-height: 64px;
+  --bottom-nav-height: 72px;
+  --mobile-header-height: 56px;
+  --page-max-width: 1200px;
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-top: env(safe-area-inset-top, 0px);
+
+  /* ── Z-Index Scale ── */
+  --z-base: 1;
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-overlay: 500;
+  --z-modal: 1000;
+  --z-toast: 2000;
+
+  /* ── Premium Tactile 3D Shadows & Colors ── */
+  --shadow-3d-sm: 0 2px 0 0 rgba(15, 23, 42, 0.05), 0 4px 6px -1px rgba(15, 23, 42, 0.06), inset 0 1px 0 0 rgba(255, 255, 255, 0.8);
+  --shadow-3d-md: 0 3px 0 0 rgba(27, 110, 243, 0.12), 0 6px 12px -2px rgba(15, 23, 42, 0.05), inset 0 1px 0 0 rgba(255, 255, 255, 0.9);
+  --shadow-3d-lg: 0 6px 0 0 rgba(15, 23, 42, 0.04), 0 12px 20px -4px rgba(15, 23, 42, 0.07), inset 0 1px 0 0 rgba(255, 255, 255, 0.9), inset 0 -1px 0 0 rgba(0, 0, 0, 0.03);
+  --shadow-3d-active: 0 1px 0 0 rgba(15, 23, 42, 0.04), 0 2px 4px -1px rgba(15, 23, 42, 0.03), inset 0 1px 0 0 rgba(255, 255, 255, 0.6);
+  --color-border-3d: rgba(255, 255, 255, 0.6);
+  --glass-bg: rgba(255, 255, 255, 0.75);
+  --glass-border: rgba(255, 255, 255, 0.4);
 }

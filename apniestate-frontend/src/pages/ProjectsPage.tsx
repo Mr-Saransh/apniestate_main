@@ -7,11 +7,14 @@ import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import EmptyState from '@/components/shared/EmptyState';
 import { Plus, FolderKanban, Search, MapPin, Calendar } from 'lucide-react';
 
+const statusFilters = ['All', 'Active', 'Planning', 'On Hold', 'Completed'];
+
 export default function ProjectsPage() {
   const navigate = useNavigate();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeFilter, setActiveFilter] = useState('All');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [creating, setCreating] = useState(false);
 
@@ -71,11 +74,13 @@ export default function ProjectsPage() {
     setFormError('');
   };
 
-  const filtered = projects.filter(
-    (p) =>
-      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.description?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filtered = projects.filter((p) => {
+    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.description?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesFilter = activeFilter === 'All' ||
+      p.status === activeFilter.toUpperCase().replace(' ', '_');
+    return matchesSearch && matchesFilter;
+  });
 
   if (loading) return <LoadingSpinner size="lg" />;
 
@@ -86,22 +91,14 @@ export default function ProjectsPage() {
         <div>
           <h1 className="page-title">Projects</h1>
           <p className="page-subtitle">
-            Manage and track all your construction projects
+            {projects.length} {projects.length === 1 ? 'project' : 'projects'} total
           </p>
         </div>
-        <button
-          className="btn btn-primary"
-          onClick={() => setShowCreateModal(true)}
-          id="create-project-btn"
-        >
-          <Plus size={18} />
-          New Project
-        </button>
       </div>
 
-      {/* Search Bar */}
+      {/* Search */}
       {projects.length > 0 && (
-        <div style={{ marginBottom: 'var(--space-5)', maxWidth: 400 }}>
+        <div style={{ marginBottom: 'var(--space-4)' }}>
           <div className="search-input-wrapper">
             <Search size={18} className="search-icon" />
             <input
@@ -116,20 +113,35 @@ export default function ProjectsPage() {
         </div>
       )}
 
-      {/* Projects Grid */}
+      {/* Filter Chips */}
+      {projects.length > 0 && (
+        <div className="filter-bar" style={{ marginBottom: 'var(--space-5)' }}>
+          {statusFilters.map((filter) => (
+            <button
+              key={filter}
+              className={`filter-chip ${activeFilter === filter ? 'active' : ''}`}
+              onClick={() => setActiveFilter(filter)}
+            >
+              {filter}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Projects List */}
       {filtered.length === 0 ? (
         <EmptyState
           icon={<FolderKanban size={36} />}
-          title={searchQuery ? 'No projects found' : 'No projects yet'}
+          title={searchQuery || activeFilter !== 'All' ? 'No projects found' : 'No projects yet'}
           description={
-            searchQuery
-              ? 'Try adjusting your search terms'
+            searchQuery || activeFilter !== 'All'
+              ? 'Try adjusting your search or filter'
               : 'Create your first project to get started'
           }
           action={
-            !searchQuery ? (
+            !searchQuery && activeFilter === 'All' ? (
               <button
-                className="btn btn-primary"
+                className="btn btn-cta"
                 onClick={() => setShowCreateModal(true)}
               >
                 <Plus size={18} />
@@ -139,63 +151,52 @@ export default function ProjectsPage() {
           }
         />
       ) : (
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
-            gap: 'var(--space-5)',
-          }}
-        >
-          {filtered.map((project) => (
+        <div className="card" style={{ overflow: 'hidden' }}>
+          {filtered.map((project, idx) => (
             <div
               key={project.id}
-              className="card"
+              className="list-card"
               onClick={() => navigate(`/projects/${project.id}`)}
-              style={{ cursor: 'pointer' }}
+              id={`project-${idx}`}
             >
-              <div className="card-body">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-3)' }}>
-                  <h3 style={{ fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-semibold)' }}>
-                    {project.name}
-                  </h3>
-                  <StatusBadge status={project.status} />
+              <div
+                className="list-card-icon"
+                style={{
+                  background: getProjectColor(project.status).bg,
+                  color: getProjectColor(project.status).color,
+                }}
+              >
+                <FolderKanban size={20} />
+              </div>
+              <div className="list-card-content">
+                <div className="list-card-title">{project.name}</div>
+                <div className="list-card-subtitle">
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <MapPin size={12} /> {project._count?.sites || 0} sites
+                  </span>
+                  <span style={{ margin: '0 6px', opacity: 0.4 }}>·</span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <Calendar size={12} /> {formatDate(project.start_date)}
+                  </span>
                 </div>
-
-                {project.description && (
-                  <p style={{
-                    fontSize: 'var(--font-size-sm)',
-                    color: 'var(--color-text-secondary)',
-                    marginBottom: 'var(--space-4)',
-                    display: '-webkit-box',
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: 'vertical',
-                    overflow: 'hidden',
-                  }}>
-                    {project.description}
-                  </p>
-                )}
-
-                <div style={{ display: 'flex', gap: 'var(--space-5)', marginTop: 'var(--space-3)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)' }}>
-                    <MapPin size={14} />
-                    <span>{project._count?.sites || 0} sites</span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)' }}>
-                    <Calendar size={14} />
-                    <span>
-                      {new Date(project.start_date).toLocaleDateString('en-GB', {
-                        day: 'numeric',
-                        month: 'short',
-                        year: 'numeric',
-                      })}
-                    </span>
-                  </div>
-                </div>
+              </div>
+              <div className="list-card-meta">
+                <StatusBadge status={project.status} />
               </div>
             </div>
           ))}
         </div>
       )}
+
+      {/* FAB */}
+      <button
+        className="fab animate-pop-in"
+        onClick={() => setShowCreateModal(true)}
+        aria-label="Create Project"
+        id="fab-create-project"
+      >
+        <Plus size={24} />
+      </button>
 
       {/* Create Modal */}
       <Modal
@@ -204,14 +205,14 @@ export default function ProjectsPage() {
           setShowCreateModal(false);
           resetForm();
         }}
-        title="Create New Project"
+        title="New Project"
         footer={
           <>
-            <button className="btn btn-ghost" onClick={() => { setShowCreateModal(false); resetForm(); }}>
+            <button className="btn btn-secondary" onClick={() => { setShowCreateModal(false); resetForm(); }}>
               Cancel
             </button>
             <button
-              className="btn btn-primary"
+              className="btn btn-cta"
               onClick={handleCreate as any}
               disabled={creating || !formName || !formStartDate}
               id="submit-create-project"
@@ -221,7 +222,7 @@ export default function ProjectsPage() {
           </>
         }
       >
-        <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+        <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
           {formError && (
             <div className="login-error">
               <span>{formError}</span>
@@ -233,7 +234,7 @@ export default function ProjectsPage() {
               id="project-name"
               type="text"
               className="form-input"
-              placeholder="Enter project name"
+              placeholder="e.g., Green Valley Residency"
               value={formName}
               onChange={(e) => setFormName(e.target.value)}
               required
@@ -248,10 +249,10 @@ export default function ProjectsPage() {
               value={formDesc}
               onChange={(e) => setFormDesc(e.target.value)}
               rows={3}
-              style={{ resize: 'vertical' }}
+              style={{ resize: 'vertical', minHeight: '80px' }}
             />
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
+          <div className="grid-2">
             <div className="form-group">
               <label className="form-label" htmlFor="project-start">Start Date *</label>
               <input
@@ -291,4 +292,27 @@ export default function ProjectsPage() {
       </Modal>
     </div>
   );
+}
+
+function getProjectColor(status: string) {
+  switch (status) {
+    case 'ACTIVE':
+      return { color: 'var(--color-success)', bg: 'var(--color-success-bg)' };
+    case 'ON_HOLD':
+      return { color: 'var(--color-warning)', bg: 'var(--color-warning-bg)' };
+    case 'COMPLETED':
+      return { color: '#166534', bg: '#F0FDF4' };
+    case 'CANCELLED':
+      return { color: 'var(--color-danger)', bg: 'var(--color-danger-bg)' };
+    default:
+      return { color: 'var(--color-primary)', bg: 'var(--color-primary-50)' };
+  }
+}
+
+function formatDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
 }

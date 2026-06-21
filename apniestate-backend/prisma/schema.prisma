@@ -7,11 +7,14 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ─── Enums ───────────────────────────────────────────────
+
 enum Role {
   BUILDER
   SITE_SUPERVISOR
   ACCOUNTANT
   INVENTORY_MANAGER
+  PROJECT_MANAGER
 }
 
 enum ProjectStatus {
@@ -22,10 +25,47 @@ enum ProjectStatus {
   CANCELLED
 }
 
+enum SiteStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  ON_HOLD
+  COMPLETED
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+  BLOCKED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum MilestoneStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  DELAYED
+}
+
 enum MaterialRequestStatus {
   PENDING
   APPROVED
   REJECTED
+  DELIVERED
+}
+
+enum PurchaseRequestStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+  ORDERED
   DELIVERED
 }
 
@@ -36,25 +76,77 @@ enum EquipmentStatus {
   RETIRED
 }
 
-model User {
-  id            String    @id @default(cuid())
-  name          String
-  email         String    @unique
-  password_hash String
-  role          Role      @default(SITE_SUPERVISOR)
-  phone         String?
-  is_active     Boolean   @default(true)
-  created_at    DateTime  @default(now())
-  updated_at    DateTime  @updatedAt
+enum ExpenseStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  PAID
+}
 
-  projects       Project[]       @relation("BuilderProjects")
-  supervised     Site[]          @relation("SupervisorSites")
-  attendances    SiteAttendance[]
-  daily_reports  DailyReport[]
-  material_reqs  MaterialRequest[]
-  notifications  Notification[]
-  refresh_tokens RefreshToken[]
-  documents      Document[]
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  CHEQUE
+  UPI
+  OTHER
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum ChangeOrderStatus {
+  PROPOSED
+  APPROVED
+  REJECTED
+  IMPLEMENTED
+}
+
+enum InventoryTransactionType {
+  IN
+  OUT
+  ADJUST
+}
+
+// ─── Core Models ─────────────────────────────────────────
+
+model User {
+  id            String   @id @default(cuid())
+  name          String
+  email         String   @unique
+  password_hash String
+  role          Role     @default(SITE_SUPERVISOR)
+  phone         String?
+  is_active     Boolean  @default(true)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  projects          Project[]              @relation("BuilderProjects")
+  managed_projects  Project[]              @relation("ManagerProjects")
+  supervised        Site[]                 @relation("SupervisorSites")
+  attendances       SiteAttendance[]
+  daily_reports     DailyReport[]
+  material_reqs     MaterialRequest[]
+  notifications     Notification[]
+  refresh_tokens    RefreshToken[]
+  documents         Document[]
+  assigned_tasks    Task[]                 @relation("TaskAssignee")
+  created_tasks     Task[]                 @relation("TaskCreator")
+  expenses          Expense[]
+  activity_logs     ActivityLog[]
+  purchase_requests PurchaseRequest[]
+  inventory_txns    InventoryTransaction[]
 
   @@map("users")
 }
@@ -73,42 +165,142 @@ model RefreshToken {
   @@map("refresh_tokens")
 }
 
-model Project {
-  id          String        @id @default(cuid())
-  name        String
-  description String?
-  builder_id  String
-  status      ProjectStatus @default(PLANNING)
-  start_date  DateTime
-  end_date    DateTime?
-  created_at  DateTime      @default(now())
-  updated_at  DateTime      @updatedAt
+// ─── Projects & Sites ────────────────────────────────────
 
-  builder User   @relation("BuilderProjects", fields: [builder_id], references: [id])
-  sites   Site[]
+model Project {
+  id                  String        @id @default(cuid())
+  name                String
+  description         String?
+  builder_id          String
+  manager_id          String?
+  status              ProjectStatus @default(PLANNING)
+  start_date          DateTime
+  end_date            DateTime?
+  budget              Float?
+  actual_cost         Float?        @default(0)
+  progress_percentage Int?          @default(0)
+  address             String?
+  city                String?
+  created_at          DateTime      @default(now())
+  updated_at          DateTime      @updatedAt
+
+  builder       User          @relation("BuilderProjects", fields: [builder_id], references: [id])
+  manager       User?         @relation("ManagerProjects", fields: [manager_id], references: [id])
+  sites         Site[]
+  milestones    Milestone[]
+  change_orders ChangeOrder[]
 
   @@index([builder_id], name: "idx_projects_builder_id")
+  @@index([manager_id], name: "idx_projects_manager_id")
   @@map("projects")
 }
 
 model Site {
+  id                  String     @id @default(cuid())
+  project_id          String
+  name                String
+  location            String
+  supervisor_id       String?
+  status              SiteStatus @default(NOT_STARTED)
+  progress_percentage Int?       @default(0)
+  phase               String?
+  created_at          DateTime   @default(now())
+  updated_at          DateTime   @updatedAt
+
+  project       Project           @relation(fields: [project_id], references: [id])
+  supervisor    User?             @relation("SupervisorSites", fields: [supervisor_id], references: [id])
+  attendances   SiteAttendance[]
+  daily_reports DailyReport[]
+  material_reqs MaterialRequest[]
+  equipment     Equipment[]
+  tasks         Task[]
+  inventory     InventoryItem[]
+  expenses      Expense[]
+
+  @@index([project_id], name: "idx_sites_project_id")
+  @@index([supervisor_id], name: "idx_sites_supervisor_id")
+  @@map("sites")
+}
+
+// ─── Tasks & Milestones ──────────────────────────────────
+
+model Task {
+  id           String       @id @default(cuid())
+  title        String
+  description  String?
+  site_id      String?
+  assignee_id  String?
+  created_by   String
+  status       TaskStatus   @default(TODO)
+  priority     TaskPriority @default(MEDIUM)
+  due_date     DateTime?
+  completed_at DateTime?
+  created_at   DateTime     @default(now())
+  updated_at   DateTime     @updatedAt
+
+  site     Site? @relation(fields: [site_id], references: [id])
+  assignee User? @relation("TaskAssignee", fields: [assignee_id], references: [id])
+  creator  User  @relation("TaskCreator", fields: [created_by], references: [id])
+
+  @@index([site_id], name: "idx_tasks_site_id")
+  @@index([assignee_id], name: "idx_tasks_assignee_id")
+  @@index([status], name: "idx_tasks_status")
+  @@map("tasks")
+}
+
+model Milestone {
+  id          String          @id @default(cuid())
+  project_id  String
+  name        String
+  description String?
+  target_date DateTime
+  actual_date DateTime?
+  status      MilestoneStatus @default(PENDING)
+  created_at  DateTime        @default(now())
+  updated_at  DateTime        @updatedAt
+
+  project Project @relation(fields: [project_id], references: [id])
+
+  @@index([project_id], name: "idx_milestones_project_id")
+  @@map("milestones")
+}
+
+// ─── Workforce ───────────────────────────────────────────
+
+model Worker {
   id            String   @id @default(cuid())
-  project_id    String
   name          String
-  location      String
-  supervisor_id String?
+  phone         String?
+  trade         String
+  daily_rate    Float?
+  contractor_id String?
+  is_active     Boolean  @default(true)
   created_at    DateTime @default(now())
   updated_at    DateTime @updatedAt
 
-  project        Project          @relation(fields: [project_id], references: [id])
-  supervisor     User?            @relation("SupervisorSites", fields: [supervisor_id], references: [id])
-  attendances    SiteAttendance[]
-  daily_reports  DailyReport[]
-  material_reqs  MaterialRequest[]
-  equipment      Equipment[]
+  contractor  Contractor?        @relation(fields: [contractor_id], references: [id])
+  attendances WorkerAttendance[]
 
-  @@index([project_id], name: "idx_sites_project_id")
-  @@map("sites")
+  @@index([contractor_id], name: "idx_workers_contractor_id")
+  @@map("workers")
+}
+
+model Contractor {
+  id         String   @id @default(cuid())
+  name       String
+  company    String?
+  phone      String?
+  email      String?
+  trade      String?
+  address    String?
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  workers  Worker[]
+  payments Payment[]
+
+  @@map("contractors")
 }
 
 model SiteAttendance {
@@ -126,34 +318,40 @@ model SiteAttendance {
 
   @@index([site_id], name: "idx_attendances_site_id")
   @@index([worker_id], name: "idx_attendances_worker_id")
+  @@index([date], name: "idx_attendances_date")
   @@map("site_attendances")
 }
 
-model DailyReport {
-  id           String   @id @default(cuid())
-  site_id      String
-  submitted_by String
-  report_date  DateTime @db.Date
-  summary      String
-  weather      String?
-  created_at   DateTime @default(now())
-  updated_at   DateTime @updatedAt
+model WorkerAttendance {
+  id         String    @id @default(cuid())
+  worker_id  String
+  date       DateTime  @db.Date
+  present    Boolean   @default(false)
+  check_in   DateTime?
+  check_out  DateTime?
+  notes      String?
+  created_at DateTime  @default(now())
 
-  site      Site @relation(fields: [site_id], references: [id])
-  submitter User @relation(fields: [submitted_by], references: [id])
+  worker Worker @relation(fields: [worker_id], references: [id])
 
-  @@index([site_id], name: "idx_daily_reports_site_id")
-  @@map("daily_reports")
+  @@unique([worker_id, date])
+  @@index([date], name: "idx_worker_attendance_date")
+  @@map("worker_attendances")
 }
+
+// ─── Materials & Inventory ───────────────────────────────
 
 model Material {
   id          String   @id @default(cuid())
   name        String
   unit        String
   description String?
+  category    String?
   created_at  DateTime @default(now())
 
-  requests MaterialRequest[]
+  requests       MaterialRequest[]
+  inventory      InventoryItem[]
+  purchase_items PurchaseRequestItem[]
 
   @@map("materials")
 }
@@ -165,6 +363,7 @@ model MaterialRequest {
   quantity     Float
   status       MaterialRequestStatus @default(PENDING)
   requested_by String
+  approved_by  String?
   notes        String?
   created_at   DateTime              @default(now())
   updated_at   DateTime              @updatedAt
@@ -174,20 +373,93 @@ model MaterialRequest {
   requester User     @relation(fields: [requested_by], references: [id])
 
   @@index([site_id], name: "idx_material_requests_site_id")
+  @@index([status], name: "idx_material_requests_status")
   @@map("material_requests")
 }
 
+model InventoryItem {
+  id           String   @id @default(cuid())
+  material_id  String
+  site_id      String
+  quantity     Float    @default(0)
+  min_quantity Float    @default(0)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  material     Material               @relation(fields: [material_id], references: [id])
+  site         Site                   @relation(fields: [site_id], references: [id])
+  transactions InventoryTransaction[]
+
+  @@unique([material_id, site_id])
+  @@index([site_id], name: "idx_inventory_site_id")
+  @@map("inventory_items")
+}
+
+model InventoryTransaction {
+  id         String                   @id @default(cuid())
+  item_id    String
+  type       InventoryTransactionType
+  quantity   Float
+  notes      String?
+  user_id    String
+  created_at DateTime                 @default(now())
+
+  item InventoryItem @relation(fields: [item_id], references: [id])
+  user User          @relation(fields: [user_id], references: [id])
+
+  @@index([item_id], name: "idx_inv_txn_item_id")
+  @@map("inventory_transactions")
+}
+
+model PurchaseRequest {
+  id           String                @id @default(cuid())
+  site_id      String?
+  requested_by String
+  approved_by  String?
+  status       PurchaseRequestStatus @default(DRAFT)
+  total_amount Float?
+  notes        String?
+  created_at   DateTime              @default(now())
+  updated_at   DateTime              @updatedAt
+
+  requester User                  @relation(fields: [requested_by], references: [id])
+  items     PurchaseRequestItem[]
+
+  @@index([status], name: "idx_purchase_requests_status")
+  @@map("purchase_requests")
+}
+
+model PurchaseRequestItem {
+  id          String @id @default(cuid())
+  request_id  String
+  material_id String
+  quantity    Float
+  unit_price  Float?
+  total       Float?
+
+  request  PurchaseRequest @relation(fields: [request_id], references: [id], onDelete: Cascade)
+  material Material        @relation(fields: [material_id], references: [id])
+
+  @@map("purchase_request_items")
+}
+
+// ─── Vendors & Equipment ─────────────────────────────────
+
 model Vendor {
-  id             String    @id @default(cuid())
+  id             String   @id @default(cuid())
   name           String
   contact_person String?
   phone          String?
   email          String?
   address        String?
-  created_at     DateTime  @default(now())
-  updated_at     DateTime  @updatedAt
+  category       String?
+  is_active      Boolean  @default(true)
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
 
   equipment Equipment[]
+  invoices  Invoice[]
+  payments  Payment[]
 
   @@map("vendors")
 }
@@ -209,6 +481,75 @@ model Equipment {
   @@map("equipment")
 }
 
+// ─── Finance ─────────────────────────────────────────────
+
+model Expense {
+  id          String        @id @default(cuid())
+  amount      Float
+  category    String
+  description String?
+  site_id     String?
+  user_id     String
+  date        DateTime      @db.Date
+  receipt_url String?
+  status      ExpenseStatus @default(PENDING)
+  created_at  DateTime      @default(now())
+  updated_at  DateTime      @updatedAt
+
+  site Site? @relation(fields: [site_id], references: [id])
+  user User  @relation(fields: [user_id], references: [id])
+
+  @@index([site_id], name: "idx_expenses_site_id")
+  @@index([date], name: "idx_expenses_date")
+  @@map("expenses")
+}
+
+model Payment {
+  id            String        @id @default(cuid())
+  amount        Float
+  vendor_id     String?
+  contractor_id String?
+  invoice_id    String?
+  date          DateTime      @db.Date
+  method        PaymentMethod @default(BANK_TRANSFER)
+  status        PaymentStatus @default(PENDING)
+  reference     String?
+  notes         String?
+  created_at    DateTime      @default(now())
+  updated_at    DateTime      @updatedAt
+
+  vendor     Vendor?     @relation(fields: [vendor_id], references: [id])
+  contractor Contractor? @relation(fields: [contractor_id], references: [id])
+  invoice    Invoice?    @relation(fields: [invoice_id], references: [id])
+
+  @@index([vendor_id], name: "idx_payments_vendor_id")
+  @@index([date], name: "idx_payments_date")
+  @@map("payments")
+}
+
+model Invoice {
+  id         String        @id @default(cuid())
+  number     String        @unique
+  vendor_id  String
+  amount     Float
+  tax_amount Float?        @default(0)
+  total      Float
+  due_date   DateTime
+  status     InvoiceStatus @default(DRAFT)
+  notes      String?
+  created_at DateTime      @default(now())
+  updated_at DateTime      @updatedAt
+
+  vendor   Vendor    @relation(fields: [vendor_id], references: [id])
+  payments Payment[]
+
+  @@index([vendor_id], name: "idx_invoices_vendor_id")
+  @@index([status], name: "idx_invoices_status")
+  @@map("invoices")
+}
+
+// ─── Documents & Notifications ───────────────────────────
+
 model Document {
   id          String   @id @default(cuid())
   name        String
@@ -216,26 +557,92 @@ model Document {
   entity_type String
   entity_id   String
   uploaded_by String
+  category    String?
+  file_size   Int?
   created_at  DateTime @default(now())
 
   uploader User @relation(fields: [uploaded_by], references: [id])
 
+  @@index([entity_type, entity_id], name: "idx_documents_entity")
   @@map("documents")
 }
 
 model Notification {
-  id         String   @id @default(cuid())
-  user_id    String
-  title      String
-  message    String
-  is_read    Boolean  @default(false)
-  created_at DateTime @default(now())
+  id          String   @id @default(cuid())
+  user_id     String
+  title       String
+  message     String
+  type        String?
+  is_read     Boolean  @default(false)
+  entity_type String?
+  entity_id   String?
+  created_at  DateTime @default(now())
 
   user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@index([user_id], name: "idx_notifications_user_id")
+  @@index([is_read], name: "idx_notifications_is_read")
   @@map("notifications")
 }
+
+// ─── Reports & Change Orders ─────────────────────────────
+
+model DailyReport {
+  id            String   @id @default(cuid())
+  site_id       String
+  submitted_by  String
+  report_date   DateTime @db.Date
+  summary       String
+  weather       String?
+  workers_count Int?
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  site      Site @relation(fields: [site_id], references: [id])
+  submitter User @relation(fields: [submitted_by], references: [id])
+
+  @@index([site_id], name: "idx_daily_reports_site_id")
+  @@index([report_date], name: "idx_daily_reports_date")
+  @@map("daily_reports")
+}
+
+model ChangeOrder {
+  id              String            @id @default(cuid())
+  project_id      String
+  title           String
+  description     String
+  cost_impact     Float?
+  schedule_impact Int?
+  status          ChangeOrderStatus @default(PROPOSED)
+  created_at      DateTime          @default(now())
+  updated_at      DateTime          @updatedAt
+
+  project Project @relation(fields: [project_id], references: [id])
+
+  @@index([project_id], name: "idx_change_orders_project_id")
+  @@map("change_orders")
+}
+
+// ─── Activity Logging ────────────────────────────────────
+
+model ActivityLog {
+  id          String   @id @default(cuid())
+  user_id     String
+  entity_type String
+  entity_id   String
+  action      String
+  metadata    Json?
+  created_at  DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id])
+
+  @@index([entity_type, entity_id], name: "idx_activity_logs_entity")
+  @@index([user_id], name: "idx_activity_logs_user_id")
+  @@index([created_at], name: "idx_activity_logs_created_at")
+  @@map("activity_logs")
+}
+
+// ─── Settings ────────────────────────────────────────────
 
 model Setting {
   id          String   @id @default(cuid())

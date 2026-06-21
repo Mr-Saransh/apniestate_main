@@ -1,17 +1,19 @@
-import { useState } from 'react';
 import { Outlet, Navigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import { useIsDesktop } from '@/hooks/useMediaQuery';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
+import MobileHeader from './MobileHeader';
+import BottomNav from './BottomNav';
 
 export default function AppLayout() {
   const { isAuthenticated, isLoading } = useAuth();
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const isDesktop = useIsDesktop();
 
   if (isLoading) {
     return (
-      <div className="loading-page">
-        <div className="spinner" />
+      <div className="loading-page" style={{ minHeight: '100vh' }}>
+        <div className="spinner spinner-lg" />
       </div>
     );
   }
@@ -22,15 +24,18 @@ export default function AppLayout() {
 
   return (
     <div className="app-layout">
-      <Sidebar
-        collapsed={sidebarCollapsed}
-        onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-      />
-      <main className={`app-main ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
-        <Topbar
-          collapsed={sidebarCollapsed}
-          onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-        />
+      {isDesktop ? (
+        <>
+          <Sidebar />
+          <Topbar />
+        </>
+      ) : (
+        <>
+          <MobileHeader />
+          <BottomNav />
+        </>
+      )}
+      <main className="app-main">
         <div className="app-content">
           <Outlet />
         </div>

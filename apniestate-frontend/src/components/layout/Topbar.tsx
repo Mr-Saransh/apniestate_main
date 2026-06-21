@@ -1,13 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { Search, Bell, Menu, LogOut, User, ChevronDown } from 'lucide-react';
+import { Search, Bell, LogOut, User, ChevronDown } from 'lucide-react';
 
-interface TopbarProps {
-  collapsed: boolean;
-  onToggle: () => void;
-}
-
-export default function Topbar({ collapsed, onToggle }: TopbarProps) {
+export default function Topbar() {
   const { user, logout } = useAuth();
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -29,19 +24,15 @@ export default function Topbar({ collapsed, onToggle }: TopbarProps) {
     role.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
   return (
-    <header className={`topbar ${collapsed ? 'sidebar-collapsed' : ''}`}>
+    <header className="topbar" id="desktop-topbar">
       <div className="topbar-left">
-        <button className="topbar-toggle" onClick={onToggle} aria-label="Toggle sidebar">
-          <Menu size={20} />
-        </button>
-
         <div className="topbar-search">
           <div className="search-input-wrapper">
             <Search size={18} className="search-icon" />
             <input
               type="text"
               className="form-input"
-              placeholder="Search project, task, vendor..."
+              placeholder="Search projects, tasks, vendors..."
               id="global-search"
             />
           </div>
@@ -61,7 +52,7 @@ export default function Topbar({ collapsed, onToggle }: TopbarProps) {
               {user ? formatRole(user.role) : ''}
             </div>
           </div>
-          <div className="avatar">
+          <div className="avatar avatar-sm">
             {user ? getInitials(user.name) : '?'}
           </div>
           <ChevronDown size={16} style={{ color: 'var(--color-text-muted)' }} />

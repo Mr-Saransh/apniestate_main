@@ -3,10 +3,10 @@ import { verifyAccessToken } from "@/lib/jwt";
 import { unauthorized } from "@/lib/response";
 import type { JWTPayload } from "@/types";
 
-type RouteHandler = (req: NextRequest, user: JWTPayload) => Promise<Response>;
+type RouteHandler = (req: NextRequest, user: JWTPayload, context?: any) => Promise<Response>;
 
 export function withAuth(handler: RouteHandler) {
-  return async (req: NextRequest): Promise<Response> => {
+  return async (req: NextRequest, context?: any): Promise<Response> => {
     const authHeader = req.headers.get("authorization");
     const token = authHeader?.split(" ")[1];
     if (!token) return unauthorized();
@@ -14,6 +14,6 @@ export function withAuth(handler: RouteHandler) {
     const payload = verifyAccessToken(token);
     if (!payload) return unauthorized();
 
-    return handler(req, payload);
+    return handler(req, payload, context);
   };
 }

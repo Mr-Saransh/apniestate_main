@@ -5,9 +5,19 @@ import LoginPage from '@/pages/LoginPage';
 import DashboardPage from '@/pages/DashboardPage';
 import ProjectsPage from '@/pages/ProjectsPage';
 import ProjectDetailPage from '@/pages/ProjectDetailPage';
-import SiteManagementPage from '@/pages/SiteManagementPage';
+import TasksPage from '@/pages/TasksPage';
+import AttendancePage from '@/pages/AttendancePage';
+import InventoryPage from '@/pages/InventoryPage';
+import MorePage from '@/pages/MorePage';
+import NotificationsPage from '@/pages/NotificationsPage';
+import SettingsPage from '@/pages/SettingsPage';
 import UsersPage from '@/pages/UsersPage';
-import ComingSoonPage from '@/pages/ComingSoonPage';
+import SitesPage from '@/pages/SitesPage';
+import MaterialsPage from '@/pages/MaterialsPage';
+import FinancePage from '@/pages/FinancePage';
+import VendorsPage from '@/pages/VendorsPage';
+import DocumentsPage from '@/pages/DocumentsPage';
+import ReportsPage from '@/pages/ReportsPage';
 
 export default function App() {
   return (
@@ -22,16 +32,21 @@ export default function App() {
             <Route path="/" element={<DashboardPage />} />
             <Route path="/projects" element={<ProjectsPage />} />
             <Route path="/projects/:id" element={<ProjectDetailPage />} />
-            <Route path="/site-management" element={<SiteManagementPage />} />
+            <Route path="/tasks" element={<TasksPage />} />
+            <Route path="/attendance" element={<AttendancePage />} />
+            <Route path="/inventory" element={<InventoryPage />} />
+            <Route path="/more" element={<MorePage />} />
+            <Route path="/notifications" element={<NotificationsPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
             <Route path="/users" element={<UsersPage />} />
-            <Route path="/tasks" element={<ComingSoonPage pageKey="tasks" />} />
-            <Route path="/finance" element={<ComingSoonPage pageKey="finance" />} />
-            <Route path="/vendors" element={<ComingSoonPage pageKey="vendors" />} />
-            <Route path="/clients" element={<ComingSoonPage pageKey="clients" />} />
-            <Route path="/reports" element={<ComingSoonPage pageKey="reports" />} />
-            <Route path="/documents" element={<ComingSoonPage pageKey="documents" />} />
-            <Route path="/messages" element={<ComingSoonPage pageKey="messages" />} />
-            <Route path="/settings" element={<ComingSoonPage pageKey="settings" />} />
+
+            {/* Modules */}
+            <Route path="/sites" element={<SitesPage />} />
+            <Route path="/materials" element={<MaterialsPage />} />
+            <Route path="/finance" element={<FinancePage />} />
+            <Route path="/vendors" element={<VendorsPage />} />
+            <Route path="/documents" element={<DocumentsPage />} />
+            <Route path="/reports" element={<ReportsPage />} />
           </Route>
         </Routes>
       </BrowserRouter>

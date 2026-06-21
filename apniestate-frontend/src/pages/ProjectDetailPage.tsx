@@ -2,12 +2,18 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { projectsApi, type Project } from '@/api/projects';
 import StatusBadge from '@/components/shared/StatusBadge';
-import ProgressBar from '@/components/shared/ProgressBar';
-import StatCard from '@/components/shared/StatCard';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
-import { ArrowLeft, ClipboardList, MapPin, Users, ShieldAlert, Calendar, Wallet } from 'lucide-react';
+import {
+  ArrowLeft,
+  ClipboardList,
+  MapPin,
+  Users,
+  Calendar,
+  Wallet,
+  ChevronRight,
+} from 'lucide-react';
 
-const tabs = ['Overview', 'Tasks', 'Site Updates', 'Documents', 'Finance'];
+const tabs = ['Overview', 'Sites', 'Tasks', 'Materials', 'Finance'];
 
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -49,33 +55,35 @@ export default function ProjectDetailPage() {
 
   return (
     <div className="animate-fade-in">
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)', marginBottom: 'var(--space-6)' }}>
+      {/* Back + Header */}
+      <div style={{ marginBottom: 'var(--space-5)' }}>
         <button
-          className="btn btn-ghost btn-icon"
+          className="btn btn-ghost btn-sm"
           onClick={() => navigate('/projects')}
+          style={{ marginBottom: 'var(--space-3)', marginLeft: '-0.5rem' }}
           aria-label="Back to projects"
         >
-          <ArrowLeft size={20} />
+          <ArrowLeft size={18} />
+          Projects
         </button>
-        <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-            <h1 className="page-title" style={{ margin: 0 }}>{project.name}</h1>
-            <StatusBadge status={project.status} />
+
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 'var(--space-3)' }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
+              <h1 className="page-title" style={{ margin: 0 }}>{project.name}</h1>
+              <StatusBadge status={project.status} />
+            </div>
+            {project.description && (
+              <p className="page-subtitle" style={{ marginTop: 'var(--space-2)' }}>
+                {project.description}
+              </p>
+            )}
           </div>
-          {project.description && (
-            <p className="page-subtitle" style={{ marginTop: 'var(--space-1)' }}>
-              {project.description}
-            </p>
-          )}
         </div>
-        <button className="btn btn-outline" id="edit-project-btn">
-          Edit
-        </button>
       </div>
 
       {/* Tabs */}
-      <div className="tabs" style={{ marginBottom: 'var(--space-6)' }}>
+      <div className="tabs" style={{ marginBottom: 'var(--space-5)' }}>
         {tabs.map((tab) => (
           <button
             key={tab}
@@ -90,131 +98,85 @@ export default function ProjectDetailPage() {
       {/* Tab Content */}
       {activeTab === 'Overview' ? (
         <div className="animate-fade-in">
-          {/* Project Info */}
-          <div className="card" style={{ marginBottom: 'var(--space-6)' }}>
+          {/* Project Progress */}
+          <div className="card" style={{ marginBottom: 'var(--space-5)' }}>
             <div className="card-body">
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-5)' }}>
-                <div>
-                  <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', marginBottom: 'var(--space-1)' }}>
-                    Project Status
-                  </div>
-                  <StatusBadge status={project.status} />
-                </div>
-                <div>
-                  <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', marginBottom: 'var(--space-1)' }}>
-                    Start Date
-                  </div>
-                  <div style={{ fontWeight: 'var(--font-weight-medium)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                    <Calendar size={14} />
-                    {new Date(project.start_date).toLocaleDateString('en-GB', {
-                      day: 'numeric',
-                      month: 'short',
-                      year: 'numeric',
-                    })}
-                  </div>
-                </div>
-                <div>
-                  <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', marginBottom: 'var(--space-1)' }}>
-                    End Date
-                  </div>
-                  <div style={{ fontWeight: 'var(--font-weight-medium)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                    <Calendar size={14} />
-                    {project.end_date
-                      ? new Date(project.end_date).toLocaleDateString('en-GB', {
-                          day: 'numeric',
-                          month: 'short',
-                          year: 'numeric',
-                        })
-                      : 'Not set'}
-                  </div>
-                </div>
-                <div>
-                  <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', marginBottom: 'var(--space-1)' }}>
-                    Budget
-                  </div>
-                  <div style={{ fontWeight: 'var(--font-weight-medium)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                    <Wallet size={14} />
-                    PKR 12.5M
-                  </div>
-                </div>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: 'var(--space-3)',
+              }}>
+                <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', fontWeight: 'var(--font-weight-medium)' }}>
+                  Overall Progress
+                </span>
+                <span style={{ fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-primary)' }}>
+                  {progress}%
+                </span>
               </div>
-
-              <div style={{ marginTop: 'var(--space-6)' }}>
-                <ProgressBar value={progress} label="Overall Progress" />
+              <div className="progress-bar">
+                <div className="progress-bar-fill" style={{ width: `${progress}%` }} />
               </div>
             </div>
           </div>
 
-          {/* Stats */}
-          <div className="stats-grid">
-            <StatCard
-              icon={<ClipboardList size={22} />}
-              label="Tasks"
-              value="45/60"
-              subtitle="Completed"
-              color="var(--color-primary)"
+          {/* Info Cards */}
+          <div className="grid-2" style={{ marginBottom: 'var(--space-5)' }}>
+            <InfoCard
+              icon={<Calendar size={18} />}
+              label="Start Date"
+              value={new Date(project.start_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
             />
-            <StatCard
-              icon={<MapPin size={22} />}
-              label="Site Visits"
-              value={12}
-              subtitle="This Month"
-              color="var(--color-secondary)"
-              bgColor="rgba(0, 77, 64, 0.08)"
+            <InfoCard
+              icon={<Calendar size={18} />}
+              label="End Date"
+              value={project.end_date
+                ? new Date(project.end_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+                : 'Not set'
+              }
             />
-            <StatCard
-              icon={<Users size={22} />}
-              label="Labour"
-              value={128}
-              subtitle="On Site"
-              color="var(--color-accent)"
-              bgColor="rgba(197, 160, 78, 0.08)"
-            />
-            <StatCard
-              icon={<ShieldAlert size={22} />}
-              label="Safety Incidents"
-              value="02"
-              subtitle="This Month"
-              color="var(--color-danger)"
-              bgColor="var(--color-danger-bg)"
-            />
+            <InfoCard icon={<MapPin size={18} />} label="Sites" value={`${project._count?.sites || project.sites?.length || 0} sites`} />
+            <InfoCard icon={<Wallet size={18} />} label="Budget" value="PKR 12.5M" />
           </div>
 
-          {/* Sites */}
-          {project.sites && project.sites.length > 0 && (
-            <div className="card">
-              <div className="card-header">
-                <h3 style={{ fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-semibold)' }}>
-                  Project Sites
-                </h3>
+          {/* Stats Row */}
+          <div className="grid-2" style={{ marginBottom: 'var(--space-5)' }}>
+            <div className="stat-card">
+              <div className="stat-card-icon" style={{ background: 'var(--color-primary-50)', color: 'var(--color-primary)' }}>
+                <ClipboardList size={20} />
               </div>
-              <div className="card-body" style={{ padding: 0 }}>
-                <div className="table-container" style={{ border: 'none' }}>
-                  <table className="table">
-                    <thead>
-                      <tr>
-                        <th>Site Name</th>
-                        <th>Location</th>
-                        <th>Created</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {project.sites.map((site) => (
-                        <tr key={site.id}>
-                          <td style={{ fontWeight: 'var(--font-weight-medium)' }}>{site.name}</td>
-                          <td style={{ color: 'var(--color-text-secondary)' }}>{site.location}</td>
-                          <td style={{ color: 'var(--color-text-muted)' }}>
-                            {new Date(site.created_at).toLocaleDateString('en-GB', {
-                              day: 'numeric',
-                              month: 'short',
-                              year: 'numeric',
-                            })}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+              <div className="stat-card-value">45</div>
+              <div className="stat-card-label">Total Tasks</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-card-icon" style={{ background: 'var(--color-info-bg)', color: 'var(--color-info)' }}>
+                <Users size={20} />
+              </div>
+              <div className="stat-card-value">128</div>
+              <div className="stat-card-label">Workers</div>
+            </div>
+          </div>
+
+          {/* Sites List */}
+          {project.sites && project.sites.length > 0 && (
+            <div className="section">
+              <div className="section-title">Project Sites</div>
+              <div className="card" style={{ overflow: 'hidden' }}>
+                {project.sites.map((site) => (
+                  <div key={site.id} className="list-card" id={`site-${site.id}`}>
+                    <div className="list-card-icon" style={{
+                      background: 'var(--color-info-bg)',
+                      color: 'var(--color-info)',
+                    }}>
+                      <MapPin size={20} />
+                    </div>
+                    <div className="list-card-content">
+                      <div className="list-card-title">{site.name}</div>
+                      <div className="list-card-subtitle">{site.location}</div>
+                    </div>
+                    <ChevronRight size={18} style={{ color: 'var(--color-text-muted)', flexShrink: 0 }} />
+                  </div>
+                ))}
               </div>
             </div>
           )}
@@ -222,14 +184,35 @@ export default function ProjectDetailPage() {
       ) : (
         <div className="coming-soon" style={{ minHeight: '40vh' }}>
           <div className="coming-soon-icon">
-            <ClipboardList size={48} />
+            <ClipboardList size={40} />
           </div>
           <h2>{activeTab}</h2>
-          <p>
-            This section is coming soon. Your team is building this module — stay tuned!
-          </p>
+          <p>This section is coming soon. Your team is building this module — stay tuned!</p>
         </div>
       )}
+    </div>
+  );
+}
+
+function InfoCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="card">
+      <div className="card-body" style={{ padding: 'var(--space-4)' }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 'var(--space-2)',
+          color: 'var(--color-text-muted)',
+          fontSize: 'var(--font-size-sm)',
+          marginBottom: 'var(--space-2)',
+        }}>
+          {icon}
+          {label}
+        </div>
+        <div style={{ fontWeight: 'var(--font-weight-semibold)', fontSize: 'var(--font-size-base)' }}>
+          {value}
+        </div>
+      </div>
     </div>
   );
 }

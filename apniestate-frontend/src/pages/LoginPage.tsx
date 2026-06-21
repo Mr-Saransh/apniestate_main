@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { ApiError } from '@/api/client';
-import { Building2, Shield, Award, Sparkles, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { Building2, AlertCircle, Eye, EyeOff, CheckCircle2, ShieldCheck } from 'lucide-react';
 
 export default function LoginPage() {
   const { login, isAuthenticated, isLoading } = useAuth();
@@ -14,8 +14,8 @@ export default function LoginPage() {
 
   if (isLoading) {
     return (
-      <div className="loading-page" style={{ minHeight: '100vh' }}>
-        <div className="spinner" />
+      <div className="loading-page" style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
+        <div className="spinner spinner-lg" />
       </div>
     );
   }
@@ -44,62 +44,74 @@ export default function LoginPage() {
 
   return (
     <div className="login-page">
-      {/* Left — Brand Panel */}
-      <div className="login-brand">
+      {/* Hero / Brand Section */}
+      <div className="login-brand-premium">
         <div className="login-brand-content">
-          <div className="login-brand-logo">
-            <Building2 size={36} />
-          </div>
-          <h1>APNI ESTATE</h1>
-          <p>Creative Development Together</p>
-          <p style={{ marginTop: 'var(--space-4)', fontSize: 'var(--font-size-sm)', opacity: 0.6 }}>
-            Your all-in-one construction ERP platform for managing projects, sites, workforce, and finances — seamlessly.
-          </p>
-        </div>
+          <div>
+            <div className="login-brand-logo-wrap">
+              <Building2 size={32} color="#ffffff" />
+              <span className="login-brand-name">Apni Estate</span>
+            </div>
+            
+            <h1 className="login-hero-title">
+              Build your dreams <br/><span className="text-gradient">together.</span>
+            </h1>
+            <p className="login-hero-subtitle">
+              The easy-to-use construction manager built for builders, supervisors, and field teams.
+            </p>
 
-        <div className="login-features">
-          <div className="login-feature">
-            <div className="login-feature-icon">
-              <Shield size={22} />
+            <div className="login-features">
+              <div className="feature-item">
+                <CheckCircle2 size={18} className="feature-icon" />
+                <span>Easy daily updates from the site</span>
+              </div>
+              <div className="feature-item">
+                <CheckCircle2 size={18} className="feature-icon" />
+                <span>Simple workforce attendance logging</span>
+              </div>
+              <div className="feature-item">
+                <CheckCircle2 size={18} className="feature-icon" />
+                <span>Track materials and costs in one tap</span>
+              </div>
             </div>
-            <div className="login-feature-label">Trust &<br />Reliability</div>
           </div>
-          <div className="login-feature">
-            <div className="login-feature-icon">
-              <Award size={22} />
-            </div>
-            <div className="login-feature-label">Premium &<br />Quality</div>
-          </div>
-          <div className="login-feature">
-            <div className="login-feature-icon">
-              <Sparkles size={22} />
-            </div>
-            <div className="login-feature-label">Clean &<br />Modern</div>
+
+          <div className="trust-badge">
+            <ShieldCheck size={18} color="var(--color-success)" />
+            <span>Enterprise-grade security and reliability</span>
           </div>
         </div>
       </div>
 
-      {/* Right — Login Form */}
-      <div className="login-form-side">
-        <div className="login-form-container">
-          <h2 className="login-form-title">Welcome Back!</h2>
-          <p className="login-form-subtitle">Sign in to continue</p>
+      {/* Form Section */}
+      <div className="login-form-wrapper">
+        <div className="login-form-container animate-fade-in">
+          <div className="login-mobile-hero">
+            <img src="/images/premium_login_bg.png" alt="Premium Construction Management" className="login-mobile-hero-img" />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: 'var(--space-2)' }}>
+            <Building2 size={24} color="var(--color-primary)" />
+            <span style={{ fontWeight: 'var(--font-weight-bold)', fontSize: 'var(--font-size-md)' }}>Apni Estate</span>
+          </div>
+
+          <h2 className="login-form-title">Sign in to your account</h2>
+          <p className="login-form-subtitle">Enter your credentials to access your dashboard</p>
 
           {error && (
-            <div className="login-error" style={{ marginBottom: 'var(--space-5)' }}>
-              <AlertCircle size={16} />
+            <div className="login-error">
+              <AlertCircle size={18} />
               <span>{error}</span>
             </div>
           )}
 
           <form className="login-form" onSubmit={handleSubmit}>
             <div className="form-group">
-              <label className="form-label" htmlFor="login-email">Email</label>
+              <label className="form-label" htmlFor="login-email">Email Address</label>
               <input
                 id="login-email"
                 type="email"
-                className="form-input"
-                placeholder="Enter your email"
+                className="form-input premium-input"
+                placeholder="name@company.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -109,34 +121,25 @@ export default function LoginPage() {
             </div>
 
             <div className="form-group">
-              <label className="form-label" htmlFor="login-password">Password</label>
-              <div style={{ position: 'relative' }}>
+              <div className="form-label-row">
+                <label className="form-label" htmlFor="login-password">Password</label>
+                <a href="#" className="login-forgot">Forgot password?</a>
+              </div>
+              <div className="password-input-wrap">
                 <input
                   id="login-password"
                   type={showPassword ? 'text' : 'password'}
-                  className="form-input"
+                  className="form-input premium-input"
                   placeholder="Enter your password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   autoComplete="current-password"
-                  style={{ paddingRight: '2.75rem' }}
                 />
                 <button
                   type="button"
+                  className="password-toggle"
                   onClick={() => setShowPassword(!showPassword)}
-                  style={{
-                    position: 'absolute',
-                    right: '0.75rem',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    color: 'var(--color-text-muted)',
-                    padding: '0.25rem',
-                    display: 'flex',
-                  }}
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -144,34 +147,25 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <div className="login-options">
-              <label className="login-remember">
-                <input type="checkbox" />
-                <span>Remember me</span>
-              </label>
-              <a href="#" className="login-forgot">Forgot Password?</a>
-            </div>
-
             <button
               type="submit"
-              className="btn btn-primary btn-lg"
+              className="btn btn-primary btn-lg btn-full premium-submit"
               disabled={submitting}
               id="login-submit"
-              style={{ width: '100%', marginTop: 'var(--space-2)' }}
             >
               {submitting ? (
                 <>
                   <div className="spinner spinner-sm" style={{ borderTopColor: '#fff', borderColor: 'rgba(255,255,255,0.3)' }} />
-                  <span>Signing in...</span>
+                  <span>Authenticating...</span>
                 </>
               ) : (
-                'Login'
+                'Continue to Dashboard'
               )}
             </button>
           </form>
 
-          <div className="login-signup">
-            Don't have an account? <a href="#">Sign up</a>
+          <div className="login-footer">
+            <p>Don't have an account? <a href="#">Contact Support</a></p>
           </div>
         </div>
       </div>
