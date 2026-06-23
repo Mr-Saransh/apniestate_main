@@ -1,5 +1,5 @@
 import { useState, useEffect, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { projectsApi, type Project, type CreateProjectData } from '@/api/projects';
 import StatusBadge from '@/components/shared/StatusBadge';
 import Modal from '@/components/shared/Modal';
@@ -11,6 +11,7 @@ const statusFilters = ['All', 'Active', 'Planning', 'On Hold', 'Completed'];
 
 export default function ProjectsPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -24,7 +25,17 @@ export default function ProjectsPage() {
   const [formStartDate, setFormStartDate] = useState('');
   const [formEndDate, setFormEndDate] = useState('');
   const [formStatus, setFormStatus] = useState<Project['status']>('PLANNING');
+  const [formBudget, setFormBudget] = useState('');
+  const [formAddress, setFormAddress] = useState('');
+  const [formCity, setFormCity] = useState('');
   const [formError, setFormError] = useState('');
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('create') === 'true') {
+      setShowCreateModal(true);
+    }
+  }, [location]);
 
   const fetchProjects = async () => {
     try {
@@ -47,12 +58,15 @@ export default function ProjectsPage() {
     setCreating(true);
 
     try {
-      const data: CreateProjectData = {
+      const data: any = {
         name: formName,
         description: formDesc || undefined,
         start_date: new Date(formStartDate).toISOString(),
         end_date: formEndDate ? new Date(formEndDate).toISOString() : undefined,
         status: formStatus,
+        budget: formBudget ? parseFloat(formBudget) : undefined,
+        address: formAddress || undefined,
+        city: formCity || undefined,
       };
       await projectsApi.create(data);
       setShowCreateModal(false);
@@ -71,6 +85,9 @@ export default function ProjectsPage() {
     setFormStartDate('');
     setFormEndDate('');
     setFormStatus('PLANNING');
+    setFormBudget('');
+    setFormAddress('');
+    setFormCity('');
     setFormError('');
   };
 
@@ -188,15 +205,6 @@ export default function ProjectsPage() {
         </div>
       )}
 
-      {/* FAB */}
-      <button
-        className="fab animate-pop-in"
-        onClick={() => setShowCreateModal(true)}
-        aria-label="Create Project"
-        id="fab-create-project"
-      >
-        <Plus size={24} />
-      </button>
 
       {/* Create Modal */}
       <Modal
@@ -275,18 +283,55 @@ export default function ProjectsPage() {
               />
             </div>
           </div>
-          <div className="form-group">
-            <label className="form-label" htmlFor="project-status">Status</label>
-            <select
-              id="project-status"
-              className="form-input form-select"
-              value={formStatus}
-              onChange={(e) => setFormStatus(e.target.value as Project['status'])}
-            >
-              <option value="PLANNING">Planning</option>
-              <option value="ACTIVE">Active</option>
-              <option value="ON_HOLD">On Hold</option>
-            </select>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
+            <div className="form-group">
+              <label className="form-label" htmlFor="project-budget">Project Budget (₹)</label>
+              <input
+                id="project-budget"
+                type="number"
+                className="form-input"
+                placeholder="e.g. 5000000"
+                value={formBudget}
+                onChange={(e) => setFormBudget(e.target.value)}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label" htmlFor="project-status">Status</label>
+              <select
+                id="project-status"
+                className="form-input form-select"
+                value={formStatus}
+                onChange={(e) => setFormStatus(e.target.value as Project['status'])}
+              >
+                <option value="PLANNING">Planning</option>
+                <option value="ACTIVE">Active</option>
+                <option value="ON_HOLD">On Hold</option>
+              </select>
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 'var(--space-4)' }}>
+            <div className="form-group">
+              <label className="form-label" htmlFor="project-address">Site Address</label>
+              <input
+                id="project-address"
+                type="text"
+                className="form-input"
+                placeholder="e.g., 123 Construction St"
+                value={formAddress}
+                onChange={(e) => setFormAddress(e.target.value)}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label" htmlFor="project-city">City</label>
+              <input
+                id="project-city"
+                type="text"
+                className="form-input"
+                placeholder="e.g., Noida"
+                value={formCity}
+                onChange={(e) => setFormCity(e.target.value)}
+              />
+            </div>
           </div>
         </form>
       </Modal>

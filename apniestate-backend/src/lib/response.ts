@@ -18,9 +18,9 @@ export const unauthorized = () =>
     { status: 401 }
   );
 
-export const forbidden = () =>
+export const forbidden = (message = "Insufficient permissions") =>
   Response.json(
-    { success: false, error: { code: "FORBIDDEN", message: "Insufficient permissions" } },
+    { success: false, error: { code: "FORBIDDEN", message } },
     { status: 403 }
   );
 

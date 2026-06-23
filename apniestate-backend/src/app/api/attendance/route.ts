@@ -5,8 +5,11 @@ import { CreateAttendanceSchema } from "@/modules/attendance/attendance.schema";
 import { getAttendances, createAttendance } from "@/modules/attendance/attendance.service";
 import { ok, created } from "@/lib/response";
 
-export const GET = withAuth(async (_req, user) => {
-  const items = await getAttendances(user.sub);
+export const GET = withAuth(async (req, user) => {
+  const url = new URL(req.url);
+  const date = url.searchParams.get("date") || undefined;
+  const siteId = url.searchParams.get("site_id") || undefined;
+  const items = await getAttendances(user.sub, date, siteId);
   return ok(items);
 });
 

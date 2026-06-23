@@ -1,21 +1,120 @@
 import { prisma } from "@/lib/prisma";
 import type { CreateProjectInput, UpdateProjectInput } from "./projects.schema";
 
-export const getProjects = (builderId: string) =>
-  prisma.project.findMany({
-    where: { builder_id: builderId },
-    include: { _count: { select: { sites: true } } },
+function calculateProjectProgress(project: {
+  tasks: { status: string }[];
+  milestones: { status: string }[];
+}) {
+  const tasks = project.tasks || [];
+  if (tasks.length > 0) {
+    const completed = tasks.filter(t => t.status === "DONE").length;
+    return Math.round((completed / tasks.length) * 100);
+  }
+  const milestones = project.milestones || [];
+  if (milestones.length > 0) {
+    const completed = milestones.filter(m => m.status === "COMPLETED").length;
+    return Math.round((completed / milestones.length) * 100);
+  }
+  return 0;
+}
+
+export const getProjects = async (userId: string, role: string) => {
+  const where: any = {};
+
+  if (role === "BUILDER") {
+    where.builder_id = userId;
+  } else if (role === "PROJECT_MANAGER") {
+    where.manager_id = userId;
+  } else if (role === "SITE_SUPERVISOR") {
+    where.sites = {
+      some: {
+        supervisor_id: userId
+      }
+    };
+  }
+
+  const projects = await prisma.project.findMany({
+    where,
+    include: {
+      builder: { select: { id: true, name: true } },
+      manager: { select: { id: true, name: true } },
+      sites: {
+        include: {
+          supervisor: { select: { id: true, name: true } }
+        }
+      },
+      tasks: { select: { status: true } },
+      milestones: { select: { status: true } },
+      _count: { select: { sites: true, tasks: true, milestones: true } }
+    },
     orderBy: { created_at: "desc" },
   });
 
-export const getProjectById = (id: string) =>
-  prisma.project.findUnique({ where: { id }, include: { sites: true } });
+  return projects.map(p => {
+    const progress_percentage = calculateProjectProgress(p);
+    return {
+      ...p,
+      progress_percentage,
+      tasks: undefined,
+      milestones: undefined
+    };
+  });
+};
 
-export const createProject = (data: CreateProjectInput, builderId: string) =>
-  prisma.project.create({ data: { ...data, builder_id: builderId } });
+export const getProjectById = async (id: string) => {
+  const project = await prisma.project.findUnique({
+    where: { id },
+    include: {
+      builder: { select: { id: true, name: true, email: true, phone: true } },
+      manager: { select: { id: true, name: true, email: true, phone: true } },
+      sites: {
+        include: {
+          supervisor: { select: { id: true, name: true } }
+        }
+      },
+      milestones: {
+        orderBy: { target_date: 'asc' }
+      },
+      tasks: {
+        include: {
+          assignee: { select: { id: true, name: true } }
+        }
+      },
+      budgets: true,
+      _count: { select: { sites: true, tasks: true, milestones: true, workers: true } }
+    }
+  });
 
-export const updateProject = (id: string, data: UpdateProjectInput) =>
-  prisma.project.update({ where: { id }, data });
+  if (!project) return null;
+
+  const progress_percentage = calculateProjectProgress(project);
+
+  return {
+    ...project,
+    progress_percentage,
+  };
+};
+
+export const createProject = (data: CreateProjectInput, builderId: string) => {
+  const { start_date, end_date, ...rest } = data;
+  return prisma.project.create({
+    data: {
+      ...rest,
+      builder_id: builderId,
+      start_date: new Date(start_date),
+      end_date: end_date ? new Date(end_date) : null,
+    }
+  });
+};
+
+export const updateProject = (id: string, data: UpdateProjectInput) => {
+  const { start_date, end_date, ...rest } = data;
+  const updateData: any = { ...rest };
+  if (start_date) updateData.start_date = new Date(start_date);
+  if (end_date !== undefined) updateData.end_date = end_date ? new Date(end_date) : null;
+  return prisma.project.update({ where: { id }, data: updateData });
+};
 
 export const deleteProject = (id: string) =>
   prisma.project.delete({ where: { id } });
+

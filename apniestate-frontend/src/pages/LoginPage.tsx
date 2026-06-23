@@ -1,14 +1,16 @@
 import { useState, type FormEvent } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { ApiError } from '@/api/client';
-import { Building2, AlertCircle, Eye, EyeOff, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { Building2, AlertCircle, Eye, EyeOff, ShieldCheck, MapPin, TrendingUp, Users } from 'lucide-react';
+import '@/styles/login.css';
 
 export default function LoginPage() {
   const { login, isAuthenticated, isLoading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -21,7 +23,7 @@ export default function LoginPage() {
   }
 
   if (isAuthenticated) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/dashboard" replace />;
   }
 
   const handleSubmit = async (e: FormEvent) => {
@@ -43,129 +45,135 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="login-page">
-      {/* Hero / Brand Section */}
-      <div className="login-brand-premium">
-        <div className="login-brand-content">
-          <div>
-            <div className="login-brand-logo-wrap">
-              <Building2 size={32} color="#ffffff" />
-              <span className="login-brand-name">Apni Estate</span>
-            </div>
-            
-            <h1 className="login-hero-title">
-              Build your dreams <br/><span className="text-gradient">together.</span>
-            </h1>
-            <p className="login-hero-subtitle">
-              The easy-to-use construction manager built for builders, supervisors, and field teams.
-            </p>
-
-            <div className="login-features">
-              <div className="feature-item">
-                <CheckCircle2 size={18} className="feature-icon" />
-                <span>Easy daily updates from the site</span>
+    <div className="login-page-premium">
+      <div className="login-container">
+        <div className="login-card">
+          {/* Left Branding Side */}
+          <div className="login-left">
+            <div className="login-left-content">
+              {/* Image area */}
+              <div className="login-image-container">
+                <div className="login-image-overlay"></div>
+                {/* You can put an actual img here, using a placeholder gradient for now */}
+                <div className="login-placeholder-img"></div>
               </div>
-              <div className="feature-item">
-                <CheckCircle2 size={18} className="feature-icon" />
-                <span>Simple workforce attendance logging</span>
-              </div>
-              <div className="feature-item">
-                <CheckCircle2 size={18} className="feature-icon" />
-                <span>Track materials and costs in one tap</span>
+              <div className="login-brand">
+                <Building2 size={48} color="var(--color-cta)" className="mb-2" />
+                <h1 className="login-brand-name">APNI ESTATE</h1>
+                <p className="login-brand-tagline">BUILDING TOMORROW, TOGETHER</p>
               </div>
             </div>
           </div>
 
-          <div className="trust-badge">
-            <ShieldCheck size={18} color="var(--color-success)" />
-            <span>Enterprise-grade security and reliability</span>
+          {/* Right Form Side */}
+          <div className="login-right">
+            <div className="login-form-content">
+              <h2>Welcome Back!</h2>
+              <p className="login-subtitle">Sign in to continue</p>
+
+              {error && (
+                <div className="login-error">
+                  <AlertCircle size={18} />
+                  <span>{error}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleSubmit}>
+                <div className="form-group">
+                  <label className="form-label" htmlFor="login-email">Email</label>
+                  <input
+                    id="login-email"
+                    type="email"
+                    className="form-input"
+                    placeholder="Enter your email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    autoComplete="email"
+                    autoFocus
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label" htmlFor="login-password">Password</label>
+                  <div className="password-input-wrap">
+                    <input
+                      id="login-password"
+                      type={showPassword ? 'text' : 'password'}
+                      className="form-input"
+                      placeholder="Enter your password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      autoComplete="current-password"
+                    />
+                    <button
+                      type="button"
+                      className="password-toggle"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="form-actions">
+                  <label className="checkbox-label">
+                    <input 
+                      type="checkbox" 
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                    />
+                    <span>Remember me</span>
+                  </label>
+                  <a href="#" className="forgot-password">Forgot Password?</a>
+                </div>
+
+                <button
+                  type="submit"
+                  className="btn btn-primary btn-full login-btn"
+                  disabled={submitting}
+                >
+                  {submitting ? 'Authenticating...' : 'Login'}
+                </button>
+              </form>
+
+              <div className="login-footer-links">
+                <p>Don't have an account? <Link to="/">Sign up</Link></p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Form Section */}
-      <div className="login-form-wrapper">
-        <div className="login-form-container animate-fade-in">
-          <div className="login-mobile-hero">
-            <img src="/images/premium_login_bg.png" alt="Premium Construction Management" className="login-mobile-hero-img" />
+      {/* Footer Trust Badges */}
+      <div className="login-footer-badges">
+        <div className="badge-item">
+          <ShieldCheck size={24} color="var(--color-cta)" />
+          <div>
+            <h4>Secure & Reliable</h4>
+            <p>Your data is safe with us</p>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: 'var(--space-2)' }}>
-            <Building2 size={24} color="var(--color-primary)" />
-            <span style={{ fontWeight: 'var(--font-weight-bold)', fontSize: 'var(--font-size-md)' }}>Apni Estate</span>
+        </div>
+        <div className="badge-item">
+          <MapPin size={24} color="var(--color-cta)" />
+          <div>
+            <h4>Project Control</h4>
+            <p>Track everything in real time</p>
           </div>
-
-          <h2 className="login-form-title">Sign in to your account</h2>
-          <p className="login-form-subtitle">Enter your credentials to access your dashboard</p>
-
-          {error && (
-            <div className="login-error">
-              <AlertCircle size={18} />
-              <span>{error}</span>
-            </div>
-          )}
-
-          <form className="login-form" onSubmit={handleSubmit}>
-            <div className="form-group">
-              <label className="form-label" htmlFor="login-email">Email Address</label>
-              <input
-                id="login-email"
-                type="email"
-                className="form-input premium-input"
-                placeholder="name@company.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                autoComplete="email"
-                autoFocus
-              />
-            </div>
-
-            <div className="form-group">
-              <div className="form-label-row">
-                <label className="form-label" htmlFor="login-password">Password</label>
-                <a href="#" className="login-forgot">Forgot password?</a>
-              </div>
-              <div className="password-input-wrap">
-                <input
-                  id="login-password"
-                  type={showPassword ? 'text' : 'password'}
-                  className="form-input premium-input"
-                  placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  autoComplete="current-password"
-                />
-                <button
-                  type="button"
-                  className="password-toggle"
-                  onClick={() => setShowPassword(!showPassword)}
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
-                >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              className="btn btn-primary btn-lg btn-full premium-submit"
-              disabled={submitting}
-              id="login-submit"
-            >
-              {submitting ? (
-                <>
-                  <div className="spinner spinner-sm" style={{ borderTopColor: '#fff', borderColor: 'rgba(255,255,255,0.3)' }} />
-                  <span>Authenticating...</span>
-                </>
-              ) : (
-                'Continue to Dashboard'
-              )}
-            </button>
-          </form>
-
-          <div className="login-footer">
-            <p>Don't have an account? <a href="#">Contact Support</a></p>
+        </div>
+        <div className="badge-item">
+          <TrendingUp size={24} color="var(--color-cta)" />
+          <div>
+            <h4>Cost Management</h4>
+            <p>Stay on budget, always</p>
+          </div>
+        </div>
+        <div className="badge-item">
+          <Users size={24} color="var(--color-cta)" />
+          <div>
+            <h4>Team Collaboration</h4>
+            <p>Work together, efficiently</p>
           </div>
         </div>
       </div>

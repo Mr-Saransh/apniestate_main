@@ -4,40 +4,46 @@ import {
   FolderKanban,
   ClipboardList,
   Package,
-  MoreHorizontal,
+  Menu,
 } from 'lucide-react';
 
 const navItems = [
-  { to: '/', icon: Home, label: 'Home' },
+  { to: '/dashboard', icon: Home, label: 'Home' },
   { to: '/projects', icon: FolderKanban, label: 'Projects' },
   { to: '/tasks', icon: ClipboardList, label: 'Work' },
   { to: '/inventory', icon: Package, label: 'Inventory' },
-  { to: '/more', icon: MoreHorizontal, label: 'More' },
+  { to: '/more', icon: Menu, label: 'Management' },
 ];
 
 export default function BottomNav() {
   const location = useLocation();
 
   const isActive = (path: string) => {
-    if (path === '/') return location.pathname === '/';
+    if (path === '/dashboard') return location.pathname === '/dashboard';
     return location.pathname.startsWith(path);
   };
 
   return (
-    <nav className="bottom-nav" id="bottom-nav">
-      {navItems.map(({ to, icon: Icon, label }) => (
-        <NavLink
-          key={to}
-          to={to}
-          className={`bottom-nav-item ${isActive(to) ? 'active' : ''}`}
-          end={to === '/'}
-        >
-          <span className="bottom-nav-icon">
-            <Icon size={22} strokeWidth={isActive(to) ? 2.5 : 2} />
-          </span>
-          <span className="bottom-nav-label">{label}</span>
-        </NavLink>
-      ))}
-    </nav>
+    <div className="bottom-nav-container">
+      <nav className="bottom-nav premium-bottom-nav" id="bottom-nav">
+        {navItems.map(({ to, icon: Icon, label }) => {
+          const active = isActive(to);
+          return (
+            <NavLink
+              key={to}
+              to={to}
+              className={`bottom-nav-item premium-nav-item ${active ? 'active' : ''}`}
+              end={to === '/dashboard'}
+            >
+              <span className="bottom-nav-icon">
+                <Icon size={24} strokeWidth={active ? 2.5 : 2} color={active ? "var(--color-primary)" : "var(--color-text-muted)"} />
+              </span>
+              <span className="bottom-nav-label">{label}</span>
+              {active && <span className="bottom-nav-indicator" />}
+            </NavLink>
+          );
+        })}
+      </nav>
+    </div>
   );
 }

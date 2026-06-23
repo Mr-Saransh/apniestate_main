@@ -25,6 +25,7 @@ interface Project {
 export default function SitesPage() {
   const [sites, setSites] = useState<Site[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -41,15 +42,16 @@ export default function SitesPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [sitesRes, projectsRes] = await Promise.all([
-          apiClient.get<Site[]>('/sites'),
-          apiClient.get<Project[]>('/projects')
-        ]);
+        const sitesRes = await apiClient.get<Site[]>('/sites').catch(() => ({ data: [] }));
+        const projectsRes = await apiClient.get<Project[]>('/projects').catch(() => ({ data: [] }));
+        const usersRes = await apiClient.get<any[]>('/users').catch(() => ({ data: [] }));
+        
         if (sitesRes.data) setSites(sitesRes.data);
         if (projectsRes.data) {
           setProjects(projectsRes.data);
           if (projectsRes.data.length > 0) setProjectId(projectsRes.data[0].id);
         }
+        if (usersRes.data) setUsers(usersRes.data);
       } catch (err) {
         console.error('Failed to load sites page data', err);
       } finally {
@@ -234,14 +236,21 @@ export default function SitesPage() {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
                 <div className="form-group">
-                  <label className="form-label">Supervisor ID</label>
-                  <input
-                    type="text"
-                    className="form-input premium-input"
-                    placeholder="User CUID (optional)"
+                  <label className="form-label">Supervisor</label>
+                  <select
+                    className="form-input premium-input form-select"
                     value={supervisorId}
                     onChange={e => setSupervisorId(e.target.value)}
-                  />
+                  >
+                    <option value="">Select Supervisor...</option>
+                    {users
+                      .filter(u => ['SITE_SUPERVISOR', 'PROJECT_MANAGER'].includes(u.role))
+                      .map(u => (
+                        <option key={u.id} value={u.id}>
+                          {u.name} ({u.role.replace(/_/g, ' ')})
+                        </option>
+                      ))}
+                  </select>
                 </div>
                 <div className="form-group">
                   <label className="form-label">Current Phase</label>

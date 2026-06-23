@@ -1,8 +1,21 @@
 import { useState, useEffect, type FormEvent } from 'react';
-import { Wallet, Plus, Loader2, Sparkles, TrendingUp, Calendar, Tag, MapPin, DollarSign } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { Wallet, Plus, Calendar, Tag, MapPin, DollarSign, TrendingUp } from 'lucide-react';
 import { apiClient } from '@/api/client';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
-import EmptyState from '@/components/shared/EmptyState';
+import Modal from '@/components/shared/Modal';
+import {
+  PrimaryCard,
+  SecondaryCard,
+  StatCard,
+  EmptyState,
+  Badge,
+  Button,
+  Input,
+  Select,
+  TextArea
+} from '@/components/design-system';
+import PieChart from '@/components/charts/PieChart';
 
 interface Expense {
   id: string;
@@ -24,12 +37,16 @@ interface Site {
 const CATEGORIES = ['All', 'Workforce', 'Materials', 'Equipment', 'Permits', 'Fuel', 'Others'];
 
 export default function FinancePage() {
+  const location = useLocation();
+  const navigate = useNavigate();
+
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [sites, setSites] = useState<Site[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [activeCategory, setActiveCategory] = useState('All');
+  const [formError, setFormError] = useState('');
 
   // Form states
   const [amount, setAmount] = useState('');
@@ -38,32 +55,59 @@ export default function FinancePage() {
   const [siteId, setSiteId] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
 
-  useEffect(() => {
-    async function loadFinanceData() {
-      try {
-        const [financeRes, sitesRes] = await Promise.all([
-          apiClient.get<Expense[]>('/finance'),
-          apiClient.get<Site[]>('/sites')
-        ]);
-        if (financeRes.data) setExpenses(financeRes.data);
-        if (sitesRes.data) {
-          setSites(sitesRes.data);
-          if (sitesRes.data.length > 0) setSiteId(sitesRes.data[0].id);
-        }
-      } catch (err) {
-        console.error('Failed to load finance data', err);
-      } finally {
-        setLoading(false);
+  const loadFinanceData = async () => {
+    try {
+      const [financeRes, sitesRes] = await Promise.all([
+        apiClient.get<Expense[]>('/finance'),
+        apiClient.get<Site[]>('/sites')
+      ]);
+      if (financeRes.data) setExpenses(financeRes.data);
+      if (sitesRes.data) {
+        setSites(sitesRes.data);
+        if (sitesRes.data.length > 0) setSiteId(sitesRes.data[0].id);
       }
+    } catch (err) {
+      console.error('Failed to load finance data', err);
+    } finally {
+      setLoading(false);
     }
+  };
+
+  useEffect(() => {
     loadFinanceData();
   }, []);
 
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('create') === 'true') {
+      setShowModal(true);
+    }
+  }, [location.search]);
+
+  const resetForm = () => {
+    setAmount('');
+    setCategory('Materials');
+    setDescription('');
+    setDate(new Date().toISOString().split('T')[0]);
+    if (sites.length > 0) setSiteId(sites[0].id);
+    setFormError('');
+  };
+
+  const handleCloseModal = () => {
+    setShowModal(false);
+    resetForm();
+    navigate('/finance', { replace: true });
+  };
+
   const handleCreateExpense = async (e: FormEvent) => {
     e.preventDefault();
-    if (!amount || isNaN(parseFloat(amount)) || !category) return;
+    if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
+      setFormError('Amount must be a positive number.');
+      return;
+    }
 
     setSaving(true);
+    setFormError('');
     try {
       const res = await apiClient.post<Expense>('/finance', {
         amount: parseFloat(amount),
@@ -76,16 +120,11 @@ export default function FinancePage() {
 
       if (res.data) {
         setExpenses(prev => [res.data!, ...prev]);
-        setShowModal(false);
-        // Reset form
-        setAmount('');
-        setCategory('Materials');
-        setDescription('');
-        setDate(new Date().toISOString().split('T')[0]);
+        handleCloseModal();
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to log expense', err);
-      alert('Error logging expense.');
+      setFormError(err.response?.data?.message || 'Error logging expense. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -97,73 +136,75 @@ export default function FinancePage() {
 
   const totalSpent = filtered.reduce((acc, curr) => acc + curr.amount, 0);
 
-  const getStatusColor = (status: string) => {
+  const getStatusVariant = (status: string): 'success' | 'primary' | 'danger' | 'warning' => {
     switch (status) {
-      case 'PAID': return 'var(--color-success)';
-      case 'APPROVED': return 'var(--color-info)';
-      case 'REJECTED': return 'var(--color-danger)';
-      default: return 'var(--color-warning)';
+      case 'PAID': return 'success';
+      case 'APPROVED': return 'primary';
+      case 'REJECTED': return 'danger';
+      default: return 'warning';
     }
   };
 
   if (loading) return <LoadingSpinner size="lg" />;
 
   return (
-    <div className="animate-fade-in texture-grain" style={{ paddingBottom: 'var(--space-12)' }}>
-      {/* Header Banner with illustration */}
-      <div className="page-header-row-with-img animate-fade-in">
-        <div className="page-header-text-block">
-          <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-            <Wallet size={24} color="var(--color-primary)" /> Financials & Expenses
-          </h1>
-          <p className="page-subtitle" style={{ marginTop: 0 }}>Track payments, purchase costs, and bills</p>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <button 
-            className="btn btn-primary btn-3d btn-3d-primary animate-pop-in" 
-            onClick={() => setShowModal(true)}
-            id="btn-add-expense"
-            style={{ minHeight: '40px', padding: '0 16px' }}
-          >
-            <Plus size={16} /> Log Expense
-          </button>
-          <div className="page-header-illust-wrap">
-            <img src="/images/finance_friendly.png" alt="Finance Ledger" className="page-header-illust-img" />
-          </div>
+    <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      
+      {/* Header Banner */}
+      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <h1 className="page-title">Financials & Expenses</h1>
+          <p className="page-subtitle">Track payments, purchase costs, and bills across project sites.</p>
         </div>
       </div>
 
-      {/* Overview Cards (Tactile 3D) */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 'var(--space-5)', marginBottom: 'var(--space-8)' }}>
-        <div className="card-3d card-3d-primary">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 'var(--font-size-sm)', opacity: 0.9 }}>Total Expenses ({activeCategory})</span>
-            <TrendingUp size={20} />
-          </div>
-          <h2 style={{ fontSize: '2rem', fontWeight: 'var(--font-weight-bold)', marginTop: '8px' }}>
-            ₹{totalSpent.toLocaleString('en-IN')}
-          </h2>
-          <p style={{ fontSize: 'var(--font-size-xs)', opacity: 0.8, marginTop: '4px' }}>
-            Based on current filters
-          </p>
+      {/* Overview Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <StatCard
+            icon={<TrendingUp size={20} />}
+            label={`Total Spent (${activeCategory})`}
+            value={`₹${totalSpent.toLocaleString('en-IN')}`}
+            color="#0A3D91"
+            bgColor="rgba(10, 61, 145, 0.08)"
+          />
+          <StatCard
+            icon={<Wallet size={20} />}
+            label="Logged Ledger Items"
+            value={`${expenses.length} records`}
+            color="#16A34A"
+            bgColor="rgba(22, 163, 74, 0.08)"
+          />
         </div>
 
-        <div className="card-3d">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--color-text-secondary)' }}>
-            <span style={{ fontSize: 'var(--font-size-sm)' }}>Active Accounts</span>
-            <Wallet size={20} color="var(--color-primary)" />
-          </div>
-          <h2 style={{ fontSize: '2rem', fontWeight: 'var(--font-weight-bold)', marginTop: '8px' }}>
-            ₹{expenses.length} transactions
-          </h2>
-          <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', marginTop: '4px' }}>
-            Total logged logs
-          </p>
-        </div>
+        <PrimaryCard style={{ minHeight: '280px' }}>
+          {expenses.length > 0 ? (() => {
+            const catTotals = CATEGORIES.filter(c => c !== 'All').map(cat => ({
+              name: cat,
+              total: expenses.filter(e => e.category === cat).reduce((acc, curr) => acc + curr.amount, 0)
+            })).filter(c => c.total > 0);
+
+            return (
+              <PieChart 
+                title="Expense Breakdown by Category"
+                labels={catTotals.map(c => c.name)}
+                data={catTotals.map(c => c.total)}
+              />
+            );
+          })() : (
+            <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyItems: 'center' }}>
+              <EmptyState 
+                icon={<Wallet size={24} />} 
+                title="No financial data" 
+                description="Your expense visualization will appear here."
+              />
+            </div>
+          )}
+        </PrimaryCard>
       </div>
 
       {/* Category filters */}
-      <div className="filter-bar" style={{ marginBottom: 'var(--space-6)' }}>
+      <div className="filter-bar">
         {CATEGORIES.map(cat => (
           <button
             key={cat}
@@ -178,54 +219,53 @@ export default function FinancePage() {
       {/* Expenses Ledger */}
       {filtered.length === 0 ? (
         <EmptyState
-          icon={<Wallet size={40} />}
-          title="No expenses recorded"
-          description="Log procurement invoices, supervisor payouts, or rental costs."
+          icon={<Wallet size={36} />}
+          title="No expenses logged"
+          description="Log procurement invoices, supervisor payouts, or rental costs to review."
+          action={<Button size="sm" onClick={() => setShowModal(true)}>Log Your First Expense</Button>}
         />
       ) : (
-        <div className="card-3d" style={{ padding: 0, overflow: 'hidden' }}>
+        <PrimaryCard style={{ padding: 0, overflow: 'hidden' }}>
           <div style={{ overflowX: 'auto' }}>
             <table className="hide-scrollbar" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '600px' }}>
               <thead>
-                <tr style={{ background: 'var(--color-bg-warm)', borderBottom: '1px solid var(--color-border)', fontSize: 'var(--font-size-xs)', textTransform: 'uppercase', color: 'var(--color-text-secondary)' }}>
-                  <th style={{ padding: 'var(--space-4) var(--space-5)' }}>Date</th>
-                  <th style={{ padding: 'var(--space-4) var(--space-5)' }}>Category</th>
-                  <th style={{ padding: 'var(--space-4) var(--space-5)' }}>Site</th>
-                  <th style={{ padding: 'var(--space-4) var(--space-5)' }}>Description</th>
-                  <th style={{ padding: 'var(--space-4) var(--space-5)' }}>Status</th>
-                  <th style={{ padding: 'var(--space-4) var(--space-5)', textAlign: 'right' }}>Amount</th>
+                <tr style={{ background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', fontSize: '12px', textTransform: 'uppercase', color: '#6B7280' }}>
+                  <th style={{ padding: '14px 20px' }}>Date</th>
+                  <th style={{ padding: '14px 20px' }}>Category</th>
+                  <th style={{ padding: '14px 20px' }}>Site Location</th>
+                  <th style={{ padding: '14px 20px' }}>Description</th>
+                  <th style={{ padding: '14px 20px' }}>Status</th>
+                  <th style={{ padding: '14px 20px', textAlign: 'right' }}>Amount</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map(exp => (
-                  <tr key={exp.id} style={{ borderBottom: '1px solid var(--color-border-light)', fontSize: 'var(--font-size-sm)', transition: 'background 150ms' }}>
-                    <td style={{ padding: 'var(--space-4) var(--space-5)', whiteSpace: 'nowrap' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Calendar size={14} className="text-muted" />
+                  <tr key={exp.id} className="hover-row" style={{ borderBottom: '1px solid #E2E8F0', fontSize: '14px' }}>
+                    <td style={{ padding: '14px 20px', whiteSpace: 'nowrap' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#111827' }}>
+                        <Calendar size={14} style={{ color: '#6B7280' }} />
                         <span>{new Date(exp.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
                       </div>
                     </td>
-                    <td style={{ padding: 'var(--space-4) var(--space-5)', fontWeight: 'var(--font-weight-medium)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Tag size={14} color="var(--color-primary-light)" />
+                    <td style={{ padding: '14px 20px', fontWeight: 600 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#0A3D91' }}>
+                        <Tag size={14} />
                         <span>{exp.category}</span>
                       </div>
                     </td>
-                    <td style={{ padding: 'var(--space-4) var(--space-5)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <MapPin size={14} className="text-muted" />
+                    <td style={{ padding: '14px 20px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#374151' }}>
+                        <MapPin size={14} style={{ color: '#6B7280' }} />
                         <span>{exp.site?.name || 'Central Headquarter'}</span>
                       </div>
                     </td>
-                    <td style={{ padding: 'var(--space-4) var(--space-5)', color: 'var(--color-text-secondary)' }}>
+                    <td style={{ padding: '14px 20px', color: '#374151' }}>
                       {exp.description || 'N/A'}
                     </td>
-                    <td style={{ padding: 'var(--space-4) var(--space-5)' }}>
-                      <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: getStatusColor(exp.status) }}>
-                        {exp.status}
-                      </span>
+                    <td style={{ padding: '14px 20px' }}>
+                      <Badge variant={getStatusVariant(exp.status)}>{exp.status}</Badge>
                     </td>
-                    <td style={{ padding: 'var(--space-4) var(--space-5)', textAlign: 'right', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-text)' }}>
+                    <td style={{ padding: '14px 20px', textAlign: 'right', fontWeight: 700, color: '#111827' }}>
                       ₹{exp.amount.toLocaleString('en-IN')}
                     </td>
                   </tr>
@@ -233,111 +273,93 @@ export default function FinancePage() {
               </tbody>
             </table>
           </div>
-        </div>
+        </PrimaryCard>
       )}
 
-      {/* 3D Glassmorphic Modal */}
-      {showModal && (
-        <div className="modal-overlay" style={{ background: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(8px)', zIndex: 'var(--z-modal)', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
-          <div className="panel-glass card-3d animate-pop-in" style={{ width: '90%', maxWidth: '460px', padding: 'var(--space-6)', background: '#fff', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-xl)' }}>
-            <h2 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', marginBottom: 'var(--space-4)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Sparkles size={20} color="var(--color-cta)" /> Record Project Expense
-            </h2>
-            <form onSubmit={handleCreateExpense} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-              
-              <div className="form-group">
-                <label className="form-label">Expense Amount (INR)</label>
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                  <DollarSign size={18} style={{ position: 'absolute', left: '12px', color: 'var(--color-text-secondary)' }} />
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="form-input premium-input"
-                    style={{ paddingLeft: '32px' }}
-                    placeholder="Enter amount"
-                    value={amount}
-                    onChange={e => setAmount(e.target.value)}
-                    required
-                    autoFocus
-                  />
-                </div>
-              </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
-                <div className="form-group">
-                  <label className="form-label">Category</label>
-                  <select
-                    className="form-input premium-input"
-                    value={category}
-                    onChange={e => setCategory(e.target.value)}
-                  >
-                    <option value="Materials">Materials</option>
-                    <option value="Workforce">Workforce</option>
-                    <option value="Equipment">Equipment</option>
-                    <option value="Permits">Permits</option>
-                    <option value="Fuel">Fuel</option>
-                    <option value="Others">Others</option>
-                  </select>
-                </div>
+      {/* Record Expense Modal */}
+      <Modal
+        isOpen={showModal}
+        onClose={handleCloseModal}
+        title="Record Project Expense"
+        footer={
+          <>
+            <Button variant="secondary" onClick={handleCloseModal}>
+              Cancel
+            </Button>
+            <Button 
+              type="submit" 
+              onClick={handleCreateExpense as any} 
+              disabled={saving || !amount}
+              id="submit-log-expense"
+            >
+              {saving ? 'Saving...' : 'Log Expense'}
+            </Button>
+          </>
+        }
+      >
+        <form onSubmit={handleCreateExpense} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {formError && <div className="login-error"><span>{formError}</span></div>}
 
-                <div className="form-group">
-                  <label className="form-label">Expense Date</label>
-                  <input
-                    type="date"
-                    className="form-input premium-input"
-                    value={date}
-                    onChange={e => setDate(e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
+          <Input
+            id="expense-amount"
+            label="Expense Amount (INR) *"
+            type="number"
+            step="0.01"
+            placeholder="e.g. 5000"
+            value={amount}
+            onChange={e => setAmount(e.target.value)}
+            required
+            autoFocus
+          />
 
-              <div className="form-group">
-                <label className="form-label">Associated Site Location</label>
-                <select
-                  className="form-input premium-input"
-                  value={siteId}
-                  onChange={e => setSiteId(e.target.value)}
-                >
-                  <option value="">Central Office / Corporate</option>
-                  {sites.map(s => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
-                </select>
-              </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <Select
+              id="expense-category"
+              label="Category *"
+              value={category}
+              onChange={e => setCategory(e.target.value)}
+            >
+              <option value="Materials">Materials</option>
+              <option value="Workforce">Workforce</option>
+              <option value="Equipment">Equipment</option>
+              <option value="Permits">Permits</option>
+              <option value="Fuel">Fuel</option>
+              <option value="Others">Others</option>
+            </Select>
 
-              <div className="form-group">
-                <label className="form-label">Memo / Description</label>
-                <textarea
-                  className="form-input premium-input"
-                  style={{ minHeight: '80px', resize: 'vertical' }}
-                  placeholder="e.g. Paid concrete supplier invoice #204"
-                  value={description}
-                  onChange={e => setDescription(e.target.value)}
-                />
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)', marginTop: 'var(--space-2)' }}>
-                <button 
-                  type="button" 
-                  className="btn btn-secondary btn-3d btn-3d-secondary"
-                  onClick={() => setShowModal(false)}
-                >
-                  Cancel
-                </button>
-                <button 
-                  type="submit" 
-                  className="btn btn-primary btn-3d btn-3d-primary"
-                  disabled={saving}
-                >
-                  {saving ? <Loader2 size={16} className="spinner" /> : 'Log Expense'}
-                </button>
-              </div>
-
-            </form>
+            <Input
+              id="expense-date"
+              label="Expense Date *"
+              type="date"
+              value={date}
+              onChange={e => setDate(e.target.value)}
+              required
+            />
           </div>
-        </div>
-      )}
+
+          <Select
+            id="expense-site"
+            label="Associated Site Location"
+            value={siteId}
+            onChange={e => setSiteId(e.target.value)}
+          >
+            <option value="">Central Office / Corporate</option>
+            {sites.map(s => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </Select>
+
+          <TextArea
+            id="expense-desc"
+            label="Memo / Description"
+            placeholder="e.g. Paid concrete supplier invoice #204"
+            value={description}
+            onChange={e => setDescription(e.target.value)}
+            rows={3}
+          />
+        </form>
+      </Modal>
     </div>
   );
 }

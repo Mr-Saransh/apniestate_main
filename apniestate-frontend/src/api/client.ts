@@ -41,6 +41,9 @@ class ApiClient {
     const json = await response.json();
 
     if (!response.ok) {
+      if (response.status === 401) {
+        window.dispatchEvent(new CustomEvent('auth:unauthorized'));
+      }
       throw new ApiError(
         json.error?.message || 'Something went wrong',
         response.status,

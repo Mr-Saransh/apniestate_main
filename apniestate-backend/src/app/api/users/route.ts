@@ -1,16 +1,16 @@
 import { NextRequest } from "next/server";
-import { withRole } from "@/middleware/rbac.middleware";
+import { withPermission } from "@/middleware/permission.middleware";
 import { validateBody } from "@/middleware/validate.middleware";
 import { CreateUserSchema } from "@/modules/users/users.schema";
 import { getUsers, createUser } from "@/modules/users/users.service";
 import { ok, created, conflict, serverError } from "@/lib/response";
 
-export const GET = withRole("BUILDER")(async () => {
+export const GET = withPermission("users", "read")(async () => {
   const users = await getUsers();
   return ok(users);
 });
 
-export const POST = withRole("BUILDER")(async (req: NextRequest) => {
+export const POST = withPermission("users", "create")(async (req: NextRequest) => {
   const parsed = await validateBody(req, CreateUserSchema);
   if ("error" in parsed) return parsed.error;
 

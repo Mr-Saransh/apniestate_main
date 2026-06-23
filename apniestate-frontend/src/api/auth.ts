@@ -9,7 +9,8 @@ export interface AuthUser {
   id: string;
   name: string;
   email: string;
-  role: 'BUILDER' | 'SITE_SUPERVISOR' | 'ACCOUNTANT' | 'INVENTORY_MANAGER';
+  role: 'ADMIN' | 'BUILDER' | 'SITE_SUPERVISOR' | 'ACCOUNTANT' | 'INVENTORY_MANAGER' | 'PROJECT_MANAGER';
+  phone?: string | null;
 }
 
 export interface LoginResponse {
@@ -20,6 +21,12 @@ export interface LoginResponse {
 export const authApi = {
   login: (credentials: LoginCredentials) =>
     apiClient.post<LoginResponse>('/auth/login', credentials),
+
+  signup: (credentials: LoginCredentials) =>
+    apiClient.post<LoginResponse>('/auth/signup', credentials),
+
+  updateRole: (role: string) =>
+    apiClient.patch<AuthUser>('/users/me/role', { role }),
 
   logout: () => apiClient.post('/auth/logout'),
 };

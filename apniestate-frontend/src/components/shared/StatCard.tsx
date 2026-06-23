@@ -1,4 +1,5 @@
 import { type ReactNode } from 'react';
+import { StatCard as DSStatCard } from '../design-system/Cards';
 
 interface StatCardProps {
   icon: ReactNode;
@@ -10,21 +11,15 @@ interface StatCardProps {
 }
 
 export default function StatCard({ icon, label, value, trend, color, bgColor }: StatCardProps) {
+  // We drop the trend prop because the new design system StatCard prioritizes clean, metric-focused visuals
+  // without cluttered trend badges unless required by a specific use case.
   return (
-    <div className="stat-card" id={`stat-${label.toLowerCase().replace(/\s+/g, '-')}`}>
-      <div className="stat-card-header">
-        <div className="stat-card-icon" style={{ background: bgColor, color }}>
-          {icon}
-        </div>
-        {trend && (
-          <div className={`stat-card-trend ${trend.direction}`}>
-            <span>{trend.direction === 'up' ? '↑' : '↓'}</span>
-            <span>{trend.value}</span>
-          </div>
-        )}
-      </div>
-      <div className="stat-card-value">{value}</div>
-      <div className="stat-card-label">{label}</div>
-    </div>
+    <DSStatCard
+      icon={icon}
+      label={label}
+      value={value}
+      color={color}
+      bgColor={bgColor}
+    />
   );
 }

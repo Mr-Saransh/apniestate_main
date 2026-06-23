@@ -8,7 +8,9 @@ type RouteHandler = (req: NextRequest, user: JWTPayload) => Promise<Response>;
 export function withRole(...roles: Role[]) {
   return (handler: RouteHandler) =>
     withAuth(async (req: NextRequest, user: JWTPayload) => {
-      if (!roles.includes(user.role)) return forbidden();
+      if (user.role !== "ADMIN" && !roles.includes(user.role)) {
+        return forbidden();
+      }
       return handler(req, user);
     });
 }

@@ -1,22 +1,17 @@
+import { useState, useEffect } from 'react';
 import { Bell, CheckCheck } from 'lucide-react';
 import EmptyState from '@/components/shared/EmptyState';
+import LoadingSpinner from '@/components/shared/LoadingSpinner';
+import { apiClient } from '@/api/client';
 
 interface Notification {
   id: string;
   title: string;
   message: string;
-  time: string;
-  read: boolean;
-  type: 'info' | 'warning' | 'success' | 'danger';
+  created_at: string;
+  is_read: boolean;
+  type: string | null;
 }
-
-const demoNotifications: Notification[] = [
-  { id: '1', title: 'Material Request Approved', message: 'Cement (50 bags) for Skyline Heights has been approved', time: '10 min ago', read: false, type: 'success' },
-  { id: '2', title: 'Task Overdue', message: 'Plumbing completion - Block B is past its due date', time: '1 hour ago', read: false, type: 'danger' },
-  { id: '3', title: 'New Task Assigned', message: 'You have been assigned "Electrical wiring - Floor 3"', time: '3 hours ago', read: false, type: 'info' },
-  { id: '4', title: 'Payment Processed', message: 'PKR 2,680,000 payment to vendor has been processed', time: '1 day ago', read: true, type: 'success' },
-  { id: '5', title: 'Low Stock Alert', message: 'PVC Pipes (4") stock is below minimum quantity', time: '2 days ago', read: true, type: 'warning' },
-];
 
 const typeColors: Record<string, { color: string; bg: string }> = {
   info: { color: 'var(--color-primary)', bg: 'var(--color-primary-50)' },
@@ -26,18 +21,49 @@ const typeColors: Record<string, { color: string; bg: string }> = {
 };
 
 export default function NotificationsPage() {
-  const unreadCount = demoNotifications.filter(n => !n.read).length;
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  const fetchNotifications = async () => {
+    try {
+      const res = await apiClient.get<any>('/notifications');
+      if (res.data) {
+        setNotifications(res.data.notifications || []);
+        setUnreadCount(res.data.unread_count || 0);
+      }
+    } catch (err) {
+      console.error('Failed to load notifications:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchNotifications();
+  }, []);
+
+  const handleMarkAllRead = async () => {
+    try {
+      await apiClient.post('/notifications', { action: 'mark_all_read' });
+      fetchNotifications();
+    } catch (err) {
+      console.error('Failed to mark notifications read:', err);
+    }
+  };
+
+  if (loading) return <LoadingSpinner size="lg" />;
 
   return (
     <div className="animate-fade-in">
       <div className="page-header">
-        <div className="page-header-row">
+        <div className="page-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
           <div>
             <h1 className="page-title">Notifications</h1>
-            <p className="page-subtitle">{unreadCount} unread</p>
+            <p className="page-subtitle">{unreadCount} unread alerts</p>
           </div>
           {unreadCount > 0 && (
-            <button className="btn btn-ghost btn-sm">
+            <button className="btn btn-ghost btn-sm" onClick={handleMarkAllRead}>
               <CheckCheck size={16} />
               Mark all read
             </button>
@@ -45,7 +71,7 @@ export default function NotificationsPage() {
         </div>
       </div>
 
-      {demoNotifications.length === 0 ? (
+      {notifications.length === 0 ? (
         <EmptyState
           icon={<Bell size={36} />}
           title="No notifications"
@@ -53,50 +79,78 @@ export default function NotificationsPage() {
         />
       ) : (
         <div className="card" style={{ overflow: 'hidden' }}>
-          {demoNotifications.map((notif) => (
-            <div
-              key={notif.id}
-              className="list-card"
-              style={{
-                background: notif.read ? 'var(--color-surface)' : 'var(--color-primary-50)',
-              }}
-              id={`notif-${notif.id}`}
-            >
+          {notifications.map((notif) => {
+            const notifType = notif.type || 'info';
+            const colorScheme = typeColors[notifType] || typeColors.info;
+            
+            return (
               <div
-                className="list-card-icon"
+                key={notif.id}
+                className="list-card"
                 style={{
-                  background: typeColors[notif.type].bg,
-                  color: typeColors[notif.type].color,
-                  borderRadius: 'var(--radius-full)',
+                  background: notif.is_read ? 'var(--color-surface)' : 'rgba(59, 130, 246, 0.05)',
+                  padding: 'var(--space-4)',
+                  borderBottom: '1px solid #E5E7EB',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 'var(--space-4)',
+                  transition: 'background-color 0.2s'
                 }}
+                id={`notif-${notif.id}`}
               >
-                <Bell size={18} />
-              </div>
-              <div className="list-card-content">
-                <div className="list-card-title" style={{
-                  fontWeight: notif.read ? 'var(--font-weight-medium)' : 'var(--font-weight-semibold)',
-                }}>
-                  {notif.title}
+                <div
+                  className="list-card-icon"
+                  style={{
+                    background: colorScheme.bg,
+                    color: colorScheme.color,
+                    borderRadius: 'var(--radius-full)',
+                    width: 36,
+                    height: 36,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}
+                >
+                  <Bell size={18} />
                 </div>
-                <div className="list-card-subtitle">{notif.message}</div>
+                <div className="list-card-content" style={{ flex: 1 }}>
+                  <div className="list-card-title" style={{
+                    fontWeight: notif.is_read ? 'var(--font-weight-medium)' : 'var(--font-weight-semibold)',
+                    color: 'var(--color-text)'
+                  }}>
+                    {notif.title}
+                  </div>
+                  <div className="list-card-subtitle" style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: '2px' }}>
+                    {notif.message}
+                  </div>
+                </div>
+                <div className="list-card-meta" style={{ textAlign: 'right', flexShrink: 0 }}>
+                  <div className="list-card-date" style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>
+                    {new Date(notif.created_at).toLocaleDateString('en-IN', {
+                      day: 'numeric',
+                      month: 'short',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </div>
+                  {!notif.is_read && (
+                    <div style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: '50%',
+                      background: 'var(--color-primary)',
+                      marginTop: 6,
+                      marginLeft: 'auto',
+                    }} />
+                  )}
+                </div>
               </div>
-              <div className="list-card-meta">
-                <div className="list-card-date">{notif.time}</div>
-                {!notif.read && (
-                  <div style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: '50%',
-                    background: 'var(--color-primary)',
-                    marginTop: 4,
-                    marginLeft: 'auto',
-                  }} />
-                )}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
   );
 }
+

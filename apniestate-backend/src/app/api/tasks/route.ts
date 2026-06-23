@@ -5,8 +5,15 @@ import { CreateTaskSchema } from "@/modules/tasks/tasks.schema";
 import { getTasks, createTask } from "@/modules/tasks/tasks.service";
 import { ok, created } from "@/lib/response";
 
-export const GET = withAuth(async (_req, user) => {
-  const tasks = await getTasks(user.sub);
+export const GET = withAuth(async (req, user) => {
+  const url = new URL(req.url);
+  const filters = {
+    project_id: url.searchParams.get("project_id") || undefined,
+    site_id: url.searchParams.get("site_id") || undefined,
+    assignee_id: url.searchParams.get("assignee_id") || undefined,
+    status: url.searchParams.get("status") || undefined,
+  };
+  const tasks = await getTasks(user.sub, user.role, filters);
   return ok(tasks);
 });
 

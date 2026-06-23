@@ -8,6 +8,9 @@ export interface Project {
   status: 'PLANNING' | 'ACTIVE' | 'ON_HOLD' | 'COMPLETED' | 'CANCELLED';
   start_date: string;
   end_date: string | null;
+  budget: number | null;
+  actual_cost: number | null;
+  progress_percentage: number | null;
   created_at: string;
   updated_at: string;
   _count?: { sites: number };
@@ -30,6 +33,10 @@ export interface CreateProjectData {
   start_date: string;
   end_date?: string;
   status?: Project['status'];
+  budget?: number;
+  address?: string;
+  city?: string;
+  manager_id?: string;
 }
 
 export interface UpdateProjectData {
@@ -38,6 +45,10 @@ export interface UpdateProjectData {
   start_date?: string;
   end_date?: string;
   status?: Project['status'];
+  budget?: number;
+  address?: string;
+  city?: string;
+  manager_id?: string;
 }
 
 export const projectsApi = {

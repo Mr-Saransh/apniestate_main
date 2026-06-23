@@ -1,30 +1,28 @@
+import { Badge as DSBadge } from '../design-system/Badge';
+
 interface StatusBadgeProps {
   status: string;
 }
 
-const statusMap: Record<string, string> = {
-  PLANNING: 'planning',
-  ACTIVE: 'active',
-  ON_HOLD: 'on-hold',
-  COMPLETED: 'completed',
-  CANCELLED: 'cancelled',
-  TODO: 'planning',
-  IN_PROGRESS: 'active',
-  DONE: 'completed',
-  BLOCKED: 'cancelled',
-  PENDING: 'on-hold',
-  APPROVED: 'active',
-  REJECTED: 'cancelled',
-  DELIVERED: 'completed',
+const variantMap: Record<string, 'primary' | 'success' | 'warning' | 'danger' | 'neutral'> = {
+  PLANNING: 'neutral',
+  ACTIVE: 'primary',
+  ON_HOLD: 'warning',
+  COMPLETED: 'success',
+  CANCELLED: 'danger',
+  TODO: 'neutral',
+  IN_PROGRESS: 'primary',
+  DONE: 'success',
+  BLOCKED: 'danger',
+  PENDING: 'warning',
+  APPROVED: 'success',
+  REJECTED: 'danger',
+  DELIVERED: 'success',
 };
 
 export default function StatusBadge({ status }: StatusBadgeProps) {
-  const badgeClass = statusMap[status] || 'planning';
+  const variant = variantMap[status] || 'primary';
   const label = status.replace(/_/g, ' ');
 
-  return (
-    <span className={`badge badge-${badgeClass}`}>
-      {label}
-    </span>
-  );
+  return <DSBadge variant={variant}>{label}</DSBadge>;
 }

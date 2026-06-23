@@ -1,52 +1,62 @@
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Bell, Building2 } from 'lucide-react';
 
 export default function MobileHeader() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const getInitials = (name: string) =>
     name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
 
+  const getPageTitle = (path: string) => {
+    if (path.startsWith('/dashboard') || path === '/') return 'Dashboard';
+    if (path.startsWith('/projects')) return 'Projects';
+    if (path.startsWith('/tasks')) return 'Tasks';
+    if (path.startsWith('/attendance')) return 'Attendance';
+    if (path.startsWith('/inventory')) return 'Inventory';
+    if (path.startsWith('/materials')) return 'Materials';
+    if (path.startsWith('/finance')) return 'Finance';
+    if (path.startsWith('/documents')) return 'Documents';
+    if (path.startsWith('/sites')) return 'Sites';
+    if (path.startsWith('/vendors')) return 'Vendors';
+    if (path.startsWith('/reports')) return 'Reports';
+    if (path.startsWith('/settings')) return 'Settings';
+    if (path.startsWith('/notifications')) return 'Notifications';
+    return 'Apni Estate';
+  };
+
   return (
-    <header className="mobile-header" id="mobile-header">
-      <div className="mobile-header-brand">
-        <div className="mobile-header-logo">
-          <Building2 size={18} />
+    <header className="mobile-header premium-header" id="mobile-header">
+      <div className="mobile-header-left" onClick={() => navigate('/dashboard')}>
+        <div className="mobile-header-logo-minimal">
+          <Building2 size={20} color="var(--color-primary)" />
         </div>
-        <span className="mobile-header-title">Apni Estate</span>
       </div>
 
-      <div className="mobile-header-actions">
+      <div className="mobile-header-center">
+        <span className="mobile-header-title-minimal">
+          {getPageTitle(location.pathname)}
+        </span>
+      </div>
+
+      <div className="mobile-header-right">
         <button
-          className="mobile-header-btn"
+          className="mobile-icon-btn"
           aria-label="Notifications"
           onClick={() => navigate('/notifications')}
-          id="mobile-notification-btn"
         >
-          <Bell size={20} />
-          <span className="notification-dot" />
+          <Bell size={22} color="var(--color-text)" />
+          <span className="notification-dot-minimal" />
         </button>
 
         <button
-          className="mobile-header-btn"
+          className="mobile-avatar-btn"
           aria-label="Profile"
           onClick={() => navigate('/settings')}
-          id="mobile-profile-btn"
         >
-          <div className="avatar-sm" style={{
-            width: 32,
-            height: 32,
-            borderRadius: '50%',
-            background: 'linear-gradient(135deg, var(--color-primary), var(--color-primary-dark))',
-            color: '#fff',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '0.75rem',
-            fontWeight: 600,
-          }}>
+          <div className="avatar-minimal">
             {user ? getInitials(user.name) : '?'}
           </div>
         </button>
