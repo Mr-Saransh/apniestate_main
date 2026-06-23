@@ -13,8 +13,14 @@ export interface Project {
   progress_percentage: number | null;
   created_at: string;
   updated_at: string;
-  _count?: { sites: number };
+  _count?: { sites: number; tasks?: number; workers?: number };
   sites?: Site[];
+  address?: string | null;
+  city?: string | null;
+  manager_id?: string | null;
+  builder?: { id: string; name: string } | null;
+  manager?: { id: string; name: string } | null;
+  tasks?: any[] | null;
 }
 
 export interface Site {
@@ -25,30 +31,34 @@ export interface Site {
   supervisor_id: string | null;
   created_at: string;
   updated_at: string;
+  status?: 'NOT_STARTED' | 'IN_PROGRESS' | 'ON_HOLD' | 'COMPLETED' | string;
+  phase?: string | null;
+  progress_percentage?: number | null;
+  supervisor?: { id: string; name: string } | null;
 }
 
 export interface CreateProjectData {
   name: string;
-  description?: string;
+  description?: string | null;
   start_date: string;
-  end_date?: string;
+  end_date?: string | null;
   status?: Project['status'];
-  budget?: number;
-  address?: string;
-  city?: string;
-  manager_id?: string;
+  budget?: number | null;
+  address?: string | null;
+  city?: string | null;
+  manager_id?: string | null;
 }
 
 export interface UpdateProjectData {
   name?: string;
-  description?: string;
-  start_date?: string;
-  end_date?: string;
+  description?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
   status?: Project['status'];
-  budget?: number;
-  address?: string;
-  city?: string;
-  manager_id?: string;
+  budget?: number | null;
+  address?: string | null;
+  city?: string | null;
+  manager_id?: string | null;
 }
 
 export const projectsApi = {

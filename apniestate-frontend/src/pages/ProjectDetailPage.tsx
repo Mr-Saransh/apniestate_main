@@ -622,7 +622,7 @@ export default function ProjectDetailPage() {
                     onClick={() => toggleMilestoneStatus(m)}
                     title="Click to cycle status"
                   >
-                    <CheckCircle color={m.status === 'COMPLETED' ? 'var(--color-success)' : 'var(--color-text-muted)'} size={22} />
+                    <CheckCircle2 color={m.status === 'COMPLETED' ? 'var(--color-success)' : 'var(--color-text-muted)'} size={22} />
                   </div>
                   <div className="list-card-content">
                     <div className="list-card-title">{m.name}</div>
@@ -681,7 +681,7 @@ export default function ProjectDetailPage() {
                       </div>
                     </div>
                     <span className="badge badge-active" style={{ textTransform: 'capitalize' }}>
-                      {site.status.replace('_', ' ').toLowerCase()}
+                      {site.status?.replace('_', ' ').toLowerCase() || ''}
                     </span>
                   </div>
 

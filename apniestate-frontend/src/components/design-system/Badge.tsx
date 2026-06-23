@@ -8,8 +8,8 @@ interface BadgeProps {
 }
 
 export function Badge({ children, variant = 'primary', style }: BadgeProps) {
-  let backgroundColor = 'rgba(10, 61, 145, 0.08)';
-  let color = Colors.primaryBlue;
+  let backgroundColor: string = 'rgba(10, 61, 145, 0.08)';
+  let color: string = Colors.primaryBlue;
 
   if (variant === 'success') {
     backgroundColor = 'rgba(22, 163, 74, 0.1)';

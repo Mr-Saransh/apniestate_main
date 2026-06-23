@@ -15,9 +15,9 @@ export function Button({
   disabled,
   ...props
 }: ButtonProps) {
-  let backgroundColor = Colors.primaryBlue;
-  let textColor = '#FFFFFF';
-  let hoverBg = '#08337A';
+  let backgroundColor: string = Colors.primaryBlue;
+  let textColor: string = '#FFFFFF';
+  let hoverBg: string = '#08337A';
 
   if (variant === 'secondary') {
     backgroundColor = '#E2E8F0';
