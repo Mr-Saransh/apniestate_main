@@ -1,22 +1,20 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import {
   UserCheck,
-  Clock,
-  Users,
   ChevronLeft,
   ChevronRight,
   Filter,
-  CheckCircle,
-  XCircle,
-  Calendar,
-  DollarSign,
-  ClipboardList,
-  Edit3
+  MoreVertical,
+  Check,
+  Clock,
+  X,
+  AlertCircle
 } from 'lucide-react';
 import { apiClient } from '@/api/client';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import EmptyState from '@/components/shared/EmptyState';
 import Modal from '@/components/shared/Modal';
+import { format, addDays, startOfWeek, isSameDay } from 'date-fns';
 
 interface WorkerRecord {
   id: string;
@@ -32,7 +30,7 @@ interface WorkerRecord {
   site_id: string | null;
   site_name: string | null;
   contractor_name: string | null;
-  daily_rate?: number;
+  daily_rate: number;
 }
 
 interface Site {
@@ -48,7 +46,13 @@ export default function AttendancePage() {
   const [selectedSiteId, setSelectedSiteId] = useState('');
   const [workers, setWorkers] = useState<WorkerRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [savingBulk, setSavingBulk] = useState(false);
+
+  // Download Report Modal State
+  const [showDownloadModal, setShowDownloadModal] = useState(false);
+  const [downloadType, setDownloadType] = useState<'MONTH' | 'YEAR'>('MONTH');
+  const [downloadMonth, setDownloadMonth] = useState(new Date().getMonth());
+  const [downloadYear, setDownloadYear] = useState(new Date().getFullYear());
+  const [downloading, setDownloading] = useState(false);
 
   // Edit Single Worker Modal State
   const [showEditModal, setShowEditModal] = useState(false);
@@ -78,7 +82,10 @@ export default function AttendancePage() {
 
       const workersRes = await apiClient.get<WorkerRecord[]>(`/attendance?${params.toString()}`);
       if (workersRes.data) {
-        setWorkers(workersRes.data);
+        setWorkers(workersRes.data.map(w => ({
+          ...w,
+          daily_rate: w.daily_rate || 0 
+        })));
       }
     } catch (err) {
       console.error('Failed to load attendance page data', err);
@@ -92,14 +99,6 @@ export default function AttendancePage() {
     fetchSitesAndWorkers();
   }, [date, selectedSiteId]);
 
-  const changeDate = (delta: number) => {
-    setDate(prev => {
-      const d = new Date(prev);
-      d.setDate(d.getDate() + delta);
-      return d;
-    });
-  };
-
   const handleStatusChange = async (workerId: string, status: WorkerRecord['status']) => {
     setWorkers(prev =>
       prev.map(w =>
@@ -107,7 +106,7 @@ export default function AttendancePage() {
           ? {
               ...w,
               status,
-              check_in: ['PRESENT', 'LATE', 'HALF_DAY'].includes(status) ? new Date().toISOString() : null
+              check_in: ['PRESENT', 'LATE', 'HALF_DAY'].includes(status) && !w.check_in ? new Date().toISOString() : w.check_in
             }
           : w
       )
@@ -123,38 +122,6 @@ export default function AttendancePage() {
     } catch (err) {
       console.error('Failed to mark worker attendance', err);
       fetchSitesAndWorkers();
-    }
-  };
-
-  const handleBulkMark = async (status: 'PRESENT' | 'ABSENT') => {
-    if (!selectedSiteId) {
-      alert('Please select a specific site to bulk mark attendance.');
-      return;
-    }
-
-    setSavingBulk(true);
-    try {
-      const dateStr = date.toISOString().split('T')[0];
-      const records = workers.map(w => ({
-        worker_id: w.id,
-        status,
-        shift: 'GENERAL' as const,
-        overtime_hours: 0,
-        notes: null
-      }));
-
-      await apiClient.post('/attendance/bulk', {
-        site_id: selectedSiteId,
-        date: dateStr,
-        records
-      });
-
-      fetchSitesAndWorkers();
-    } catch (err) {
-      console.error('Bulk attendance marking failed', err);
-      alert('Bulk action failed. Try again.');
-    } finally {
-      setSavingBulk(false);
     }
   };
 
@@ -208,184 +175,482 @@ export default function AttendancePage() {
     }
   };
 
+  const generateExcelSheet = (reportData: any, fromStr: string, toStr: string) => {
+    const records = reportData.records || [];
+    const workerSummaries = reportData.worker_summaries || [];
+    
+    const fromDate = new Date(fromStr);
+    const toDate = new Date(toStr);
+    
+    const monthName = fromDate.toLocaleDateString('en-US', { month: 'long' });
+    const year = fromDate.getFullYear();
+    
+    const siteName = sites.find(s => s.id === selectedSiteId)?.name || 'All Sites';
+    const supervisorName = localStorage.getItem('user') 
+      ? JSON.parse(localStorage.getItem('user')!).name 
+      : 'Site Supervisor';
+
+    // Calculate dates between fromDate and toDate
+    const dateList: string[] = [];
+    const tempDate = new Date(fromDate);
+    while (tempDate <= toDate) {
+      dateList.push(tempDate.toISOString().split('T')[0]);
+      tempDate.setDate(tempDate.getDate() + 1);
+    }
+
+    // Dynamic headers for dates
+    const dateHeaders = dateList.map(dStr => {
+      const dNum = new Date(dStr).getDate();
+      return `<th style="background-color: #E5E7EB; font-weight: bold; text-align: center; border: 1px solid #CCCCCC;">${dNum}</th>`;
+    }).join('\n');
+
+    // Worker Rows
+    let workerRows = '';
+    let totalPresentSum = 0;
+    let totalOTHoursSum = 0;
+    let totalSalarySum = 0;
+
+    workerSummaries.forEach((w: any) => {
+      totalPresentSum += w.effective_days;
+      totalOTHoursSum += w.overtime;
+      totalSalarySum += w.total_wage;
+
+      // Find attendance status for each date
+      const dateCells = dateList.map(dStr => {
+        const matching = records.find((r: any) => {
+          if (!r.date) return false;
+          const dPart = typeof r.date === 'string' ? r.date.split('T')[0] : new Date(r.date).toISOString().split('T')[0];
+          return r.worker_id === w.worker_id && dPart === dStr;
+        });
+
+        let cellText = '-';
+        if (matching) {
+          const otText = matching.overtime_hours > 0 ? ` +${matching.overtime_hours}h` : '';
+          if (matching.status === 'PRESENT') cellText = `P${otText}`;
+          else if (matching.status === 'HALF_DAY') cellText = `H${otText}`;
+          else if (matching.status === 'ABSENT') cellText = 'A';
+          else if (matching.status === 'ON_LEAVE') cellText = 'L';
+          else if (matching.status === 'LATE') cellText = `L${otText}`;
+        }
+        return `<td style="text-align: center; border: 1px solid #CCCCCC;">${cellText}</td>`;
+      }).join('\n');
+
+      const otRate = Math.round((w.daily_rate / 8) * 1.5);
+      workerRows += `
+        <tr>
+          <td style="border: 1px solid #CCCCCC; font-weight: bold;">${w.worker_name}</td>
+          <td style="border: 1px solid #CCCCCC; text-align: center;">${w.trade}</td>
+          <td style="border: 1px solid #CCCCCC; text-align: right;">₹${w.daily_rate}</td>
+          <td style="border: 1px solid #CCCCCC; text-align: right;">₹${otRate}</td>
+          ${dateCells}
+          <td style="border: 1px solid #CCCCCC; text-align: center; font-weight: bold;">${w.effective_days}</td>
+          <td style="border: 1px solid #CCCCCC; text-align: center;">${w.overtime}</td>
+          <td style="border: 1px solid #CCCCCC; text-align: right; font-weight: bold;">₹${Math.round(w.total_wage).toLocaleString('en-IN')}</td>
+          <td style="border: 1px solid #CCCCCC; text-align: right;">₹0</td>
+          <td style="border: 1px solid #CCCCCC; text-align: right; font-weight: bold; color: #16A34A;">₹${Math.round(w.total_wage).toLocaleString('en-IN')}</td>
+        </tr>
+      `;
+    });
+
+    const colspanDates = dateList.length;
+
+    const htmlTable = `
+      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+      <head>
+        <meta charset="utf-8">
+        <!--[if gte mso 9]>
+        <xml>
+          <x:ExcelWorkbook>
+            <x:ExcelWorksheets>
+              <x:ExcelWorksheet>
+                <x:Name>Attendance Sheet</x:Name>
+                <x:WorksheetOptions>
+                  <x:DisplayGridlines/>
+                </x:WorksheetOptions>
+              </x:ExcelWorksheet>
+            </x:ExcelWorksheets>
+          </x:ExcelWorkbook>
+        </xml>
+        <![endif]-->
+        <style>
+          table { border-collapse: collapse; }
+          th, td { border: 1px solid #CCCCCC; padding: 6px; font-family: Arial, sans-serif; font-size: 11px; }
+        </style>
+      </head>
+      <body>
+        <table>
+          <!-- Brand Header -->
+          <tr>
+            <td colspan="${4 + colspanDates + 6}" style="text-align: center; font-size: 20px; font-weight: bold; padding: 12px 0;">
+              Apni Estate
+            </td>
+          </tr>
+          <tr>
+            <td colspan="${Math.floor((4 + colspanDates + 6)/2)}" style="text-align: left; font-size: 12px; font-weight: bold; border: none;">
+              Site: ${siteName}
+            </td>
+            <td colspan="${Math.ceil((4 + colspanDates + 6)/2)}" style="text-align: right; font-size: 12px; font-weight: bold; border: none;">
+              Foreman: ${supervisorName}
+            </td>
+          </tr>
+
+          <!-- Banner -->
+          <tr>
+            <td colspan="${4 + colspanDates + 6}" style="background-color: #F4B400; color: #000000; font-size: 14px; font-weight: bold; text-align: center; padding: 8px 0; border: 1px solid #000;">
+              Worker Attendance Sheet
+            </td>
+          </tr>
+          <tr>
+            <td colspan="${4 + colspanDates + 6}" style="background-color: #D1FAE5; font-size: 13px; font-weight: bold; text-align: center; padding: 6px 0; border: 1px solid #000;">
+              ${downloadType === 'MONTH' ? `${monthName} ${year}` : `Year ${downloadYear}`}
+            </td>
+          </tr>
+
+          <!-- Headers -->
+          <tr>
+            <th rowspan="2" style="background-color: #E5E7EB; font-weight: bold; border: 1px solid #CCCCCC;">Name</th>
+            <th rowspan="2" style="background-color: #E5E7EB; font-weight: bold; border: 1px solid #CCCCCC;">Designation</th>
+            <th rowspan="2" style="background-color: #E5E7EB; font-weight: bold; border: 1px solid #CCCCCC;">Daily Charge</th>
+            <th rowspan="2" style="background-color: #E5E7EB; font-weight: bold; border: 1px solid #CCCCCC;">OT Rate</th>
+            <th colspan="${colspanDates}" style="background-color: #E5E7EB; font-weight: bold; text-align: center; border: 1px solid #CCCCCC;">Dates</th>
+            <th rowspan="2" style="background-color: #E5E7EB; font-weight: bold; border: 1px solid #CCCCCC;">Present</th>
+            <th rowspan="2" style="background-color: #E5E7EB; font-weight: bold; border: 1px solid #CCCCCC;">OT Hours</th>
+            <th rowspan="2" style="background-color: #E5E7EB; font-weight: bold; border: 1px solid #CCCCCC;">Total Salary</th>
+            <th rowspan="2" style="background-color: #E5E7EB; font-weight: bold; border: 1px solid #CCCCCC;">Payment</th>
+            <th rowspan="2" style="background-color: #E5E7EB; font-weight: bold; border: 1px solid #CCCCCC;">Balance</th>
+          </tr>
+          <tr>
+            ${dateHeaders}
+          </tr>
+
+          <!-- Worker Rows -->
+          ${workerRows}
+
+          <!-- Grand Total Row -->
+          <tr style="background-color: #F4B400; font-weight: bold;">
+            <td colspan="4" style="text-align: right; border: 1px solid #000; font-weight: bold;">Grand Total</td>
+            <td colspan="${colspanDates}" style="border: 1px solid #000;"></td>
+            <td style="text-align: center; border: 1px solid #000; font-weight: bold;">${totalPresentSum}</td>
+            <td style="text-align: center; border: 1px solid #000; font-weight: bold;">${totalOTHoursSum}</td>
+            <td style="text-align: right; border: 1px solid #000; font-weight: bold;">₹${Math.round(totalSalarySum).toLocaleString('en-IN')}</td>
+            <td style="text-align: right; border: 1px solid #000; font-weight: bold;">₹0</td>
+            <td style="text-align: right; border: 1px solid #000; font-weight: bold;">₹${Math.round(totalSalarySum).toLocaleString('en-IN')}</td>
+          </tr>
+        </table>
+      </body>
+      </html>
+    `;
+
+    const blob = new Blob([htmlTable], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    const siteSlug = siteName.toLowerCase().replace(/[^a-z0-9]/g, '_');
+    const periodSlug = downloadType === 'MONTH' ? `${monthName}_${year}` : `${downloadYear}`;
+    a.download = `apni_estate_attendance_${siteSlug}_${periodSlug}.xls`;
+    a.click();
+  };
+
+  const handleDownloadReport = async () => {
+    setDownloading(true);
+    try {
+      let fromStr = '';
+      let toStr = '';
+      if (downloadType === 'MONTH') {
+        const lastDay = new Date(downloadYear, downloadMonth + 1, 0).getDate();
+        fromStr = `${downloadYear}-${String(downloadMonth + 1).padStart(2, '0')}-01`;
+        toStr = `${downloadYear}-${String(downloadMonth + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+      } else {
+        fromStr = `${downloadYear}-01-01`;
+        toStr = `${downloadYear}-12-31`;
+      }
+
+      const params = new URLSearchParams();
+      params.append('from', fromStr);
+      params.append('to', toStr);
+      if (selectedSiteId) {
+        params.append('site_id', selectedSiteId);
+      }
+
+      const res = await apiClient.get<any>(`/attendance/report?${params.toString()}`);
+      if (res.data) {
+        generateExcelSheet(res.data, fromStr, toStr);
+        setShowDownloadModal(false);
+      }
+    } catch (err) {
+      console.error('Failed to download report', err);
+      alert('Failed to generate report.');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   // Metrics Formulas
   const totalMarked = workers.filter(w => w.status !== 'UNMARKED').length;
-  const presentCount = workers.filter(w => ['PRESENT', 'LATE', 'HALF_DAY'].includes(w.status)).length;
+  const presentCount = workers.filter(w => ['PRESENT', 'LATE'].includes(w.status)).length;
+  const halfDayCount = workers.filter(w => w.status === 'HALF_DAY').length;
   const absentCount = workers.filter(w => w.status === 'ABSENT').length;
   const leaveCount = workers.filter(w => w.status === 'ON_LEAVE').length;
-  const totalOTHours = workers.reduce((sum, w) => sum + (w.overtime_hours || 0), 0);
-  const attendanceRate = totalMarked > 0 ? Math.round((presentCount / workers.length) * 100) : 0;
-  const laborUtilization = workers.length > 0 ? Math.round((presentCount / workers.length) * 100) : 0;
+  const overtimeCount = workers.filter(w => (w.overtime_hours || 0) > 0).length;
+  
+  const dailyLabourCost = workers.reduce((sum, w) => {
+    let cost = 0;
+    if (['PRESENT', 'LATE'].includes(w.status)) cost += w.daily_rate;
+    if (w.status === 'HALF_DAY') cost += w.daily_rate / 2;
+    // OT simplified estimation (assume daily rate / 8 is hourly rate)
+    if (w.overtime_hours) cost += (w.daily_rate / 8) * w.overtime_hours * 1.5; 
+    return sum + cost;
+  }, 0);
 
-  const isToday = date.toDateString() === new Date().toDateString();
+  const totalWageLiability = workers.reduce((sum, w) => sum + (w.daily_rate || 0), 0);
+  const attendanceRate = totalMarked > 0 ? Math.round(((presentCount + (halfDayCount * 0.5)) / totalMarked) * 100) : 0;
+  const laborUtilization = workers.length > 0 ? Math.round(((presentCount + (halfDayCount * 0.5)) / workers.length) * 100) : 0;
 
-  if (loading) return <LoadingSpinner size="lg" />;
+  // Weekly Strip Logic
+  const startOfCurrentWeek = startOfWeek(date, { weekStartsOn: 1 }); // Monday start
+  const weekDays = Array.from({ length: 7 }).map((_, i) => addDays(startOfCurrentWeek, i));
+
+  if (loading && workers.length === 0) return <LoadingSpinner size="lg" />;
 
   return (
-    <div className="animate-fade-in texture-grain" style={{ paddingBottom: 'var(--space-12)' }}>
-      {/* Header */}
-      <div className="page-header">
-        <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
-          <div>
-            <h1 className="page-title">Daily Attendance Logs</h1>
-            <p className="page-subtitle">Record labor utilization, overtime hours, and check-in times</p>
-          </div>
-          {selectedSiteId && workers.length > 0 && (
-            <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-              <button className="btn btn-secondary btn-sm" onClick={() => handleBulkMark('PRESENT')} disabled={savingBulk}>
-                Mark All Present
-              </button>
-              <button className="btn btn-ghost btn-sm text-danger" onClick={() => handleBulkMark('ABSENT')} disabled={savingBulk} style={{ color: 'var(--color-danger)' }}>
-                Mark All Absent
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Date Selector & Site Filter */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-        gap: 'var(--space-4)',
-        marginBottom: 'var(--space-5)'
-      }}>
-        {/* Date Selector */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          background: 'var(--color-surface)',
-          borderRadius: 'var(--radius-lg)',
-          padding: 'var(--space-3) var(--space-4)',
-          boxShadow: 'var(--shadow-card)',
-        }}>
-          <button className="btn btn-icon btn-ghost btn-sm" onClick={() => changeDate(-1)} aria-label="Previous day">
-            <ChevronLeft size={18} />
-          </button>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-bold)' }}>
-              {isToday ? 'Today' : date.toLocaleDateString('en-GB', { weekday: 'short' })}
-            </div>
-            <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
-              {date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-            </div>
-          </div>
-          <button className="btn btn-icon btn-ghost btn-sm" onClick={() => changeDate(1)} aria-label="Next day">
-            <ChevronRight size={18} />
-          </button>
-        </div>
-
-        {/* Site Dropdown */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--space-2)',
-          background: 'var(--color-surface)',
-          borderRadius: 'var(--radius-lg)',
-          padding: 'var(--space-2) var(--space-4)',
-          boxShadow: 'var(--shadow-card)',
-        }}>
-          <Filter size={16} color="var(--color-text-secondary)" />
-          <select
-            className="form-input form-select"
-            style={{ border: 'none', background: 'transparent', padding: 'var(--space-2)', fontSize: 'var(--font-size-sm)', width: '100%' }}
+    <div className="animate-fade-in texture-grain" style={{ paddingBottom: '260px' }}>
+      {/* Top Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-4) var(--space-4) var(--space-2)' }}>
+        <button className="btn btn-icon btn-ghost btn-sm" onClick={() => window.history.back()}>
+          <ChevronLeft size={20} />
+        </button>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+          <h1 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', margin: 0 }}>
+            Attendance: {selectedSiteId ? sites.find(s => s.id === selectedSiteId)?.name : 'All Sites'}
+          </h1>
+          <select 
+            style={{ opacity: 0, position: 'absolute', width: '200px', cursor: 'pointer' }}
             value={selectedSiteId}
-            onChange={e => setSelectedSiteId(e.target.value)}
+            onChange={(e) => setSelectedSiteId(e.target.value)}
           >
-            <option value="">All Company Workforce</option>
-            {sites.map(site => (
-              <option key={site.id} value={site.id}>{site.name} ({site.location})</option>
-            ))}
+            <option value="">All Sites</option>
+            {sites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
         </div>
+        <button className="btn btn-icon btn-ghost btn-sm" style={{ color: 'var(--color-primary)' }}>
+          <UserCheck size={20} />
+        </button>
+      </div>
+      
+      <div style={{ textAlign: 'center', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)', marginBottom: 'var(--space-3)' }}>
+        {format(date, 'dd MMM yyyy')}
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid-4" style={{ marginBottom: 'var(--space-5)' }}>
-        <div style={{ background: 'var(--color-success-bg)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-4)', textAlign: 'center' }}>
-          <div style={{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-success)' }}>{presentCount}</div>
-          <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-success)', fontWeight: 'var(--font-weight-medium)' }}>Present Days</div>
-        </div>
-        <div style={{ background: 'var(--color-danger-bg)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-4)', textAlign: 'center' }}>
-          <div style={{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-danger)' }}>{absentCount}</div>
-          <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-danger)', fontWeight: 'var(--font-weight-medium)' }}>Absent Days</div>
-        </div>
-        <div style={{ background: 'var(--color-info-bg)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-4)', textAlign: 'center' }}>
-          <div style={{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-info)' }}>{totalOTHours} hrs</div>
-          <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-info)', fontWeight: 'var(--font-weight-medium)' }}>OT Hours</div>
-        </div>
-        <div style={{ background: 'var(--color-primary-50)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-4)', textAlign: 'center' }}>
-          <div style={{ fontSize: 'var(--font-size-xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-primary)' }}>{laborUtilization}%</div>
-          <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-primary)', fontWeight: 'var(--font-weight-medium)' }}>Workforce Utilization</div>
-        </div>
-      </div>
-
-      {/* Workforce Table/Card Grid */}
-      {workers.length === 0 ? (
-        <EmptyState
-          icon={<Users size={40} />}
-          title="No workers assigned"
-          description="Ensure you have workers active and assigned to this site in the Workers directory."
-        />
-      ) : (
-        <div className="card" style={{ overflow: 'hidden' }}>
-          {workers.map((worker) => (
-            <div
-              key={worker.id}
-              className="list-card hover-row"
-              style={{ padding: 'var(--space-3) var(--space-4)', alignItems: 'center' }}
-            >
-              <div className="list-card-content" style={{ minWidth: '150px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span className="list-card-title">{worker.name}</span>
-                  {worker.contractor_name && (
-                    <span className="badge" style={{ background: '#F3F4F6', color: '#6B7280', fontSize: '9px', padding: '1px 6px' }}>
-                      {worker.contractor_name}
-                    </span>
-                  )}
-                </div>
-                <div className="list-card-subtitle" style={{ fontSize: 'var(--font-size-xs)' }}>
-                  {worker.trade} · {worker.site_name || 'No assigned site'}
-                </div>
-              </div>
-
-              {/* Status Action Row */}
-              <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', flex: 1, justifyContent: 'center' }}>
-                <StatusButton active={worker.status === 'PRESENT'} color="var(--color-success)" onClick={() => handleStatusChange(worker.id, 'PRESENT')}>Present</StatusButton>
-                <StatusButton active={worker.status === 'LATE'} color="var(--color-warning)" onClick={() => handleStatusChange(worker.id, 'LATE')}>Late</StatusButton>
-                <StatusButton active={worker.status === 'HALF_DAY'} color="#D97706" onClick={() => handleStatusChange(worker.id, 'HALF_DAY')}>Half Day</StatusButton>
-                <StatusButton active={worker.status === 'ABSENT'} color="var(--color-danger)" onClick={() => handleStatusChange(worker.id, 'ABSENT')}>Absent</StatusButton>
-                <StatusButton active={worker.status === 'ON_LEAVE'} color="var(--color-info)" onClick={() => handleStatusChange(worker.id, 'ON_LEAVE')}>Leave</StatusButton>
-              </div>
-
-              {/* OT and Corrections actions */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)', minWidth: '120px', justifyContent: 'flex-end' }}>
-                <div style={{ textAlign: 'right' }}>
-                  {worker.overtime_hours > 0 && (
-                    <div style={{ fontSize: '11px', color: 'var(--color-success)', fontWeight: 'bold' }}>
-                      +{worker.overtime_hours} hrs OT
-                    </div>
-                  )}
-                  {worker.check_in && (
-                    <div style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>
-                      In: {new Date(worker.check_in).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
-                    </div>
-                  )}
-                </div>
-                <button
-                  className="btn btn-ghost btn-icon btn-sm"
-                  onClick={() => openEditModal(worker)}
-                  title="Correct Attendance or Set Overtime Details"
-                >
-                  <Edit3 size={15} />
-                </button>
-              </div>
-
+      {/* Summary Card */}
+      <div style={{ padding: '0 var(--space-4)' }}>
+        <div style={{ 
+          background: 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%)', 
+          color: 'white', 
+          borderRadius: 'var(--radius-lg)', 
+          padding: 'var(--space-4)', 
+          boxShadow: 'var(--shadow-md)',
+          marginBottom: 'var(--space-4)'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-4)' }}>
+            <div>
+              <div style={{ fontSize: 'var(--font-size-xs)', opacity: 0.8, marginBottom: '2px' }}>Total Cost</div>
+              <div style={{ fontSize: 'var(--font-size-3xl)', fontWeight: 'bold', lineHeight: 1 }}>₹ {Math.round(dailyLabourCost).toLocaleString()}</div>
             </div>
-          ))}
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ color: '#4ADE80', fontWeight: 'bold', fontSize: 'var(--font-size-sm)' }}>Present: {presentCount}</div>
+              <div style={{ color: '#FCD34D', fontSize: 'var(--font-size-xs)' }}>Half Day: {halfDayCount}</div>
+            </div>
+          </div>
+          
+          <div style={{ 
+            fontSize: 'var(--font-size-xs)', 
+            opacity: 0.9, 
+            display: 'flex', 
+            flexWrap: 'wrap', 
+            gap: 'var(--space-2)', 
+            borderTop: '1px solid rgba(255,255,255,0.2)', 
+            paddingTop: 'var(--space-3)' 
+          }}>
+            <span>Abs: {absentCount}</span>
+            <span>|</span>
+            <span>Leave: {leaveCount}</span>
+            <span>|</span>
+            <span>OT: {overtimeCount}</span>
+            <span>|</span>
+            <span>Util: {laborUtilization}%</span>
+          </div>
         </div>
-      )}
+      </div>
+
+      {/* Weekly Strip */}
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        padding: '0 var(--space-4)',
+        marginBottom: 'var(--space-4)'
+      }}>
+        {weekDays.map(day => {
+          const isSelected = isSameDay(date, day);
+          const isToday = isSameDay(new Date(), day);
+          
+          return (
+            <div 
+              key={day.toISOString()}
+              onClick={() => setDate(day)}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '4px',
+                cursor: 'pointer',
+                opacity: isSelected ? 1 : 0.6,
+                transition: 'all 0.2s'
+              }}
+            >
+              <div style={{ fontSize: '10px', textTransform: 'uppercase', fontWeight: isSelected ? 'bold' : 'normal', color: isSelected ? 'var(--color-primary)' : 'var(--color-text-secondary)' }}>
+                {format(day, 'EEE')}
+              </div>
+              <div style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '13px',
+                fontWeight: 'bold',
+                background: isSelected ? 'var(--color-primary)' : (isToday ? 'rgba(10, 61, 145, 0.1)' : 'transparent'),
+                color: isSelected ? 'white' : 'var(--color-text)',
+                boxShadow: isSelected ? '0 4px 8px rgba(10, 61, 145, 0.3)' : 'none'
+              }}>
+                {format(day, 'dd')}
+              </div>
+              {/* Optional: dot indicator for marked days could go here */}
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{ textAlign: 'center', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', marginBottom: 'var(--space-4)' }}>
+        Hidden/Leave Workers: {leaveCount} (Tap to manage)
+      </div>
+
+      {/* Workers List - High Density Mobile First */}
+      <div style={{ padding: '0 var(--space-2)' }}>
+        {workers.filter(w => w.status !== 'ON_LEAVE').map((worker) => (
+          <div
+            key={worker.id}
+            style={{
+              background: 'white',
+              borderRadius: 'var(--radius-md)',
+              padding: 'var(--space-3) var(--space-4)',
+              marginBottom: 'var(--space-2)',
+              boxShadow: 'var(--shadow-xs)',
+              border: '1px solid var(--color-border-light)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 'var(--space-2)'
+            }}
+          >
+            {/* Worker Info */}
+            <div style={{ flex: '1 1 120px', minWidth: 0 }}>
+              <div style={{ fontWeight: 'bold', fontSize: 'var(--font-size-sm)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {worker.name}
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', display: 'flex', gap: '4px', alignItems: 'center' }}>
+                <span style={{ color: 'var(--color-primary)', fontWeight: '500' }}>{worker.trade}</span>
+                <span>₹{worker.daily_rate}/day</span>
+              </div>
+              {worker.contractor_name && (
+                <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {worker.contractor_name}
+                </div>
+              )}
+            </div>
+
+            {/* Action Buttons (P, H, A, OT) */}
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <TapButton 
+                label="P" 
+                active={['PRESENT', 'LATE'].includes(worker.status)} 
+                color="#10B981" 
+                onClick={() => handleStatusChange(worker.id, 'PRESENT')} 
+              />
+              <TapButton 
+                label="H" 
+                active={worker.status === 'HALF_DAY'} 
+                color="#F59E0B" 
+                onClick={() => handleStatusChange(worker.id, 'HALF_DAY')} 
+              />
+              <TapButton 
+                label="A" 
+                active={worker.status === 'ABSENT'} 
+                color="#EF4444" 
+                onClick={() => handleStatusChange(worker.id, 'ABSENT')} 
+              />
+              <button 
+                onClick={() => openEditModal(worker)}
+                style={{
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '50%',
+                  border: 'none',
+                  background: worker.overtime_hours > 0 ? '#8B5CF6' : 'transparent',
+                  color: worker.overtime_hours > 0 ? 'white' : 'var(--color-text-secondary)',
+                  fontSize: '11px',
+                  fontWeight: 'bold',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer'
+                }}
+              >
+                OT
+              </button>
+              
+              <button 
+                className="btn btn-ghost btn-icon btn-sm" 
+                onClick={() => openEditModal(worker)}
+                style={{ marginLeft: '4px', color: 'var(--color-text-muted)' }}
+              >
+                <MoreVertical size={16} />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+      
+      {/* Sticky Save & Download Buttons */}
+      <div style={{ 
+        position: 'fixed', 
+        bottom: 'var(--bottom-nav-height)', 
+        left: 0, 
+        right: 0, 
+        padding: 'var(--space-4)',
+        background: 'linear-gradient(0deg, var(--color-bg) 70%, transparent 100%)',
+        zIndex: 10
+      }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <button 
+            className="btn btn-primary" 
+            style={{ width: '100%', borderRadius: 'var(--radius-full)', padding: 'var(--space-3) 0', fontSize: 'var(--font-size-md)', boxShadow: 'var(--shadow-md)' }}
+            onClick={() => {
+              // Since it auto-saves, this just provides reassurance
+              alert('Attendance data is automatically saved!');
+            }}
+          >
+            Save Attendance
+          </button>
+          <button 
+            className="btn btn-secondary" 
+            style={{ width: '100%', borderRadius: 'var(--radius-full)', padding: 'var(--space-3) 0', fontSize: 'var(--font-size-md)', border: '1px solid var(--color-border)', backgroundColor: '#FFFFFF' }}
+            onClick={() => setShowDownloadModal(true)}
+          >
+            Download Attendance Report
+          </button>
+        </div>
+      </div>
 
       {/* Edit Worker Details Modal */}
       {selectedWorker && (
@@ -493,38 +758,101 @@ export default function AttendancePage() {
         </Modal>
       )}
 
+      {/* Download Attendance Modal */}
+      <Modal
+        isOpen={showDownloadModal}
+        onClose={() => setShowDownloadModal(false)}
+        title="Download Attendance Report"
+        footer={
+          <>
+            <button className="btn btn-secondary" onClick={() => setShowDownloadModal(false)}>Cancel</button>
+            <button className="btn btn-primary" onClick={handleDownloadReport} disabled={downloading}>
+              {downloading ? 'Generating...' : 'Download excel'}
+            </button>
+          </>
+        }
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+          <div className="form-group">
+            <label className="form-label" htmlFor="download-type">Report Period</label>
+            <select
+              id="download-type"
+              className="form-input form-select"
+              value={downloadType}
+              onChange={e => setDownloadType(e.target.value as any)}
+            >
+              <option value="MONTH">Monthly Sheet</option>
+              <option value="YEAR">Yearly Sheet</option>
+            </select>
+          </div>
+
+          {downloadType === 'MONTH' && (
+            <div className="form-group">
+              <label className="form-label" htmlFor="download-month">Select Month</label>
+              <select
+                id="download-month"
+                className="form-input form-select"
+                value={downloadMonth}
+                onChange={e => setDownloadMonth(Number(e.target.value))}
+              >
+                <option value={0}>January</option>
+                <option value={1}>February</option>
+                <option value={2}>March</option>
+                <option value={3}>April</option>
+                <option value={4}>May</option>
+                <option value={5}>June</option>
+                <option value={6}>July</option>
+                <option value={7}>August</option>
+                <option value={8}>September</option>
+                <option value={9}>October</option>
+                <option value={10}>November</option>
+                <option value={11}>December</option>
+              </select>
+            </div>
+          )}
+
+          <div className="form-group">
+            <label className="form-label" htmlFor="download-year">Select Year</label>
+            <select
+              id="download-year"
+              className="form-input form-select"
+              value={downloadYear}
+              onChange={e => setDownloadYear(Number(e.target.value))}
+            >
+              <option value={2025}>2025</option>
+              <option value={2026}>2026</option>
+              <option value={2027}>2027</option>
+            </select>
+          </div>
+        </div>
+      </Modal>
+
     </div>
   );
 }
 
-function StatusButton({
-  active,
-  color,
-  onClick,
-  children
-}: {
-  active: boolean;
-  color: string;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
+function TapButton({ label, active, color, onClick }: { label: string, active: boolean, color: string, onClick: () => void }) {
   return (
     <button
-      type="button"
-      className="btn btn-sm"
-      style={{
-        padding: 'var(--space-2) var(--space-3)',
-        borderRadius: 'var(--radius-md)',
-        fontSize: '11px',
-        fontWeight: 'bold',
-        transition: 'all 0.2s',
-        border: `1px solid ${color}`,
-        background: active ? color : 'transparent',
-        color: active ? '#fff' : color,
-      }}
       onClick={onClick}
+      style={{
+        width: '28px',
+        height: '28px',
+        borderRadius: '50%',
+        border: active ? `none` : `1px solid transparent`,
+        background: active ? color : '#F3F4F6',
+        color: active ? 'white' : '#9CA3AF',
+        fontSize: '12px',
+        fontWeight: 'bold',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        cursor: 'pointer',
+        boxShadow: active ? `0 2px 4px ${color}40` : 'none',
+        transition: 'all 0.1s ease'
+      }}
     >
-      {children}
+      {label}
     </button>
   );
 }

@@ -34,7 +34,7 @@ export default function WorkersPage() {
   // Form Fields
   const [formName, setFormName] = useState('');
   const [formPhone, setFormPhone] = useState('');
-  const [formTrade, setFormTrade] = useState('MASON');
+  const [formTrade, setFormTrade] = useState('Labour');
   const [formDailyRate, setFormDailyRate] = useState(500);
   const [formStatus, setFormStatus] = useState<Worker['status']>('ACTIVE');
   const [formSiteId, setFormSiteId] = useState('');
@@ -161,7 +161,7 @@ export default function WorkersPage() {
     setSelectedWorker(null);
     setFormName('');
     setFormPhone('');
-    setFormTrade('MASON');
+    setFormTrade('Labour');
     setFormDailyRate(500);
     setFormStatus('ACTIVE');
     setFormSiteId('');
@@ -295,7 +295,7 @@ export default function WorkersPage() {
         </div>
       </div>
 
-      {/* Workers List Table */}
+      {/* Workers List - Mobile First Card Layout */}
       {filtered.length === 0 ? (
         <EmptyState
           icon={<Users size={36} />}
@@ -308,76 +308,64 @@ export default function WorkersPage() {
           }
         />
       ) : (
-        <div className="card">
-          <div className="card-body" style={{ padding: 0 }}>
-            <div className="table-container" style={{ border: 'none' }}>
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Worker Name</th>
-                    <th>Trade / Skill</th>
-                    <th>Status</th>
-                    <th>Daily Rate</th>
-                    <th>Current Site</th>
-                    <th>Contractor</th>
-                    <th>Phone</th>
-                    <th style={{ width: 100 }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((worker) => (
-                    <tr key={worker.id} style={{ transition: 'background-color 0.2s' }} className="hover-row">
-                      <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-                          <div className="avatar avatar-sm" style={{ background: '#E0E7FF', color: '#4F46E5', fontWeight: 'bold' }}>
-                            {worker.name.slice(0, 2).toUpperCase()}
-                          </div>
-                          <div>
-                            <div style={{ fontWeight: 'var(--font-weight-medium)' }}>{worker.name}</div>
-                            {worker.aadhaar_number && (
-                              <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>
-                                Aadhaar: {worker.aadhaar_number}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                      <td>
-                        <span className="badge" style={{ background: '#F3F4F6', color: '#374151', textTransform: 'uppercase' }}>
-                          {worker.trade}
-                        </span>
-                      </td>
-                      <td>
-                        <StatusBadge status={worker.status} />
-                      </td>
-                      <td style={{ fontWeight: '600' }}>₹{worker.daily_rate}</td>
-                      <td>{worker.site?.name || <span style={{ color: 'var(--color-text-muted)', fontStyle: 'italic' }}>Unassigned</span>}</td>
-                      <td>{worker.contractor?.name || <span style={{ color: 'var(--color-text-muted)' }}>Direct Hire</span>}</td>
-                      <td style={{ color: 'var(--color-text-secondary)' }}>{worker.phone || '—'}</td>
-                      <td>
-                        <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                          <button
-                            className="btn btn-ghost btn-icon btn-sm"
-                            onClick={() => openEditModal(worker)}
-                            title="Edit Worker"
-                          >
-                            <Edit2 size={15} />
-                          </button>
-                          <button
-                            className="btn btn-ghost btn-icon btn-sm text-danger"
-                            onClick={() => handleDelete(worker.id)}
-                            title="Delete Worker"
-                          >
-                            <Trash2 size={15} color="#EF4444" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+        <div className="card" style={{ overflow: 'hidden' }}>
+          {filtered.map((worker) => (
+            <div
+              key={worker.id}
+              className="list-card hover-row"
+              style={{ padding: 'var(--space-3) var(--space-4)', alignItems: 'center', borderBottom: '1px solid var(--color-border)', display: 'flex', flexWrap: 'wrap', gap: 'var(--space-3)', justifyContent: 'space-between' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flex: '1 1 200px' }}>
+                <div className="avatar avatar-sm" style={{ background: '#E0E7FF', color: '#4F46E5', fontWeight: 'bold' }}>
+                  {worker.name.slice(0, 2).toUpperCase()}
+                </div>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontWeight: 'var(--font-weight-medium)', fontSize: 'var(--font-size-md)' }}>{worker.name}</span>
+                    <StatusBadge status={worker.status} />
+                  </div>
+                  <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                    <span style={{ fontWeight: 'var(--font-weight-medium)', color: 'var(--color-primary)' }}>{worker.trade}</span>
+                    <span>•</span>
+                    <span>₹{worker.daily_rate}/day</span>
+                    <span>•</span>
+                    <span>{worker.phone || 'No phone'}</span>
+                  </div>
+                  <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '4px' }}>
+                    <span>Site: {worker.site?.name || 'Unassigned'}</span>
+                    {worker.contractor?.name && (
+                      <>
+                        <span>•</span>
+                        <span>Contractor: {worker.contractor.name}</span>
+                      </>
+                    )}
+                    {worker.aadhaar_number && (
+                      <>
+                        <span>•</span>
+                        <span>Aadhaar: {worker.aadhaar_number}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                <button
+                  className="btn btn-ghost btn-icon btn-sm"
+                  onClick={() => openEditModal(worker)}
+                  title="Edit Worker"
+                >
+                  <Edit2 size={18} />
+                </button>
+                <button
+                  className="btn btn-ghost btn-icon btn-sm text-danger"
+                  onClick={() => handleDelete(worker.id)}
+                  title="Delete Worker"
+                >
+                  <Trash2 size={18} color="#EF4444" />
+                </button>
+              </div>
             </div>
-          </div>
+          ))}
         </div>
       )}
 
@@ -418,13 +406,17 @@ export default function WorkersPage() {
             <div className="form-group">
               <label className="form-label" htmlFor="w-trade">Trade / Skill Type *</label>
               <select id="w-trade" className="form-input form-select" value={formTrade} onChange={(e) => setFormTrade(e.target.value)}>
-                <option value="MASON">Mason (Rajmistri)</option>
-                <option value="LABOUR">General Labour (Mazdoor)</option>
-                <option value="CARPENTER">Carpenter</option>
-                <option value="PLUMBER">Plumber</option>
-                <option value="ELECTRICIAN">Electrician</option>
-                <option value="PAINTER">Painter</option>
-                <option value="SUPERVISOR">Labour Supervisor</option>
+                <option value="Labour">Labour</option>
+                <option value="Mason">Mason</option>
+                <option value="Electrician">Electrician</option>
+                <option value="Plumber">Plumber</option>
+                <option value="Carpenter">Carpenter</option>
+                <option value="Painter">Painter</option>
+                <option value="Welder">Welder</option>
+                <option value="Technician">Technician</option>
+                <option value="Supervisor">Supervisor</option>
+                <option value="Helper">Helper</option>
+                <option value="Contractor Staff">Contractor Staff</option>
               </select>
             </div>
             <div className="form-group">
@@ -530,13 +522,17 @@ export default function WorkersPage() {
             <div className="form-group">
               <label className="form-label" htmlFor="edit-w-trade">Trade / Skill Type *</label>
               <select id="edit-w-trade" className="form-input form-select" value={formTrade} onChange={(e) => setFormTrade(e.target.value)}>
-                <option value="MASON">Mason (Rajmistri)</option>
-                <option value="LABOUR">General Labour (Mazdoor)</option>
-                <option value="CARPENTER">Carpenter</option>
-                <option value="PLUMBER">Plumber</option>
-                <option value="ELECTRICIAN">Electrician</option>
-                <option value="PAINTER">Painter</option>
-                <option value="SUPERVISOR">Labour Supervisor</option>
+                <option value="Labour">Labour</option>
+                <option value="Mason">Mason</option>
+                <option value="Electrician">Electrician</option>
+                <option value="Plumber">Plumber</option>
+                <option value="Carpenter">Carpenter</option>
+                <option value="Painter">Painter</option>
+                <option value="Welder">Welder</option>
+                <option value="Technician">Technician</option>
+                <option value="Supervisor">Supervisor</option>
+                <option value="Helper">Helper</option>
+                <option value="Contractor Staff">Contractor Staff</option>
               </select>
             </div>
             <div className="form-group">

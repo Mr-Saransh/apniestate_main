@@ -18,6 +18,7 @@ import {
   Users,
   Calendar,
   Layers,
+  Calculator,
 } from 'lucide-react';
 
 const mainNav = [
@@ -36,6 +37,7 @@ const managementNav = [
   { to: '/workers', icon: Users, label: 'Workers' },
   { to: '/contractors', icon: Layers, label: 'Contractors' },
   { to: '/leaves', icon: Calendar, label: 'Leaves' },
+  { to: '/payroll', icon: Calculator, label: 'Payroll' },
 ];
 
 const financeNav = [
@@ -82,6 +84,7 @@ export default function Sidebar() {
       case '/workers': return hasPermission('workers.read');
       case '/contractors': return hasPermission('contractors.read');
       case '/leaves': return hasPermission('leaves.read');
+      case '/payroll': return hasPermission('workers.read');
       case '/finance': return hasPermission('finance.read');
       case '/invoices': return hasPermission('invoices.read');
       case '/payments': return hasPermission('payments.read');

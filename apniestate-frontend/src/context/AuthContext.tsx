@@ -45,7 +45,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       permissionsApi.getMyPermissions()
         .then((res) => {
           if (res.success && res.data) {
-            setPermissions(res.data.permissions);
+            const backendRole = res.data.role as AuthUser['role'];
+            const permissionsList = res.data.permissions;
+            setPermissions(permissionsList);
+            setUser(prevUser => {
+              if (prevUser && prevUser.role !== backendRole) {
+                const updated = { ...prevUser, role: backendRole };
+                localStorage.setItem('user', JSON.stringify(updated));
+                return updated;
+              }
+              return prevUser;
+            });
           }
         })
         .catch((err) => {
@@ -116,7 +126,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const hasPermission = useCallback((permission: string) => {
-    if (user?.role === 'ADMIN' || user?.role === 'SITE_SUPERVISOR') return true;
+    if (user?.role === 'ADMIN') return true;
+    if (user?.role === 'SITE_SUPERVISOR') {
+      if (permission.startsWith('users.')) {
+        return permissions.includes(permission);
+      }
+      return true;
+    }
     return permissions.includes(permission);
   }, [permissions, user]);
 

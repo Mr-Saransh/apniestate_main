@@ -1,6 +1,7 @@
 import { useState, useEffect, type FormEvent } from 'react';
-import { ClipboardList, Plus, Search, Calendar, MapPin, CloudSun, AlertCircle, FileText, Trash2, Eye, User, Users } from 'lucide-react';
+import { ClipboardList, Plus, Search, Calendar, MapPin, CloudSun, AlertCircle, FileText, Trash2, Eye, User, Users, Download } from 'lucide-react';
 import { dprApi, type DPR } from '@/api/dpr';
+import { generateDprPdf } from '@/components/shared/PdfGenerator';
 import { apiClient } from '@/api/client';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import EmptyState from '@/components/shared/EmptyState';
@@ -122,6 +123,12 @@ export default function DprPage() {
   const openDetails = (dpr: DPR) => {
     setSelectedDpr(dpr);
     setShowDetailModal(true);
+  };
+
+  const handleDownloadPdf = () => {
+    if (!selectedDpr) return;
+    const doc = generateDprPdf(selectedDpr, selectedDpr.site?.name || 'Unknown Site');
+    doc.save(`DPR_${selectedDpr.site?.name || 'Site'}_${selectedDpr.report_date.split('T')[0]}.pdf`);
   };
 
   if (loading) return <LoadingSpinner size="lg" />;
@@ -315,7 +322,12 @@ export default function DprPage() {
           onClose={() => setShowDetailModal(false)}
           title={`DPR Log: ${selectedDpr.site?.name || 'Site location'}`}
           footer={
-            <button className="btn btn-secondary" onClick={() => setShowDetailModal(false)}>Close Details</button>
+            <div style={{ display: 'flex', gap: '8px', width: '100%', justifyContent: 'flex-end' }}>
+              <button className="btn btn-primary" onClick={handleDownloadPdf} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Download size={16} /> Download PDF
+              </button>
+              <button className="btn btn-secondary" onClick={() => setShowDetailModal(false)}>Close</button>
+            </div>
           }
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', fontSize: 'var(--font-size-sm)' }}>

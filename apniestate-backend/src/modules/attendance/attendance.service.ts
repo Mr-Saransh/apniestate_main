@@ -39,7 +39,8 @@ export async function getAttendances(userId: string, dateStr?: string, siteId?: 
       notes: att?.notes || null,
       site_id: w.site_id,
       site_name: w.site?.name || null,
-      contractor_name: w.contractor?.name || null
+      contractor_name: w.contractor?.name || null,
+      daily_rate: w.daily_rate || 0
     };
   });
 }

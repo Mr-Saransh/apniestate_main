@@ -1,5 +1,6 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useAuth } from '@/context/AuthContext';
 import { projectsApi, type Project } from '@/api/projects';
 import { milestonesApi, type Milestone } from '@/api/milestones';
 import { budgetsApi, type Budget } from '@/api/budgets';
@@ -34,6 +35,7 @@ import {
 const tabs = ['Overview', 'Milestones', 'Sites', 'Tasks', 'Finance', 'Timeline'];
 
 export default function ProjectDetailPage() {
+  const { hasPermission } = useAuth();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   
@@ -136,8 +138,10 @@ export default function ProjectDetailPage() {
       const timelineRes = await apiClient.get<any>(`/projects/${id}/timeline`);
       if (timelineRes.data) setTimelineData(timelineRes.data);
 
-      // Fetch Users list (for manager assignment dropdown)
-      const usersRes = await usersApi.getAll();
+      let usersRes: any = { data: [] };
+      if (hasPermission('users.read')) {
+        usersRes = await usersApi.getAll().catch(() => ({ data: [] }));
+      }
       if (usersRes.data) setUsers(usersRes.data);
 
     } catch (err) {

@@ -28,6 +28,7 @@ import InvoicesPage from '@/pages/InvoicesPage';
 import PaymentsPage from '@/pages/PaymentsPage';
 import BudgetsPage from '@/pages/BudgetsPage';
 import DprPage from '@/pages/DprPage';
+import PayrollPage from '@/pages/PayrollPage';
 import RouteGuard from '@/components/shared/RouteGuard';
 
 export default function App() {
@@ -101,6 +102,9 @@ export default function App() {
             </Route>
             <Route element={<RouteGuard permission="budgets.read" />}>
               <Route path="/budgets" element={<BudgetsPage />} />
+            </Route>
+            <Route element={<RouteGuard permission="workers.read" />}>
+              <Route path="/payroll" element={<PayrollPage />} />
             </Route>
           </Route>
         </Routes>

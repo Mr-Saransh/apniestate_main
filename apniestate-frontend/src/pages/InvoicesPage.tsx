@@ -6,7 +6,8 @@ import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import EmptyState from '@/components/shared/EmptyState';
 import StatCard from '@/components/shared/StatCard';
 import StatusBadge from '@/components/shared/StatusBadge';
-import { Plus, Search, FileText, Calendar, Edit2, Trash2, IndianRupee } from 'lucide-react';
+import { Plus, Search, FileText, Calendar, Edit2, Trash2, IndianRupee, Download } from 'lucide-react';
+import { generateInvoicePdf } from '@/components/shared/PdfGenerator';
 
 export default function InvoicesPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -116,6 +117,11 @@ export default function InvoicesPage() {
     } catch (err) {
       console.error('Failed to delete invoice', err);
     }
+  };
+
+  const handleDownloadPdf = (invoice: Invoice) => {
+    const doc = generateInvoicePdf(invoice, invoice.vendor);
+    doc.save(`Invoice_${invoice.number}.pdf`);
   };
 
   const openEditModal = (invoice: Invoice) => {
@@ -280,6 +286,13 @@ export default function InvoicesPage() {
                       </td>
                       <td>
                         <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                          <button
+                            className="btn btn-ghost btn-icon btn-sm"
+                            onClick={() => handleDownloadPdf(invoice)}
+                            title="Download PDF"
+                          >
+                            <Download size={15} />
+                          </button>
                           <button
                             className="btn btn-ghost btn-icon btn-sm"
                             onClick={() => openEditModal(invoice)}

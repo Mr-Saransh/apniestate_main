@@ -1,102 +1,52 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/context/AuthContext';
-import { projectsApi, type Project } from '@/api/projects';
-import { tasksApi, type Task } from '@/api/tasks';
 import { apiClient } from '@/api/client';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import {
-  PrimaryCard,
-  SecondaryCard,
-  StatCard,
-  ActionCard,
-  EmptyState,
-  Badge,
-  Button
-} from '@/components/design-system';
-import {
-  Clock,
-  ArrowRight,
-  ClipboardCheck,
-  CheckCircle2,
-  Package,
-  UserCheck,
+  Building2,
+  Users,
   Wallet,
-  FileText,
+  ClipboardCheck,
+  Package,
   Plus,
-  Bell,
-  Check,
-  X,
+  AlertCircle,
+  AlertTriangle,
   FileWarning,
-  TrendingUp,
-  FolderKanban
+  CheckCircle,
+  ChevronRight,
+  FileText,
+  Clock,
+  Calendar,
+  CheckCircle2
 } from 'lucide-react';
-import PieChart from '@/components/charts/PieChart';
-import BarChart from '@/components/charts/BarChart';
 
 export default function DashboardPage() {
-  const { user } = useAuth();
   const navigate = useNavigate();
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [activityLogs, setActivityLogs] = useState<any[]>([]);
-  const [pendingRequests, setPendingRequests] = useState<any[]>([]);
+  const [currentProject, setCurrentProject] = useState<any>(null);
+  const [attendanceSummary, setAttendanceSummary] = useState<any>(null);
+  const [todayTasks, setTodayTasks] = useState<any[]>([]);
+  const [recentActivities, setRecentActivities] = useState<any[]>([]);
+  const [pendingMaterials, setPendingMaterials] = useState<any[]>([]);
+  const [dprStatus, setDprStatus] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [actionInProgress, setActionInProgress] = useState<string | null>(null);
 
   const fetchDashboardData = async () => {
     try {
-      const [projRes, tasksRes, notifRes, logsRes, matReqRes, leavesRes, expensesRes] = await Promise.all([
-        projectsApi.getAll(),
-        tasksApi.getAll(),
-        apiClient.get<any>('/notifications'),
-        apiClient.get<any[]>('/activity-logs?limit=5'),
-        apiClient.get<any[]>('/material-requests').catch(() => ({ data: [] })),
-        apiClient.get<any[]>('/leaves').catch(() => ({ data: [] })),
-        apiClient.get<any[]>('/finance').catch(() => ({ data: [] }))
+      const [projRes, attRes, tasksRes, actRes, matRes, dprRes] = await Promise.all([
+        apiClient.get<any>('/projects/current').catch(() => ({ data: null } as any)),
+        apiClient.get<any>('/attendance/summary').catch(() => ({ data: null } as any)),
+        apiClient.get<any[]>('/tasks/today').catch(() => ({ data: [] } as any)),
+        apiClient.get<any[]>('/activities/recent').catch(() => ({ data: [] } as any)),
+        apiClient.get<any[]>('/materials/pending').catch(() => ({ data: [] } as any)),
+        apiClient.get<any>('/dpr/pending').catch(() => ({ data: null } as any))
       ]);
 
-      if (projRes.data) setProjects(projRes.data);
-      if (tasksRes.data) setTasks(tasksRes.data);
-      if (notifRes.data) setUnreadCount(notifRes.data.unread_count || 0);
-      if (logsRes.data) setActivityLogs(logsRes.data);
-
-      // Consolidate live pending approvals
-      const pendingMat = (matReqRes.data || [])
-        .filter((r: any) => r.status === 'PENDING')
-        .map((r: any) => ({
-          id: r.id,
-          category: 'material-requests',
-          type: 'Material Request',
-          title: `${r.material?.name || 'Material'} for ${r.site?.name || 'Site'}`,
-          quantity: `${r.quantity} ${r.material?.unit || ''}`,
-          date: r.created_at
-        }));
-
-      const pendingExp = (expensesRes.data || [])
-        .filter((r: any) => r.status === 'PENDING')
-        .map((r: any) => ({
-          id: r.id,
-          category: 'finance',
-          type: 'Expense Approval',
-          title: `${r.category} - ${r.description || 'No description'}`,
-          quantity: `₹${r.amount}`,
-          date: r.created_at
-        }));
-
-      const pendingLeaves = (leavesRes.data || [])
-        .filter((r: any) => r.status === 'PENDING')
-        .map((r: any) => ({
-          id: r.id,
-          category: 'leaves',
-          type: 'Leave Request',
-          title: `${r.worker?.name || 'Worker'} - ${r.type}`,
-          quantity: `${new Date(r.from_date).toLocaleDateString()} to ${new Date(r.to_date).toLocaleDateString()}`,
-          date: r.created_at
-        }));
-
-      setPendingRequests([...pendingMat, ...pendingExp, ...pendingLeaves].slice(0, 5));
+      setCurrentProject(projRes.data);
+      setAttendanceSummary(attRes.data);
+      setTodayTasks(tasksRes.data || []);
+      setRecentActivities(actRes.data || []);
+      setPendingMaterials(matRes.data || []);
+      setDprStatus(dprRes.data);
     } catch (err) {
       console.error('Failed to load dashboard data', err);
     } finally {
@@ -108,396 +58,309 @@ export default function DashboardPage() {
     fetchDashboardData();
   }, []);
 
-  const handleApprovalAction = async (id: string, category: string, approve: boolean) => {
-    setActionInProgress(id);
-    try {
-      const status = approve ? 'APPROVED' : 'REJECTED';
-      if (category === 'material-requests') {
-        await apiClient.patch(`/material-requests/${id}`, { status });
-      } else if (category === 'finance') {
-        await apiClient.patch(`/finance/${id}`, { status });
-      } else if (category === 'leaves') {
-        await apiClient.patch(`/leaves/${id}`, { status });
-      }
-      await fetchDashboardData();
-    } catch (err) {
-      console.error('Failed to update approval status:', err);
-    } finally {
-      setActionInProgress(null);
-    }
-  };
-
   if (loading) return <LoadingSpinner size="lg" />;
 
-  const firstName = user?.name?.split(' ')[0] || 'Member';
-  const activeProjects = projects.filter(p => p.status === 'ACTIVE');
-  const currentProject = activeProjects[0] || projects[0];
-  const pendingTasks = tasks.filter(t => t.status !== 'DONE');
-  const overdueTasks = pendingTasks.filter(t => t.due_date && new Date(t.due_date) < new Date());
+  const hasProject = currentProject && currentProject.id;
 
-  // Statistics summaries
-  const lowStockCount = () => {
-    // Standard mock/simulation count of low items or calculated directly
-    return 1; // Seeds loaded mat_steel as low stock
-  };
+  // Compute Alerts
+  const alerts = [];
+  if (hasProject) {
+    if (dprStatus?.pending) {
+      alerts.push({
+        type: 'dpr',
+        title: 'Daily DPR Pending',
+        desc: "Submit today's progress report",
+        icon: FileWarning,
+        color: 'primary',
+        bg: 'rgba(10, 61, 145, 0.05)',
+        link: '/dpr'
+      });
+    }
+    if (pendingMaterials && pendingMaterials.length > 0) {
+      const materialsList = pendingMaterials.map(m => m.materialName).join(', ');
+      alerts.push({
+        type: 'materials',
+        title: `${pendingMaterials.length} Material Request${pendingMaterials.length > 1 ? 's' : ''} Pending`,
+        desc: materialsList || 'Cement, Steel, Bricks',
+        icon: AlertTriangle,
+        color: 'warning',
+        bg: 'rgba(245, 158, 11, 0.05)',
+        link: '/inventory'
+      });
+    }
+    if (currentProject.pendingTasks > 0) {
+      alerts.push({
+        type: 'overdue',
+        title: `${currentProject.pendingTasks} Pending Tasks`,
+        desc: 'Overdue or active work on site',
+        icon: AlertCircle,
+        color: 'error',
+        bg: 'rgba(220, 38, 38, 0.05)',
+        link: '/tasks'
+      });
+    }
+    if (currentProject.pendingMaterialRequests > 0 && (!pendingMaterials || pendingMaterials.length === 0)) {
+      alerts.push({
+        type: 'approval',
+        title: 'Approval Pending',
+        desc: 'Material requests awaiting signoff',
+        icon: Clock,
+        color: 'warning',
+        bg: 'rgba(245, 158, 11, 0.05)',
+        link: '/inventory'
+      });
+    }
+  }
 
   return (
-    <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      
-      {/* 1. Welcome Section */}
-      <PrimaryCard>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
-          <div>
-            <h1 style={{ fontSize: '26px', fontWeight: 700, margin: '0 0 4px 0', letterSpacing: '-0.025em', color: '#111827' }}>
-              Welcome back, {firstName}
-            </h1>
-            <p style={{ margin: 0, color: '#4B5563', fontSize: '14px' }}>
-              Here is your construction status overview for today.
-            </p>
+    <div className="cc-dashboard animate-fade-in">
+      {!hasProject ? (
+        <div className="cc-card cc-onboard-card">
+          <div className="cc-onboard-header">
+            <Building2 size={32} color="#0A3D91" />
+            <h2 className="cc-onboard-title">Start Your Site</h2>
           </div>
-          {currentProject && (
-            <div style={{ borderLeft: '3px solid #0A3D91', paddingLeft: '12px' }}>
-              <span style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', color: '#6B7280', letterSpacing: '0.05em' }}>
-                Current Project Focus
-              </span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
-                <span style={{ fontWeight: 600, color: '#111827', fontSize: '15px' }}>{currentProject.name}</span>
-                <Badge variant={currentProject.status === 'ACTIVE' ? 'success' : 'warning'}>
-                  {currentProject.status}
-                </Badge>
-              </div>
-            </div>
-          )}
-        </div>
-      </PrimaryCard>
-
-      {/* 2. Today's Focus Section */}
-      <div>
-        <h2 style={{ fontSize: '16px', fontWeight: 700, margin: '0 0 12px 0', color: '#111827', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-          Today's Focus
-        </h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
-          <StatCard
-            icon={<Bell size={20} />}
-            label="Unread Alerts"
-            value={unreadCount}
-            color={unreadCount > 0 ? '#DC2626' : '#0A3D91'}
-            bgColor={unreadCount > 0 ? 'rgba(220, 38, 38, 0.08)' : 'rgba(10, 61, 145, 0.08)'}
-            onClick={() => navigate('/notifications')}
-            style={{ cursor: 'pointer' }}
-          />
-          <StatCard
-            icon={<ClipboardCheck size={20} />}
-            label="Pending Tasks"
-            value={pendingTasks.length}
-            color={pendingTasks.length > 0 ? '#F59E0B' : '#16A34A'}
-            bgColor={pendingTasks.length > 0 ? 'rgba(245, 158, 11, 0.08)' : 'rgba(22, 163, 74, 0.08)'}
-            onClick={() => navigate('/tasks')}
-            style={{ cursor: 'pointer' }}
-          />
-          <StatCard
-            icon={<Clock size={20} />}
-            label="Overdue Tasks"
-            value={overdueTasks.length}
-            color={overdueTasks.length > 0 ? '#DC2626' : '#16A34A'}
-            bgColor={overdueTasks.length > 0 ? 'rgba(220, 38, 38, 0.08)' : 'rgba(22, 163, 74, 0.08)'}
-            onClick={() => navigate('/tasks')}
-            style={{ cursor: 'pointer' }}
-          />
-        </div>
-      </div>
-
-      {/* 3. Quick Actions */}
-      <div>
-        <h2 style={{ fontSize: '16px', fontWeight: 700, margin: '0 0 12px 0', color: '#111827', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-          Quick Actions
-        </h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
-          <ActionCard
-            icon={<UserCheck size={20} />}
-            label="Mark Attendance"
-            description="Log labor work log details"
-            onClick={() => navigate('/attendance')}
-          />
-          <ActionCard
-            icon={<ClipboardCheck size={20} />}
-            label="Update Tasks"
-            description="Review and complete checklist"
-            onClick={() => navigate('/tasks')}
-          />
-          <ActionCard
-            icon={<Package size={20} />}
-            label="Request Material"
-            description="Submit inventory request"
-            onClick={() => navigate('/inventory?create=true')}
-          />
-          <ActionCard
-            icon={<Plus size={20} />}
-            label="Create Task"
-            description="Assign work to sites"
-            onClick={() => navigate('/tasks?create=true')}
-          />
-        </div>
-
-      {/* 3.5 Graphical Overview */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px', marginTop: '8px' }}>
-        <PrimaryCard>
-          {tasks.length > 0 ? (
-            <PieChart 
-              title="Task Distribution"
-              labels={['To Do', 'In Progress', 'Done', 'Blocked']}
-              data={[
-                tasks.filter(t => t.status === 'TODO').length,
-                tasks.filter(t => t.status === 'IN_PROGRESS').length,
-                tasks.filter(t => t.status === 'DONE').length,
-                tasks.filter(t => t.status === 'BLOCKED').length
-              ]}
-              colors={[
-                'rgba(142, 142, 147, 0.85)', // gray for todo
-                'rgba(0, 102, 255, 0.85)',   // blue for in progress
-                'rgba(52, 199, 89, 0.85)',   // green for done
-                'rgba(255, 59, 48, 0.85)'    // red for blocked
-              ]}
-            />
-          ) : (
-            <div style={{ height: '280px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <EmptyState 
-                icon={<ClipboardCheck size={24} />} 
-                title="No tasks yet" 
-                description="Create tasks to see your distribution chart."
-              />
-            </div>
-          )}
-        </PrimaryCard>
-
-        <PrimaryCard>
-          {projects.length > 0 ? (
-            <BarChart 
-              title="Project Budgets Overview"
-              label="Budget (₹)"
-              labels={projects.slice(0, 5).map(p => p.name.length > 12 ? p.name.substring(0, 12) + '...' : p.name)}
-              data={projects.slice(0, 5).map(p => p.budget || 0)}
-              color="rgba(0, 102, 255, 0.85)"
-            />
-          ) : (
-            <div style={{ height: '280px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <EmptyState 
-                icon={<FolderKanban size={24} />} 
-                title="No projects yet" 
-                description="Create projects to visualize your budgets."
-              />
-            </div>
-          )}
-        </PrimaryCard>
-      </div>
-      </div>
-
-      {/* Two Column Grid for Projects and Approvals */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
-        
-        {/* 4. Projects Summary */}
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <h2 style={{ fontSize: '16px', fontWeight: 700, margin: 0, color: '#111827', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Projects Summary
-            </h2>
-            <Button variant="secondary" size="sm" onClick={() => navigate('/projects')}>
-              View All
-            </Button>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {projects.slice(0, 3).map((project) => (
-              <PrimaryCard
-                key={project.id}
-                onClick={() => navigate(`/projects/${project.id}`)}
-                style={{ cursor: 'pointer', padding: '16px' }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <span style={{ fontWeight: 700, color: '#111827', fontSize: '15px' }}>{project.name}</span>
-                  <Badge variant="primary">{project.progress_percentage || 0}% Done</Badge>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#6B7280' }}>
-                  <span>Status: <strong style={{ color: '#374151' }}>{project.status.replace('_', ' ')}</strong></span>
-                  <span>Budget: <strong style={{ color: '#374151' }}>₹{project.budget?.toLocaleString('en-IN') || 0}</strong></span>
-                </div>
-              </PrimaryCard>
-            ))}
-            {projects.length === 0 && (
-              <EmptyState
-                icon={<FolderKanban size={24} />}
-                title="No active projects"
-                description="Create your first construction project to begin tracking."
-                action={<Button size="sm" onClick={() => navigate('/projects?create=true')}>Create Project</Button>}
-              />
-            )}
+          <p className="cc-onboard-desc">
+            No active project is currently assigned to you. Get started by setting up your project, adding workers, or creating a site.
+          </p>
+          <div className="cc-onboard-actions">
+            <button className="cc-btn-primary" onClick={() => navigate('/projects')}>
+              Create Project
+            </button>
+            <button className="cc-btn-secondary" onClick={() => navigate('/workers')}>
+              Add Workers
+            </button>
+            <button className="cc-btn-secondary" onClick={() => navigate('/sites')}>
+              Create Site
+            </button>
           </div>
         </div>
-
-        {/* 5. Pending Approvals */}
-        <div>
-          <h2 style={{ fontSize: '16px', fontWeight: 700, margin: '0 0 12px 0', color: '#111827', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Pending Approvals
-          </h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {pendingRequests.map((req) => (
-              <PrimaryCard key={req.id} style={{ padding: '14px 16px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Badge variant="warning" style={{ fontSize: '10px', padding: '2px 6px' }}>
-                        {req.type}
-                      </Badge>
-                      <span style={{ fontSize: '11px', color: '#6B7280' }}>
-                        {new Date(req.date).toLocaleDateString()}
-                      </span>
-                    </div>
-                    <div style={{ fontWeight: 600, color: '#111827', fontSize: '14px', marginTop: '6px' }}>
-                      {req.title}
-                    </div>
-                    <div style={{ fontSize: '13px', color: '#0A3D91', fontWeight: 700, marginTop: '2px' }}>
-                      Value/Qty: {req.quantity}
-                    </div>
-                  </div>
-                  
-                  {/* Action Buttons */}
-                  <div style={{ display: 'flex', gap: '6px' }}>
-                    <button
-                      type="button"
-                      disabled={actionInProgress === req.id}
-                      onClick={() => handleApprovalAction(req.id, req.category, true)}
-                      style={{
-                        backgroundColor: '#16A34A',
-                        border: 'none',
-                        color: '#FFFFFF',
-                        borderRadius: '8px',
-                        width: '28px',
-                        height: '28px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        cursor: 'pointer'
-                      }}
-                      title="Approve"
-                    >
-                      <Check size={16} />
-                    </button>
-                    <button
-                      type="button"
-                      disabled={actionInProgress === req.id}
-                      onClick={() => handleApprovalAction(req.id, req.category, false)}
-                      style={{
-                        backgroundColor: '#DC2626',
-                        border: 'none',
-                        color: '#FFFFFF',
-                        borderRadius: '8px',
-                        width: '28px',
-                        height: '28px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        cursor: 'pointer'
-                      }}
-                      title="Reject"
-                    >
-                      <X size={16} />
-                    </button>
-                  </div>
+      ) : (
+        <>
+          {/* SECTION 1: Site Overview Hero Card */}
+          <div className="cc-card cc-hero-v3">
+            <div className="cc-hero-top">
+              <div className="cc-hero-info">
+                <div className="cc-hero-avatar">
+                  <Building2 size={20} color="#FFF" />
                 </div>
-              </PrimaryCard>
-            ))}
-            {pendingRequests.length === 0 && (
-              <EmptyState
-                icon={<CheckCircle2 size={24} />}
-                title="No pending approvals"
-                description="Everything is current. You have no pending material, leaves or expenses."
-              />
-            )}
-          </div>
-        </div>
-
-      </div>
-
-      {/* Two Column Grid for Recent Activity and Insights */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px', marginBottom: '24px' }}>
-        
-        {/* 6. Recent Activity */}
-        <div>
-          <h2 style={{ fontSize: '16px', fontWeight: 700, margin: '0 0 12px 0', color: '#111827', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Recent Activity
-          </h2>
-          <PrimaryCard style={{ padding: 0 }}>
-            {activityLogs.map((log, index) => (
-              <div
-                key={log.id}
-                style={{
-                  display: 'flex',
-                  gap: '12px',
-                  padding: '16px',
-                  borderBottom: index < activityLogs.length - 1 ? '1px solid #E2E8F0' : 'none'
-                }}
-              >
-                <div style={{ color: '#0A3D91', marginTop: '2px' }}>
-                  <CheckCircle2 size={16} />
-                </div>
-                <div>
-                  <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>
-                    {log.action} on {log.entity_type}
-                  </div>
-                  <div style={{ fontSize: '12px', color: '#6B7280', marginTop: '2px' }}>
-                    by {log.user?.name} · {new Date(log.created_at).toLocaleString('en-IN', { hour: '2-digit', minute: '2-digit' })}
-                  </div>
-                </div>
-              </div>
-            ))}
-            {activityLogs.length === 0 && (
-              <div style={{ padding: '24px', textAlign: 'center', color: '#6B7280', fontSize: '14px' }}>
-                No recent activity logs recorded.
-              </div>
-            )}
-          </PrimaryCard>
-        </div>
-
-        {/* 7. Insights */}
-        <div>
-          <h2 style={{ fontSize: '16px', fontWeight: 700, margin: '0 0 12px 0', color: '#111827', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Insights & Health
-          </h2>
-          <PrimaryCard>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                <div style={{ color: '#F59E0B', background: 'rgba(245, 158, 11, 0.08)', padding: '8px', borderRadius: '10px' }}>
-                  <FileWarning size={20} />
-                </div>
-                <div>
-                  <h4 style={{ margin: '0 0 2px 0', fontSize: '14px', fontWeight: 600, color: '#111827' }}>
-                    Depletion Warnings
-                  </h4>
-                  <p style={{ margin: 0, fontSize: '13px', color: '#6B7280', lineHeight: '1.4' }}>
-                    Steel Rebar stock at Site A is below minimum alert level (30 kg left).
+                <div className="cc-hero-text">
+                  <h1 className="cc-hero-title">{currentProject.siteName || currentProject.name}</h1>
+                  <p className="cc-hero-meta">
+                    Site ID: {currentProject.siteId?.substring(0, 8).toUpperCase() || 'GV-1024'} • {currentProject.location || 'Bhopal, MP'}
                   </p>
                 </div>
               </div>
+              <div className="cc-hero-badge-container">
+                <span className="cc-hero-badge">{currentProject.status || 'ACTIVE'}</span>
+              </div>
+            </div>
 
-              <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                <div style={{ color: '#16A34A', background: 'rgba(22, 163, 74, 0.08)', padding: '8px', borderRadius: '10px' }}>
-                  <TrendingUp size={20} />
+            <div className="cc-hero-mid">
+              <div className="cc-hero-date-row">
+                <Calendar size={12} />
+                <span>{currentProject.date}</span>
+              </div>
+              <div className="cc-hero-stats">
+                <div className="cc-hero-stat">
+                  <span className="cc-h-num">{attendanceSummary?.present + (attendanceSummary?.halfDay || 0) || currentProject.workersPresentToday || 0}</span>
+                  <span className="cc-h-lbl">Workers Present</span>
                 </div>
-                <div>
-                  <h4 style={{ margin: '0 0 2px 0', fontSize: '14px', fontWeight: 600, color: '#111827' }}>
-                    Budget Operations
-                  </h4>
-                  <p style={{ margin: 0, fontSize: '13px', color: '#6B7280', lineHeight: '1.4' }}>
-                    Project budgets are healthy. Budget actual variance is currently within safe parameters.
-                  </p>
+                <div className="cc-hero-stat">
+                  <span className="cc-h-num">₹{(attendanceSummary?.todayLabourCost || currentProject.todayLabourCost || 0).toLocaleString('en-IN')}</span>
+                  <span className="cc-h-lbl">Today's Cost</span>
+                </div>
+                <div className="cc-hero-stat progress-stat">
+                  <div className="cc-circular-progress">
+                    <span className="cc-circle-percent">{currentProject.progress}%</span>
+                    <svg viewBox="0 0 36 36" className="circular-chart">
+                      <path className="circle-bg"
+                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                      />
+                      <path className="circle"
+                        strokeDasharray={`${currentProject.progress}, 100`}
+                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                      />
+                    </svg>
+                  </div>
+                  <span className="cc-h-lbl">Progress</span>
                 </div>
               </div>
             </div>
-          </PrimaryCard>
-        </div>
+          </div>
 
-      </div>
+          {/* SECTION 2: Quick Actions */}
+          <div className="cc-actions-section">
+            <div className="cc-actions-grid-v3">
+              <button className="cc-act-card" onClick={() => navigate('/attendance')}>
+                <div className="cc-act-icon-box" style={{ background: 'rgba(10, 61, 145, 0.08)', color: '#0A3D91' }}>
+                  <Users size={24} />
+                </div>
+                <div className="cc-act-text">
+                  <span className="cc-act-title">Attendance</span>
+                  <span className="cc-act-sub">Mark presence</span>
+                </div>
+              </button>
 
+              <button className="cc-act-card" onClick={() => navigate('/dpr')}>
+                <div className="cc-act-icon-box" style={{ background: 'rgba(22, 163, 74, 0.08)', color: '#16A34A' }}>
+                  <ClipboardCheck size={24} />
+                </div>
+                <div className="cc-act-text">
+                  <span className="cc-act-title">Submit DPR</span>
+                  <span className="cc-act-sub">Daily report</span>
+                </div>
+              </button>
+
+              <button className="cc-act-card" onClick={() => navigate('/inventory?create=true')}>
+                <div className="cc-act-icon-box" style={{ background: 'rgba(245, 158, 11, 0.08)', color: '#F59E0B' }}>
+                  <Package size={24} />
+                </div>
+                <div className="cc-act-text">
+                  <span className="cc-act-title">Request Material</span>
+                  <span className="cc-act-sub">Order inventory</span>
+                </div>
+              </button>
+
+              <button className="cc-act-card" onClick={() => navigate('/tasks?create=true')}>
+                <div className="cc-act-icon-box" style={{ background: 'rgba(10, 61, 145, 0.08)', color: '#0A3D91' }}>
+                  <Plus size={24} />
+                </div>
+                <div className="cc-act-text">
+                  <span className="cc-act-title">Create Task</span>
+                  <span className="cc-act-sub">Assign new work</span>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          {/* RESPONSIVE 2-COLUMN LAYOUT */}
+          <div className="cc-dashboard-columns">
+            <div className="cc-col">
+              {/* TODAY'S WORK */}
+              <div className="cc-section-block">
+                <div className="cc-section-header">
+                  <h2 className="cc-v3-section-title">Today's Work Plan</h2>
+                  <span className="cc-section-link" onClick={() => navigate('/tasks')}>View All Tasks</span>
+                </div>
+                <div className="cc-card cc-dense-list">
+                  {todayTasks.length > 0 ? (
+                    todayTasks.slice(0, 5).map((task) => (
+                      <div key={task.id} className="cc-dense-row" onClick={() => navigate('/tasks')}>
+                        <div className="cc-row-left">
+                          <div className={`cc-custom-check ${task.status === 'DONE' ? 'checked' : ''}`}>
+                            {task.status === 'DONE' && <span className="check-mark">✓</span>}
+                          </div>
+                          <div className="cc-row-info">
+                            <span className={`cc-row-name ${task.status === 'DONE' ? 'strike' : ''}`}>{task.title}</span>
+                            <span className="cc-row-sub">{task.location}</span>
+                          </div>
+                        </div>
+                        <div className="cc-row-right">
+                          <span className="cc-workers-badge">{task.assignedWorkersCount} Workers</span>
+                          <span className={`cc-status-indicator ${task.status.toLowerCase()}`}>
+                            {task.status === 'TODO' ? 'Pending' : task.status === 'IN_PROGRESS' ? 'In Progress' : 'Completed'}
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="cc-empty-state-dense">
+                      <span>No tasks scheduled today.</span>
+                      <button className="cc-btn-primary cc-btn-sm" onClick={() => navigate('/tasks?create=true')}>
+                        Create Task
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* ATTENTION REQUIRED */}
+              {alerts.length > 0 && (
+                <div className="cc-section-block">
+                  <h2 className="cc-v3-section-title">Attention Required</h2>
+                  <div className="cc-alerts-stack">
+                    {alerts.map((alert, idx) => {
+                      const Icon = alert.icon;
+                      return (
+                        <div key={idx} className="cc-alert-row-v3" style={{ background: alert.bg }} onClick={() => navigate(alert.link)}>
+                          <div className={`cc-alert-icon-v3 ${alert.color}`}>
+                            <Icon size={18} />
+                          </div>
+                          <div className="cc-alert-content-v3">
+                            <span className={`cc-alert-title-v3 ${alert.color}`}>{alert.title}</span>
+                            <span className="cc-alert-desc-v3">{alert.desc}</span>
+                          </div>
+                          <ChevronRight size={18} className="cc-alert-arrow" />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="cc-col">
+              {/* RECENT ACTIVITY */}
+              <div className="cc-section-block">
+                <div className="cc-section-header">
+                  <h2 className="cc-v3-section-title">Site Activity</h2>
+                  <span className="cc-section-link" onClick={() => navigate('/more')}>View All Activity</span>
+                </div>
+                <div className="cc-card cc-timeline-v3">
+                  {recentActivities.length > 0 ? (
+                    recentActivities.map((log) => (
+                      <div key={log.id} className="cc-tl-row-v3">
+                        <div className="cc-tl-time-box">{log.time}</div>
+                        <div className="cc-tl-node-v3">
+                          <div className="cc-tl-dot-v3"></div>
+                          <div className="cc-tl-line-v3"></div>
+                        </div>
+                        <div className="cc-tl-desc-v3">{log.text}</div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="cc-empty-state-dense">
+                      <span>No recent activity logged.</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* QUICK ACCESS */}
+              <div className="cc-section-block">
+                <h2 className="cc-v3-section-title">Quick Access</h2>
+                <div className="cc-quick-access-grid">
+                  <div className="cc-qa-chip" onClick={() => navigate('/workers')}>
+                    <Users size={16} />
+                    <span>Workers</span>
+                  </div>
+                  <div className="cc-qa-chip" onClick={() => navigate('/materials')}>
+                    <Package size={16} />
+                    <span>Materials</span>
+                  </div>
+                  <div className="cc-qa-chip" onClick={() => navigate('/finance')}>
+                    <Wallet size={16} />
+                    <span>Cashbook</span>
+                  </div>
+                  <div className="cc-qa-chip" onClick={() => navigate('/more')}>
+                    <CheckCircle size={16} />
+                    <span>Approvals</span>
+                  </div>
+                  <div className="cc-qa-chip" onClick={() => navigate('/more')}>
+                    <FileText size={16} />
+                    <span>Documents</span>
+                  </div>
+                  <div className="cc-qa-chip" onClick={() => navigate('/vendors')}>
+                    <Users size={16} />
+                    <span>Vendors</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

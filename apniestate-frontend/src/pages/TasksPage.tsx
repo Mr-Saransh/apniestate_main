@@ -1,5 +1,6 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { useLocation } from 'react-router-dom';
+import { useAuth } from '@/context/AuthContext';
 import {
   ClipboardList,
   Plus,
@@ -37,6 +38,7 @@ const priorityColors: Record<string, string> = {
 };
 
 export default function TasksPage() {
+  const { hasPermission } = useAuth();
   const location = useLocation();
   const [activeFilter, setActiveFilter] = useState('All');
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -75,7 +77,10 @@ export default function TasksPage() {
     try {
       const projRes = await apiClient.get<any[]>('/projects').catch(() => ({ data: [] }));
       const sitesRes = await apiClient.get<any[]>('/sites').catch(() => ({ data: [] }));
-      const usersRes = await apiClient.get<any[]>('/users').catch(() => ({ data: [] }));
+      let usersRes: any = { data: [] };
+      if (hasPermission('users.read')) {
+        usersRes = await apiClient.get<any[]>('/users').catch(() => ({ data: [] }));
+      }
       
       setProjects(projRes.data || []);
       setSites(sitesRes.data || []);
