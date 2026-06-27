@@ -115,8 +115,10 @@ export function FAB() {
                     style={{ minHeight: 48, outline: 'none' }} // Minimum 48px touch target
                   >
                     <span className="sd-fab-item-label">{action.label}</span>
-                    <span className="sd-fab-item-icon" style={{ background: action.bg, color: action.color, width: 48, height: 48 }}>
-                      <Icon size={20} />
+                    <span className="sd-fab-item-icon-wrapper" style={{ width: 56, display: 'flex', justifyContent: 'center', alignItems: 'center', flexShrink: 0 }}>
+                      <span className="sd-fab-item-icon" style={{ background: action.bg, color: action.color, width: 48, height: 48 }}>
+                        <Icon size={20} />
+                      </span>
                     </span>
                   </motion.button>
                 );

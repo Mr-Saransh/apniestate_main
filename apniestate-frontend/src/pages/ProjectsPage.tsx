@@ -105,11 +105,16 @@ export default function ProjectsPage() {
     <div className="animate-fade-in">
       {/* Header */}
       <div className="page-header">
-        <div>
-          <h1 className="page-title">Projects</h1>
-          <p className="page-subtitle">
-            {projects.length} {projects.length === 1 ? 'project' : 'projects'} total
-          </p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', flexWrap: 'wrap', gap: '16px' }}>
+          <div>
+            <h1 className="page-title">Projects</h1>
+            <p className="page-subtitle">
+              {projects.length} {projects.length === 1 ? 'project' : 'projects'} total
+            </p>
+          </div>
+          <button className="btn btn-primary" onClick={() => { resetForm(); setShowCreateModal(true); }} id="btn-add-project">
+            <Plus size={18} /> Add Project
+          </button>
         </div>
       </div>
 

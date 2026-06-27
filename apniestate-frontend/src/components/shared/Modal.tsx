@@ -1,4 +1,5 @@
 import { type ReactNode, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import { useIsDesktop } from '@/hooks/useMediaQuery';
@@ -56,7 +57,7 @@ export default function Modal({ isOpen, onClose, title, children, footer }: Moda
       : { y: '100%', transition: { type: 'spring', stiffness: 350, damping: 32 } }
   };
 
-  return (
+  return createPortal(
     <AnimatePresence>
       {isOpen && (
         <motion.div
@@ -110,6 +111,7 @@ export default function Modal({ isOpen, onClose, title, children, footer }: Moda
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }
