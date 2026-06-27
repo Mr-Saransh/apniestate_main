@@ -12,7 +12,23 @@ export const GET = withAuth(async (req: NextRequest, user) => {
     where: { id: user.sub }
   });
 
-  const company_id = dbUser?.company_id || undefined;
+  let company_id = dbUser?.company_id || undefined;
+
+  // Fallback: If company_id is not directly set on user, find it from their assigned site!
+  if (!company_id) {
+    const assignedSite = await prisma.site.findFirst({
+      where: { supervisor_id: user.sub },
+      select: { company_id: true }
+    });
+    if (assignedSite?.company_id) {
+      company_id = assignedSite.company_id;
+      await prisma.user.update({
+        where: { id: user.sub },
+        data: { company_id }
+      });
+    }
+  }
+
   if (!company_id) {
     return ok({
       site: null,

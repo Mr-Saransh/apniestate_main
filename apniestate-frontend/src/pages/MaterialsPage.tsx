@@ -5,6 +5,7 @@ import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import EmptyState from '@/components/shared/EmptyState';
 import StatusBadge from '@/components/shared/StatusBadge';
 import { PrimaryCard, Button, Badge } from '@/components/design-system';
+import Modal from '@/components/shared/Modal';
 
 interface Material {
   id: string;
@@ -295,87 +296,95 @@ export default function MaterialsPage() {
       )}
 
       {/* Catalog Modal */}
-      {showCatalogModal && (
-        <div className="modal-overlay" style={{ background: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(8px)', zIndex: 'var(--z-modal)', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
-          <div className="panel-glass card-3d animate-pop-in" style={{ width: '90%', maxWidth: '460px', padding: 'var(--space-6)', background: '#fff', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-xl)' }}>
-            <h2 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', marginBottom: 'var(--space-4)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Sparkles size={20} color="var(--color-cta)" /> Add Material to Catalog
-            </h2>
-            <form onSubmit={handleCreateMaterial} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-              <div className="form-group">
-                <label className="form-label">Material Name</label>
-                <input type="text" className="form-input" value={name} onChange={e => setName(e.target.value)} required />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
-                <div className="form-group">
-                  <label className="form-label">Unit</label>
-                  <select className="form-input" value={unit} onChange={e => setUnit(e.target.value)}>
-                    <option value="Bags">Bags</option>
-                    <option value="Tons">Tons</option>
-                    <option value="CFT">CFT</option>
-                    <option value="Kilograms">Kg</option>
-                    <option value="Liters">Liters</option>
-                    <option value="Nos">Nos</option>
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Category</label>
-                  <select className="form-input" value={category} onChange={e => setCategory(e.target.value)}>
-                    <option value="Structural">Structural</option>
-                    <option value="Finishing">Finishing</option>
-                    <option value="Electrical">Electrical</option>
-                    <option value="Plumbing">Plumbing</option>
-                    <option value="General">General</option>
-                  </select>
-                </div>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)', marginTop: '16px' }}>
-                <Button variant="secondary" onClick={() => setShowCatalogModal(false)}>Cancel</Button>
-                <Button type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save Material'}</Button>
-              </div>
-            </form>
+      <Modal
+        isOpen={showCatalogModal}
+        onClose={() => setShowCatalogModal(false)}
+        title="Add Material to Catalog"
+        footer={
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <Button variant="secondary" onClick={() => setShowCatalogModal(false)}>Cancel</Button>
+            <Button onClick={() => {
+              const form = document.getElementById('catalog-form') as HTMLFormElement;
+              if (form) form.requestSubmit();
+            }} disabled={saving}>
+              {saving ? 'Saving...' : 'Save Material'}
+            </Button>
           </div>
-        </div>
-      )}
+        }
+      >
+        <form id="catalog-form" onSubmit={handleCreateMaterial} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+          <div className="form-group">
+            <label className="form-label">Material Name</label>
+            <input type="text" className="form-input" value={name} onChange={e => setName(e.target.value)} required />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
+            <div className="form-group">
+              <label className="form-label">Unit</label>
+              <select className="form-input" value={unit} onChange={e => setUnit(e.target.value)}>
+                <option value="Bags">Bags</option>
+                <option value="Tons">Tons</option>
+                <option value="CFT">CFT</option>
+                <option value="Kilograms">Kg</option>
+                <option value="Liters">Liters</option>
+                <option value="Nos">Nos</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Category</label>
+              <select className="form-input" value={category} onChange={e => setCategory(e.target.value)}>
+                <option value="Structural">Structural</option>
+                <option value="Finishing">Finishing</option>
+                <option value="Electrical">Electrical</option>
+                <option value="Plumbing">Plumbing</option>
+                <option value="General">General</option>
+              </select>
+            </div>
+          </div>
+        </form>
+      </Modal>
 
       {/* Request Modal */}
-      {showRequestModal && (
-        <div className="modal-overlay" style={{ background: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(8px)', zIndex: 'var(--z-modal)', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
-          <div className="panel-glass card-3d animate-pop-in" style={{ width: '90%', maxWidth: '460px', padding: 'var(--space-6)', background: '#fff', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-xl)' }}>
-            <h2 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', marginBottom: 'var(--space-4)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <ShoppingCart size={20} color="var(--color-cta)" /> Request Material
-            </h2>
-            <form onSubmit={handleCreateRequest} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-              <div className="form-group">
-                <label className="form-label">Select Site *</label>
-                <select className="form-input" value={reqSiteId} onChange={e => setReqSiteId(e.target.value)} required>
-                  <option value="">Select a site</option>
-                  {sites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Select Material *</label>
-                <select className="form-input" value={reqMaterialId} onChange={e => setReqMaterialId(e.target.value)} required>
-                  <option value="">Select a material</option>
-                  {materials.map(m => <option key={m.id} value={m.id}>{m.name} ({m.unit})</option>)}
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Quantity Required *</label>
-                <input type="number" className="form-input" min="0.1" step="0.1" value={reqQuantity} onChange={e => setReqQuantity(e.target.value)} required />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Urgency / Notes</label>
-                <textarea className="form-input" value={reqNotes} onChange={e => setReqNotes(e.target.value)} rows={2} />
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)', marginTop: '16px' }}>
-                <Button variant="secondary" onClick={() => setShowRequestModal(false)}>Cancel</Button>
-                <Button type="submit" disabled={saving}>{saving ? 'Submitting...' : 'Submit Request'}</Button>
-              </div>
-            </form>
+      <Modal
+        isOpen={showRequestModal}
+        onClose={() => setShowRequestModal(false)}
+        title="Request Material"
+        footer={
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <Button variant="secondary" onClick={() => setShowRequestModal(false)}>Cancel</Button>
+            <Button onClick={() => {
+              const form = document.getElementById('request-form') as HTMLFormElement;
+              if (form) form.requestSubmit();
+            }} disabled={saving}>
+              {saving ? 'Submitting...' : 'Submit Request'}
+            </Button>
           </div>
-        </div>
-      )}
+        }
+      >
+        <form id="request-form" onSubmit={handleCreateRequest} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+          <div className="form-group">
+            <label className="form-label">Select Site *</label>
+            <select className="form-input" value={reqSiteId} onChange={e => setReqSiteId(e.target.value)} required>
+              <option value="">Select a site</option>
+              {sites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Select Material *</label>
+            <select className="form-input" value={reqMaterialId} onChange={e => setReqMaterialId(e.target.value)} required>
+              <option value="">Select a material</option>
+              {materials.map(m => <option key={m.id} value={m.id}>{m.name} ({m.unit})</option>)}
+            </select>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Quantity Required *</label>
+            <input type="number" className="form-input" min="0.1" step="0.1" value={reqQuantity} onChange={e => setReqQuantity(e.target.value)} required />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Urgency / Notes</label>
+            <textarea className="form-input" value={reqNotes} onChange={e => setReqNotes(e.target.value)} rows={2} />
+          </div>
+        </form>
+      </Modal>
 
     </div>
   );

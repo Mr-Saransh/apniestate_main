@@ -15,8 +15,8 @@ export function withAuth(handler: RouteHandler) {
     const payload = verifyAccessToken(token);
     if (!payload) return unauthorized();
 
-    // Database fallback if company_id is not in active token payload
-    if (payload.company_id === undefined) {
+    // Database fallback if company_id is not in active token payload or is null
+    if (!payload.company_id) {
       const dbUser = await prisma.user.findUnique({
         where: { id: payload.sub },
         select: { company_id: true }

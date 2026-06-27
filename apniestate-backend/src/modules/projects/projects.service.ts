@@ -21,6 +21,19 @@ function calculateProjectProgress(project: {
 export const getProjects = async (userId: string, role: string, companyId?: string | null) => {
   if (!companyId) return [];
 
+  // Self-repair: Assign current companyId to any projects created by this builder that lack it
+  if (role === "BUILDER") {
+    await prisma.project.updateMany({
+      where: {
+        builder_id: userId,
+        company_id: null
+      },
+      data: {
+        company_id: companyId
+      }
+    });
+  }
+
   const where: any = { company_id: companyId };
 
   if (role === "BUILDER") {
