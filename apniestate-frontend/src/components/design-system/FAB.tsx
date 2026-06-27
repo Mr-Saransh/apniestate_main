@@ -69,7 +69,7 @@ export function FAB() {
       opacity: 1, 
       scale: 1, 
       y: 0,
-      transition: { type: 'spring', stiffness: 450, damping: 25 }
+      transition: { type: 'spring', stiffness: 450, damping: 25 } as const
     },
     exit: { opacity: 0, scale: 0.8, y: 12, transition: { duration: 0.15 } }
   };

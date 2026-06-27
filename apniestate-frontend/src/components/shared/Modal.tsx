@@ -50,11 +50,11 @@ export default function Modal({ isOpen, onClose, title, children, footer }: Moda
       scale: 1, 
       opacity: 1, 
       y: 0,
-      transition: { type: 'spring', stiffness: 350, damping: 30 }
+      transition: { type: 'spring', stiffness: 350, damping: 30 } as const
     },
     exit: isDesktop
       ? { scale: 0.96, opacity: 0, y: 10, transition: { duration: 0.15 } }
-      : { y: '100%', transition: { type: 'spring', stiffness: 350, damping: 32 } }
+      : { y: '100%', transition: { type: 'spring', stiffness: 350, damping: 32 } as const }
   };
 
   return createPortal(
