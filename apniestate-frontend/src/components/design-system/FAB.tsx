@@ -13,7 +13,9 @@ export function FAB() {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const actions = getFabConfig(user?.role || 'SITE_SUPERVISOR');
+  // Maximum 6 visible actions, slice to guarantee compliance
+  const rawActions = getFabConfig(user?.role || 'SITE_SUPERVISOR');
+  const actions = rawActions.slice(0, 6);
 
   const handleAction = useCallback(
     (action: any) => {
@@ -29,23 +31,48 @@ export function FAB() {
 
   useEffect(() => {
     if (!isOpen) return;
+
     const handleOutside = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setIsOpen(false);
       }
     };
+
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setIsOpen(false);
     };
-    document.body.style.overflow = 'hidden';
+
     document.addEventListener('mousedown', handleOutside);
     document.addEventListener('keydown', handleEscape);
+    
     return () => {
-      document.body.style.overflow = '';
       document.removeEventListener('mousedown', handleOutside);
       document.removeEventListener('keydown', handleEscape);
     };
   }, [isOpen]);
+
+  // Framer Motion transition parameters
+  const menuVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.05,
+        delayChildren: 0.02
+      }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, scale: 0.8, y: 16 },
+    visible: { 
+      opacity: 1, 
+      scale: 1, 
+      y: 0,
+      transition: { type: 'spring', stiffness: 450, damping: 25 }
+    },
+    exit: { opacity: 0, scale: 0.8, y: 12, transition: { duration: 0.15 } }
+  };
 
   return (
     <>
@@ -56,7 +83,7 @@ export function FAB() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
+            transition={{ duration: 0.2 }}
             onClick={() => setIsOpen(false)}
             aria-hidden
           />
@@ -70,13 +97,13 @@ export function FAB() {
         <AnimatePresence>
           {isOpen && (
             <motion.div
-              className={`sd-fab-menu ${isDesktop ? 'sd-fab-menu--desktop' : 'sd-fab-menu--mobile'}`}
-              initial={{ opacity: 0, scale: 0.92, y: 16 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.92, y: 12 }}
-              transition={{ type: 'spring', stiffness: 420, damping: 30 }}
+              className="sd-fab-menu"
+              initial="hidden"
+              animate="visible"
+              exit="hidden"
+              variants={menuVariants}
             >
-              {actions.map((action, i) => {
+              {actions.map((action) => {
                 const Icon = action.icon;
                 return (
                   <motion.button
@@ -84,15 +111,13 @@ export function FAB() {
                     type="button"
                     className="sd-fab-item"
                     onClick={() => handleAction(action)}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 6 }}
-                    transition={{ delay: i * 0.025, duration: 0.18 }}
+                    variants={itemVariants}
+                    style={{ minHeight: 48, outline: 'none' }} // Minimum 48px touch target
                   >
-                    <span className="sd-fab-item-icon" style={{ background: action.bg, color: action.color }}>
-                      <Icon size={16} />
-                    </span>
                     <span className="sd-fab-item-label">{action.label}</span>
+                    <span className="sd-fab-item-icon" style={{ background: action.bg, color: action.color, width: 48, height: 48 }}>
+                      <Icon size={20} />
+                    </span>
                   </motion.button>
                 );
               })}
@@ -106,9 +131,10 @@ export function FAB() {
           onClick={() => setIsOpen((o) => !o)}
           aria-label={isOpen ? 'Close quick actions' : 'Open quick actions'}
           aria-expanded={isOpen}
+          style={{ width: 56, height: 56, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           whileTap={{ scale: 0.92 }}
-          animate={{ rotate: isOpen ? 45 : 0 }}
-          transition={{ type: 'spring', stiffness: 400, damping: 24 }}
+          animate={{ rotate: isOpen ? 135 : 0 }}
+          transition={{ type: 'spring', stiffness: 450, damping: 25 }}
         >
           <Plus size={28} strokeWidth={2.5} />
         </motion.button>

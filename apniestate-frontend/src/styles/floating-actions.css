@@ -1,13 +1,13 @@
 /* ============================================
-   APNI ESTATE — Responsive FAB Styles
-   Upward-expanding action tray
+   APNI ESTATE — Responsive FAB 2.0 Styles
+   Upward-expanding action tray with 48px touch targets
    ============================================ */
 
-/* Backdrop */
+/* Semi-transparent Backdrop */
 .sd-fab-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(17, 24, 39, 0.35);
+  background: rgba(15, 23, 42, 0.4);
   backdrop-filter: blur(4px);
   z-index: 999;
 }
@@ -15,29 +15,30 @@
 /* FAB Container */
 .sd-fab-container {
   position: fixed;
-  right: 20px;
   z-index: 1000;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
 }
 
-/* Desktop positioning */
+/* Desktop: bottom-right (24px margin) */
 .sd-fab-container--desktop {
   bottom: 24px;
+  right: 24px;
 }
 
-/* Mobile positioning - sit above bottom nav (64px) */
+/* Mobile: bottom-right above Bottom Navigation with safe-area inset */
 .sd-fab-container--mobile {
-  bottom: 84px;
+  bottom: calc(64px + 20px + env(safe-area-inset-bottom, 0px));
+  right: 16px;
 }
 
 /* FAB Menu list container */
 .sd-fab-menu {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  margin-bottom: 14px;
+  gap: 12px;
+  margin-bottom: 16px;
   align-items: flex-end;
 }
 
@@ -51,41 +52,43 @@
   cursor: pointer;
   padding: 0;
   outline: none;
+  min-height: 48px; /* 48px Touch Target compliance */
+  user-select: none;
 }
 
 /* Hover state elevation for item label */
 .sd-fab-item:hover .sd-fab-item-label {
   transform: translateX(-4px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   border-color: var(--color-primary);
 }
 
 .sd-fab-item-label {
   background: #FFFFFF;
   border: 1px solid #E2E8F0;
-  color: #111827;
-  padding: 6px 12px;
-  border-radius: 8px;
+  color: #1E293B;
+  padding: 8px 14px;
+  border-radius: 10px;
   font-size: 13px;
   font-weight: 600;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
   white-space: nowrap;
   transition: all 0.2s ease;
 }
 
 .sd-fab-item-icon {
-  width: 42px;
-  height: 42px;
+  width: 48px; /* 48px Touch Target compliance */
+  height: 48px; /* 48px Touch Target compliance */
   border-radius: 50%;
   display: flex;
   align-items: center;
   justifyContent: center;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.06);
   transition: transform 0.2s ease;
 }
 
 .sd-fab-item:hover .sd-fab-item-icon {
-  transform: scale(1.1);
+  transform: scale(1.08);
 }
 
 /* Trigger Button */
@@ -99,7 +102,7 @@
   display: flex;
   align-items: center;
   justifyContent: center;
-  box-shadow: 0 6px 20px rgba(10, 61, 145, 0.4);
+  box-shadow: 0 6px 20px rgba(10, 61, 145, 0.3);
   cursor: pointer;
   outline: none;
   z-index: 1001;
@@ -107,5 +110,5 @@
 
 .sd-fab-btn:hover {
   background: var(--color-primary-hover, #08337A);
-  box-shadow: 0 8px 24px rgba(10, 61, 145, 0.5);
+  box-shadow: 0 8px 24px rgba(10, 61, 145, 0.4);
 }

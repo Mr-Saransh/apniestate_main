@@ -1,5 +1,7 @@
-import { type ReactNode } from 'react';
+import { type ReactNode, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
+import { useIsDesktop } from '@/hooks/useMediaQuery';
 
 interface ModalProps {
   isOpen: boolean;
@@ -10,34 +12,104 @@ interface ModalProps {
 }
 
 export default function Modal({ isOpen, onClose, title, children, footer }: ModalProps) {
-  if (!isOpen) return null;
+  const isDesktop = useIsDesktop();
+
+  // Escape key handler
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  // Prevent background scroll when modal is active
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
+
+  const overlayVariants = {
+    hidden: { opacity: 0 },
+    visible: { opacity: 1 },
+  };
+
+  const modalVariants = {
+    hidden: isDesktop 
+      ? { scale: 0.96, opacity: 0, y: 10 } 
+      : { y: '100%' },
+    visible: { 
+      scale: 1, 
+      opacity: 1, 
+      y: 0,
+      transition: { type: 'spring', stiffness: 350, damping: 30 }
+    },
+    exit: isDesktop
+      ? { scale: 0.96, opacity: 0, y: 10, transition: { duration: 0.15 } }
+      : { y: '100%', transition: { type: 'spring', stiffness: 350, damping: 32 } }
+  };
 
   return (
-    <div className="modal-overlay" onClick={(e) => {
-      if (e.target === e.currentTarget) onClose();
-    }}>
-      <div className="modal" role="dialog" aria-modal="true" aria-label={title}>
-        <div className="modal-handle" />
-        <div className="modal-header">
-          <h2 className="modal-title">{title}</h2>
-          <button
-            className="btn btn-icon btn-ghost"
-            onClick={onClose}
-            aria-label="Close"
-            style={{ minHeight: 40, minWidth: 40 }}
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          className="responsive-modal-overlay"
+          initial="hidden"
+          animate="visible"
+          exit="hidden"
+          variants={overlayVariants}
+          transition={{ duration: 0.2 }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) onClose();
+          }}
+        >
+          <motion.div
+            className="responsive-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label={title}
+            variants={modalVariants}
           >
-            <X size={20} />
-          </button>
-        </div>
-        <div className="modal-body">
-          {children}
-        </div>
-        {footer && (
-          <div className="modal-footer">
-            {footer}
-          </div>
-        )}
-      </div>
-    </div>
+            <div className="responsive-modal-handle" />
+            <div className="responsive-modal-header">
+              <h2 className="responsive-modal-title">{title}</h2>
+              <button
+                className="btn btn-icon btn-ghost"
+                onClick={onClose}
+                aria-label="Close"
+                style={{ 
+                  minHeight: 48, 
+                  minWidth: 48, 
+                  borderRadius: '50%', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="responsive-modal-body">
+              {children}
+            </div>
+            {footer && (
+              <div className="responsive-modal-footer">
+                {footer}
+              </div>
+            )}
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
