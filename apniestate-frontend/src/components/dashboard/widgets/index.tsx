@@ -355,7 +355,7 @@ export function AttendanceWidget({ present, absent, loading }: { present?: numbe
     <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '20px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
       <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--color-text)' }}>Workforce Presence</h3>
       <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
-        <ProgressRing percentage={presentPct} size={90} strokeWidth={8} color="var(--color-primary)" />
+        <ProgressRing value={presentPct} size={90} strokeWidth={8} color="var(--color-primary)" />
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
             <span style={{ color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}><UserCheck size={14} color="#16A34A" /> Present</span>
