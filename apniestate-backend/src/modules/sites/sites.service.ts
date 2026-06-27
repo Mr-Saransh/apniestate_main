@@ -4,8 +4,14 @@ export async function getSites(userId: string, role: string, companyId?: string 
   if (!companyId) return [];
   const where: any = { company_id: companyId };
 
-  if (role === "SITE_SUPERVISOR") {
-    where.supervisor_id = userId;
+  if (role === "BUILDER" || role === "ADMIN") {
+    // see all
+  } else {
+    where.OR = [
+      { supervisor_id: userId },
+      { project: { builder_id: userId } },
+      { project: { manager_id: userId } }
+    ];
   }
 
   return prisma.site.findMany({

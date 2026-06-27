@@ -9,10 +9,12 @@ import {
 
 export const GET = withAuth(async (req: NextRequest, user) => {
   const dbUser = await prisma.user.findUnique({
-    where: { id: user.sub }
+    where: { id: user.sub },
+    select: { company_id: true, role: true }
   });
 
   let company_id = dbUser?.company_id || undefined;
+  const userRole = dbUser?.role || user.role || 'SITE_SUPERVISOR';
 
   // Fallback: If company_id is not directly set on user, find it from their assigned site!
   if (!company_id) {
@@ -47,9 +49,21 @@ export const GET = withAuth(async (req: NextRequest, user) => {
     });
   }
 
-  // Find the supervisor's active site
+  // Use unified visibility logic to find the first accessible site
+  const siteWhere: any = { company_id };
+  if (userRole === "BUILDER" || userRole === "ADMIN") {
+    // see all
+  } else {
+    siteWhere.OR = [
+      { supervisor_id: user.sub },
+      { project: { builder_id: user.sub } },
+      { project: { manager_id: user.sub } }
+    ];
+  }
+
+  // Find the user's active site context
   const site = await prisma.site.findFirst({
-    where: { supervisor_id: user.sub, company_id },
+    where: siteWhere,
     include: { project: true }
   });
 

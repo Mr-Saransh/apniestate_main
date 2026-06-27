@@ -28,7 +28,7 @@ export const authApi = {
     apiClient.post<LoginResponse>('/auth/signup', credentials),
 
   updateRole: (role: string) =>
-    apiClient.patch<AuthUser>('/users/me/role', { role }),
+    apiClient.patch<{ user: AuthUser; accessToken: string }>('/users/me/role', { role }),
 
   logout: () => apiClient.post('/auth/logout'),
 };

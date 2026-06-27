@@ -65,10 +65,10 @@ class ApiClient {
     });
   }
 
-  async patch<T>(endpoint: string, body: unknown): Promise<ApiResponse<T>> {
+  async patch<T>(endpoint: string, body?: unknown): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, {
       method: 'PATCH',
-      body: JSON.stringify(body),
+      body: body ? JSON.stringify(body) : undefined,
     });
   }
 

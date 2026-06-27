@@ -6,13 +6,13 @@ import { getMaterials, createMaterial } from "@/modules/materials/materials.serv
 import { ok, created } from "@/lib/response";
 
 export const GET = withAuth(async (_req, user) => {
-  const items = await getMaterials(user.sub);
+  const items = await getMaterials(user.sub, user.company_id);
   return ok(items);
 });
 
 export const POST = withAuth(async (req, user) => {
   const parsed = await validateBody(req, CreateMaterialSchema);
   if ("error" in parsed) return parsed.error;
-  const item = await createMaterial(parsed.data, user.sub);
+  const item = await createMaterial(parsed.data, user.sub, user.company_id);
   return created(item, "Material created");
 });

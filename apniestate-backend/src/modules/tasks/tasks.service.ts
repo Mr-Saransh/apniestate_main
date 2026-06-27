@@ -28,15 +28,15 @@ export async function getTasks(
     where.status = filters.status;
   }
 
-  // Scoping checks within the company boundary
-  if (role === "SITE_SUPERVISOR") {
-    where.site = { supervisor_id: userId };
-  } else if (role === "PROJECT_MANAGER") {
-    where.project = { manager_id: userId };
-  } else if (role !== "ADMIN" && role !== "BUILDER" && role !== "ACCOUNTANT") {
+  if (role === "BUILDER" || role === "ADMIN") {
+    // see all
+  } else {
     where.OR = [
       { assignee_id: userId },
-      { created_by: userId }
+      { created_by: userId },
+      { site: { supervisor_id: userId } },
+      { project: { builder_id: userId } },
+      { project: { manager_id: userId } }
     ];
   }
 

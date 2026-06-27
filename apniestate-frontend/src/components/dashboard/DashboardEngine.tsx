@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useDashboardQuery } from '@/hooks/useDashboardQuery';
-import { 
-  FolderKanban, 
-  Briefcase, 
-  Users, 
-  Wallet, 
-  BarChart3, 
+import {
+  FolderKanban,
+  Briefcase,
+  Users,
+  Wallet,
+  BarChart3,
   Clock,
   ClipboardList,
   Building2,
@@ -20,15 +20,15 @@ import {
   MapPin,
   Clock3
 } from 'lucide-react';
-import { 
-  KPIWidget, 
-  CriticalAlertsWidget, 
-  ProjectHealthWidget, 
-  ApprovalWidget, 
-  CalendarWidget, 
-  AttendanceWidget, 
-  RecentActivityWidget, 
-  TasksSummaryWidget 
+import {
+  KPIWidget,
+  CriticalAlertsWidget,
+  ProjectHealthWidget,
+  ApprovalWidget,
+  CalendarWidget,
+  AttendanceWidget,
+  RecentActivityWidget,
+  TasksSummaryWidget
 } from './widgets';
 import { SkeletonPulse, KpiGridSkeleton } from './DashboardSkeletons';
 
@@ -96,7 +96,7 @@ export default function DashboardEngine() {
 
   // Determine endpoint based on role
   const endpoint = role === 'BUILDER' ? '/dashboard/builder' : '/dashboard/supervisor';
-  
+
   // Load main aggregated dashboard data via TanStack Query
   const { data, isLoading, refetch } = useDashboardQuery<any>(endpoint, {
     refetchInterval: 8000 // Background update query syncing
@@ -207,11 +207,11 @@ export default function DashboardEngine() {
               <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10B981', display: 'inline-block' }}></span>
               <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.05em', color: '#38BDF8' }}>ACTIVE PROJECT SITE</span>
             </div>
-            
-            <h1 style={{ fontSize: '32px', fontWeight: 800, margin: '0 0 6px 0', letterSpacing: '-0.03em', lineHeight: 1.15 }}>
+
+            <h1 style={{ color: 'white', fontSize: '32px', fontWeight: 800, margin: '0 0 6px 0', letterSpacing: '-0.03em', lineHeight: 1.15 }}>
               {activeSite?.name || 'No Site Assigned'}
             </h1>
-            
+
             <p style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: 0.8, fontSize: '13px', margin: '0 0 16px 0', fontWeight: 550 }}>
               <MapPin size={14} color="#38BDF8" /> {activeSite?.location || 'Unassigned Location'}
             </p>
@@ -225,11 +225,11 @@ export default function DashboardEngine() {
           {/* Right Column: Weather Forecasting & Project Health Stats */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', justifyContent: 'center' }}>
             {/* Real Weather Control Card */}
-            <div style={{ 
-              background: 'rgba(255, 255, 255, 0.05)', 
-              backdropFilter: 'blur(10px)', 
-              borderRadius: '16px', 
-              padding: '16px 20px', 
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.05)',
+              backdropFilter: 'blur(10px)',
+              borderRadius: '16px',
+              padding: '16px 20px',
               border: '1px solid rgba(255,255,255,0.08)',
               display: 'flex',
               alignItems: 'center',
@@ -244,11 +244,11 @@ export default function DashboardEngine() {
             </div>
 
             {/* Project Health Index */}
-            <div style={{ 
-              background: 'rgba(255, 255, 255, 0.05)', 
-              backdropFilter: 'blur(10px)', 
-              borderRadius: '16px', 
-              padding: '16px 20px', 
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.05)',
+              backdropFilter: 'blur(10px)',
+              borderRadius: '16px',
+              padding: '16px 20px',
               border: '1px solid rgba(255,255,255,0.08)',
               display: 'flex',
               alignItems: 'center',

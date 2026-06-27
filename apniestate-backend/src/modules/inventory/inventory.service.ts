@@ -2,8 +2,14 @@ import { prisma } from "@/lib/prisma";
 
 export async function getInventoryItems(userId: string, role?: string) {
   const where: any = {};
-  if (role === "SITE_SUPERVISOR") {
-    where.site = { supervisor_id: userId };
+  if (role === "BUILDER" || role === "ADMIN") {
+    // see all
+  } else {
+    where.OR = [
+      { site: { supervisor_id: userId } },
+      { site: { project: { builder_id: userId } } },
+      { site: { project: { manager_id: userId } } }
+    ];
   }
 
   const items = await prisma.inventoryItem.findMany({

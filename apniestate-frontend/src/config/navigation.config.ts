@@ -23,9 +23,10 @@ import {
   Menu,
   Home,
   ClipboardCheck,
-  Building2,
   TrendingUp,
-  AlertTriangle
+  AlertTriangle,
+  Plus,
+  Building2
 } from 'lucide-react';
 
 export interface NavigationItem {
@@ -254,6 +255,7 @@ export function getBottomNavConfig(role: string): NavigationItem[] {
 
 // ─── FAB Actions Configs ──────────────────────────────────
 const builderFab: FabAction[] = [
+  { label: 'Add Project', icon: Plus, path: '/projects?create=true', color: '#FFFFFF', bg: '#0891B2' },
   { label: 'Projects', icon: FolderKanban, path: '/projects', color: '#FFFFFF', bg: '#0A3D91' },
   { label: 'Sites', icon: MapPin, path: '/sites', color: '#FFFFFF', bg: '#16A34A' },
   { label: 'Approvals', icon: CheckCircle, path: '/dashboard', color: '#111827', bg: '#F4B400' },
@@ -274,6 +276,7 @@ const supervisorFab: FabAction[] = [
 ];
 
 const pmFab: FabAction[] = [
+  { label: 'Add Project', icon: Plus, path: '/projects?create=true', color: '#FFFFFF', bg: '#0891B2' },
   { label: 'Timeline', icon: Calendar, path: '/projects', color: '#FFFFFF', bg: '#0A3D91' },
   { label: 'Milestones', icon: CheckCircle, path: '/tasks', color: '#FFFFFF', bg: '#16A34A' },
   { label: 'Resources', icon: Users, path: '/workers', color: '#FFFFFF', bg: '#0A3D91' },

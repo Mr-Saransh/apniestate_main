@@ -655,7 +655,7 @@
   border-bottom: 1px solid #F1F5F9;
   display: flex;
   align-items: center;
-  justifyContent: space-between;
+  justify-content: space-between;
   flex-shrink: 0;
   background: #FFFFFF;
 }
@@ -676,10 +676,8 @@
 
 /* Auto-fold double column grids inside modals on mobile devices */
 @media (max-width: 767px) {
-  .responsive-modal-body form [style*="grid-template-columns: 1fr 1fr"],
-  .responsive-modal-body form [style*="grid-template-columns:1fr 1fr"],
-  .responsive-modal-body [style*="grid-template-columns: 1fr 1fr"],
-  .responsive-modal-body [style*="grid-template-columns:1fr 1fr"] {
+  .responsive-modal-body [style*="grid-template-columns:"],
+  .responsive-modal-body .grid-2 {
     grid-template-columns: 1fr !important;
   }
 }

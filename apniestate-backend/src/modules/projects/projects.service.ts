@@ -36,16 +36,21 @@ export const getProjects = async (userId: string, role: string, companyId?: stri
 
   const where: any = { company_id: companyId };
 
-  if (role === "BUILDER") {
-    // Builders see all projects under their company namespace
-  } else if (role === "PROJECT_MANAGER") {
-    where.manager_id = userId;
-  } else if (role === "SITE_SUPERVISOR") {
-    where.sites = {
-      some: {
-        supervisor_id: userId
+  if (role === "BUILDER" || role === "ADMIN") {
+    // Builders and Admins see all projects under the company
+  } else {
+    // Non-builders see projects they created, manage, or supervisor sites inside
+    where.OR = [
+      { builder_id: userId },
+      { manager_id: userId },
+      {
+        sites: {
+          some: {
+            supervisor_id: userId
+          }
+        }
       }
-    };
+    ];
   }
 
   const projects = await prisma.project.findMany({

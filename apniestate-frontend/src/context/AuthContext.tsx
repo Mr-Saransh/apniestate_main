@@ -107,8 +107,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const updateUserRole = useCallback(async (role: string) => {
     const response = await authApi.updateRole(role);
     if (response.success && response.data) {
-      setUser(response.data);
-      localStorage.setItem('user', JSON.stringify(response.data));
+      const { user: updatedUser, accessToken } = response.data;
+      setUser(updatedUser);
+      setToken(accessToken);
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      localStorage.setItem('access_token', accessToken);
     }
   }, []);
 
@@ -145,15 +148,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const switchRole = useCallback(async (role: string) => {
     const response = await authApi.updateRole(role);
     if (response.success && response.data) {
-      setUser(response.data);
-      localStorage.setItem('user', JSON.stringify(response.data));
+      const { user: updatedUser, accessToken } = response.data;
+      setUser(updatedUser);
+      setToken(accessToken);
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      localStorage.setItem('access_token', accessToken);
       try {
-        const res = await permissionsApi.getMyPermissions();
-        if (res.success && res.data) {
-          setPermissions(res.data.permissions);
-        }
-      } catch (err) {
-        console.error('Failed to update permissions after role switch:', err);
+        window.location.reload();
+      } catch {
+        // ignore
       }
     }
   }, []);

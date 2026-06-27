@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { withAuth } from "@/middleware/auth.middleware";
-import { updateUser } from "@/modules/users/users.service";
+import { prisma } from "@/lib/prisma";
 import { ok, badRequest } from "@/lib/response";
 
 export const PATCH = withAuth(async (req: NextRequest, user) => {
@@ -15,6 +15,18 @@ export const PATCH = withAuth(async (req: NextRequest, user) => {
     return badRequest(`Invalid role. Must be one of: ${validRoles.join(", ")}`);
   }
 
-  const updated = await updateUser(user.sub, { role: body.role });
-  return ok(updated, "Role updated successfully");
+  const updated = await prisma.user.update({ 
+    where: { id: user.sub },
+    data: { role: body.role }
+  });
+  
+  const { signAccessToken } = await import("@/lib/jwt");
+  const newToken = signAccessToken({
+    sub: updated.id,
+    email: updated.email,
+    role: updated.role as any,
+    company_id: updated.company_id,
+  });
+
+  return ok({ user: updated, accessToken: newToken }, "Role updated successfully");
 });
