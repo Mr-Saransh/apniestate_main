@@ -11,6 +11,8 @@ export interface AuthUser {
   email: string;
   role: 'ADMIN' | 'BUILDER' | 'SITE_SUPERVISOR' | 'ACCOUNTANT' | 'INVENTORY_MANAGER' | 'PROJECT_MANAGER';
   phone?: string | null;
+  onboarded?: boolean;
+  company_id?: string | null;
 }
 
 export interface LoginResponse {

@@ -1,65 +1,8 @@
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
-import {
-  LayoutDashboard,
-  FolderKanban,
-  MapPin,
-  ClipboardList,
-  UserCheck,
-  Package,
-  Boxes,
-  Truck,
-  Wallet,
-  FileText,
-  BarChart3,
-  Settings,
-  LogOut,
-  Building2,
-  Users,
-  Calendar,
-  Layers,
-  Calculator,
-} from 'lucide-react';
-
-const mainNav = [
-  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/projects', icon: FolderKanban, label: 'Projects' },
-  { to: '/sites', icon: MapPin, label: 'Sites' },
-  { to: '/tasks', icon: ClipboardList, label: 'Tasks' },
-  { to: '/attendance', icon: UserCheck, label: 'Attendance' },
-  { to: '/more', icon: Layers, label: 'Management' },
-];
-
-const managementNav = [
-  { to: '/inventory', icon: Package, label: 'Inventory' },
-  { to: '/materials', icon: Boxes, label: 'Materials' },
-  { to: '/vendors', icon: Truck, label: 'Vendors' },
-  { to: '/workers', icon: Users, label: 'Workers' },
-  { to: '/contractors', icon: Layers, label: 'Contractors' },
-  { to: '/leaves', icon: Calendar, label: 'Leaves' },
-  { to: '/payroll', icon: Calculator, label: 'Payroll' },
-];
-
-const financeNav = [
-  { to: '/finance', icon: Wallet, label: 'Expenses' },
-  { to: '/invoices', icon: FileText, label: 'Invoices' },
-  { to: '/payments', icon: Wallet, label: 'Payments' },
-  { to: '/budgets', icon: BarChart3, label: 'Budgets' },
-  { to: '/documents', icon: FileText, label: 'Documents' },
-  { to: '/reports', icon: BarChart3, label: 'Reports' },
-];
-
-const adminNav = [
-  { to: '/settings', icon: Settings, label: 'Settings' },
-];
-
-const navSections = [
-  { label: 'Main', items: mainNav },
-  { label: 'Management', items: managementNav },
-  { label: 'Finance', items: financeNav },
-  { label: 'Admin', items: adminNav },
-];
-
+import Logo from '@/components/shared/Logo';
+import { LogOut } from 'lucide-react';
+import { getSidebarConfig } from '@/config/navigation.config';
 
 export default function Sidebar() {
   const { user, logout, hasPermission } = useAuth();
@@ -70,32 +13,12 @@ export default function Sidebar() {
   const formatRole = (role: string) =>
     role.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
-  const checkAccess = (path: string) => {
-    if (user?.role === 'ADMIN') return true;
-    switch (path) {
-      case '/dashboard': return true;
-      case '/projects': return hasPermission('projects.read');
-      case '/sites': return hasPermission('sites.read');
-      case '/tasks': return hasPermission('tasks.read');
-      case '/attendance': return hasPermission('attendance.read');
-      case '/inventory': return hasPermission('inventory.read');
-      case '/materials': return hasPermission('materials.read');
-      case '/vendors': return hasPermission('vendors.read');
-      case '/workers': return hasPermission('workers.read');
-      case '/contractors': return hasPermission('contractors.read');
-      case '/leaves': return hasPermission('leaves.read');
-      case '/payroll': return hasPermission('workers.read');
-      case '/finance': return hasPermission('finance.read');
-      case '/invoices': return hasPermission('invoices.read');
-      case '/payments': return hasPermission('payments.read');
-      case '/budgets': return hasPermission('budgets.read');
-      case '/documents': return hasPermission('documents.read');
-      case '/reports': return hasPermission('reports.read');
-      case '/settings': return true;
-      case '/more': return true;
-      default: return false;
-    }
+  const checkAccess = (permission?: string) => {
+    if (!permission) return true;
+    return hasPermission(permission);
   };
+
+  const navSections = getSidebarConfig(user?.role || 'SITE_SUPERVISOR');
 
   const filteredNavSections = navSections.map(section => ({
     ...section,
@@ -105,14 +28,8 @@ export default function Sidebar() {
   return (
     <aside className="sidebar" id="desktop-sidebar">
       {/* Brand */}
-      <div className="sidebar-brand">
-        <div className="sidebar-logo">
-          <Building2 size={20} />
-        </div>
-        <div className="sidebar-brand-text">
-          <span className="sidebar-brand-name">APNI ESTATE</span>
-          <span className="sidebar-brand-tagline">Creative Development Together</span>
-        </div>
+      <div className="sidebar-brand" style={{ display: 'flex', justifyContent: 'center', padding: 'var(--space-4) 0' }}>
+        <Logo size="lg" />
       </div>
 
       {/* Navigation */}

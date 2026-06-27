@@ -166,8 +166,13 @@ async function seedPermissions() {
   // SITE_SUPERVISOR role permissions
   await assignRolePermissions(Role.SITE_SUPERVISOR, [
     { module: 'projects', action: 'read' },
+    { module: 'projects', action: 'create' },
+    { module: 'projects', action: 'update' },
     { module: 'sites', action: 'read' },
+    { module: 'sites', action: 'create' },
+    { module: 'sites', action: 'update' },
     { module: 'tasks', action: 'read' },
+    { module: 'tasks', action: 'create' },
     { module: 'tasks', action: 'update' },
     { module: 'attendance', action: 'create' },
     { module: 'attendance', action: 'read' },
@@ -175,10 +180,18 @@ async function seedPermissions() {
     { module: 'leaves', action: 'create' },
     { module: 'leaves', action: 'read' },
     { module: 'inventory', action: 'read' },
+    { module: 'inventory', action: 'create' },
     { module: 'inventory', action: 'update' },
     { module: 'material-requests', action: 'create' },
     { module: 'material-requests', action: 'read' },
     { module: 'workers', action: 'read' },
+    { module: 'workers', action: 'create' },
+    { module: 'workers', action: 'update' },
+    { module: 'finance', action: 'create' },
+    { module: 'finance', action: 'read' },
+    { module: 'vendors', action: 'read' },
+    { module: 'payments', action: 'create' },
+    { module: 'payments', action: 'read' },
     { module: 'documents', action: 'create' },
     { module: 'documents', action: 'read' },
     { module: 'reports', action: 'read' },
@@ -218,12 +231,22 @@ async function main() {
   // Seed permissions first
   await seedPermissions();
 
+  const company = await prisma.company.upsert({
+    where: { id: 'cl_demo_company_1' },
+    update: { name: 'Apni Estate Demo' },
+    create: {
+      id: 'cl_demo_company_1',
+      name: 'Apni Estate Demo',
+    },
+  });
+  console.log(`Created/updated demo company: ${company.name}`);
+
   const commonPassword = await bcrypt.hash('admin123', 10);
 
   // 1. Admin user
   const admin = await prisma.user.upsert({
     where: { email: 'admin@apniestate.com' },
-    update: { role: Role.ADMIN },
+    update: { role: Role.ADMIN, company_id: company.id },
     create: {
       name: 'System Admin',
       email: 'admin@apniestate.com',
@@ -231,6 +254,7 @@ async function main() {
       role: Role.ADMIN,
       phone: '+1234567890',
       is_active: true,
+      company_id: company.id,
     },
   });
   console.log(`Created admin user: ${admin.email}`);
@@ -238,7 +262,7 @@ async function main() {
   // 2. Builder user
   const builder = await prisma.user.upsert({
     where: { email: 'builder@apniestate.com' },
-    update: {},
+    update: { company_id: company.id },
     create: {
       name: 'Lead Builder',
       email: 'builder@apniestate.com',
@@ -246,6 +270,7 @@ async function main() {
       role: Role.BUILDER,
       phone: '+0987654321',
       is_active: true,
+      company_id: company.id,
     },
   });
   console.log(`Created builder user: ${builder.email}`);
@@ -253,7 +278,7 @@ async function main() {
   // 3. Project Manager user
   const pm = await prisma.user.upsert({
     where: { email: 'pm@apniestate.com' },
-    update: {},
+    update: { company_id: company.id },
     create: {
       name: 'Project Manager',
       email: 'pm@apniestate.com',
@@ -261,6 +286,7 @@ async function main() {
       role: Role.PROJECT_MANAGER,
       phone: '+1112223333',
       is_active: true,
+      company_id: company.id,
     },
   });
   console.log(`Created project manager user: ${pm.email}`);
@@ -268,7 +294,7 @@ async function main() {
   // 4. Supervisor user
   const supervisor = await prisma.user.upsert({
     where: { email: 'supervisor@apniestate.com' },
-    update: {},
+    update: { company_id: company.id },
     create: {
       name: 'Site Supervisor',
       email: 'supervisor@apniestate.com',
@@ -276,6 +302,7 @@ async function main() {
       role: Role.SITE_SUPERVISOR,
       phone: '+4445556666',
       is_active: true,
+      company_id: company.id,
     },
   });
   console.log(`Created site supervisor user: ${supervisor.email}`);
@@ -283,7 +310,7 @@ async function main() {
   // 5. Accountant user
   const accountant = await prisma.user.upsert({
     where: { email: 'accountant@apniestate.com' },
-    update: {},
+    update: { company_id: company.id },
     create: {
       name: 'Accountant User',
       email: 'accountant@apniestate.com',
@@ -291,6 +318,7 @@ async function main() {
       role: Role.ACCOUNTANT,
       phone: '+7778889999',
       is_active: true,
+      company_id: company.id,
     },
   });
   console.log(`Created accountant user: ${accountant.email}`);
@@ -298,7 +326,7 @@ async function main() {
   // 6. Inventory Manager user
   const inventoryManager = await prisma.user.upsert({
     where: { email: 'inventory@apniestate.com' },
-    update: {},
+    update: { company_id: company.id },
     create: {
       name: 'Inventory Manager',
       email: 'inventory@apniestate.com',
@@ -306,6 +334,7 @@ async function main() {
       role: Role.INVENTORY_MANAGER,
       phone: '+1212121212',
       is_active: true,
+      company_id: company.id,
     },
   });
   console.log(`Created inventory manager user: ${inventoryManager.email}`);
@@ -313,7 +342,7 @@ async function main() {
   // Create an initial project
   const project = await prisma.project.upsert({
     where: { id: 'cl_demo_project_1' },
-    update: {},
+    update: { company_id: company.id },
     create: {
       id: 'cl_demo_project_1',
       name: 'Alpha Tower Construction',
@@ -325,6 +354,7 @@ async function main() {
       budget: 15000000,
       address: '123 Alpha St',
       city: 'Metropolis',
+      company_id: company.id,
     },
   });
   console.log(`Created demo project: ${project.name}`);
@@ -332,7 +362,7 @@ async function main() {
   // Create demo sites
   const site1 = await prisma.site.upsert({
     where: { id: 'cl_demo_site_1' },
-    update: {},
+    update: { company_id: company.id },
     create: {
       id: 'cl_demo_site_1',
       project_id: project.id,
@@ -342,6 +372,7 @@ async function main() {
       status: 'IN_PROGRESS',
       progress_percentage: 45,
       phase: 'Foundation',
+      company_id: company.id,
     },
   });
   console.log(`Created demo site: ${site1.name}`);
@@ -365,8 +396,12 @@ async function main() {
         unit: mat.unit,
         category: mat.category,
         description: mat.description,
+        company_id: company.id,
       },
-      create: mat,
+      create: {
+        ...mat,
+        company_id: company.id,
+      },
     });
   }
   console.log('Seeded standard materials');
@@ -387,12 +422,15 @@ async function main() {
           site_id: site1.id,
         },
       },
-      update: {},
+      update: {
+        company_id: company.id,
+      },
       create: {
         material_id: inv.material_id,
         site_id: site1.id,
         quantity: 0,
         min_quantity: inv.min_quantity,
+        company_id: company.id,
       },
     });
 

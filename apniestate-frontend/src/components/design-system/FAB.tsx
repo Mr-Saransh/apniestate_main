@@ -1,248 +1,117 @@
-import React, { useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import {
-  Plus,
-  FolderKanban,
-  ClipboardCheck,
-  Package,
-  UserCheck,
-  Wallet,
-  FileText,
-  X
-} from 'lucide-react';
-import { Colors } from './Colors';
-import { Shadows } from './Shadows';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Plus } from 'lucide-react';
+import { useIsDesktop } from '@/hooks/useMediaQuery';
+import { useAuth } from '@/context/AuthContext';
+import { getFabConfig } from '@/config/navigation.config';
 
 export function FAB() {
   const navigate = useNavigate();
+  const isDesktop = useIsDesktop();
+  const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  const handleFabClick = () => {
-    setIsOpen(!isOpen);
-  };
+  const actions = getFabConfig(user?.role || 'SITE_SUPERVISOR');
 
-  const handleMenuAction = (targetPath: string) => {
-    setIsOpen(false);
-    navigate(targetPath);
-  };
+  const handleAction = useCallback(
+    (action: any) => {
+      setIsOpen(false);
+      if (action.action === 'search') {
+        window.dispatchEvent(new CustomEvent('open-search'));
+        return;
+      }
+      navigate(action.path);
+    },
+    [navigate]
+  );
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsOpen(false);
+    };
+    document.body.style.overflow = 'hidden';
+    document.addEventListener('mousedown', handleOutside);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.body.style.overflow = '';
+      document.removeEventListener('mousedown', handleOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [isOpen]);
 
   return (
     <>
-      <style>
-        {`
-          @keyframes slideUpFab {
-            0% { opacity: 0; transform: translateY(20px) scale(0.9); }
-            100% { opacity: 1; transform: translateY(0) scale(1); }
-          }
-          .fab-menu-container {
-            animation: slideUpFab 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-            transform-origin: bottom right;
-          }
-          .fab-btn-rotate {
-            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-          }
-          .fab-btn-rotate.open {
-            transform: rotate(135deg);
-          }
-        `}
-      </style>
-      <div
-        style={{
-          position: 'fixed',
-          bottom: '88px', // High enough to avoid bottom nav bar on mobile
-          right: '24px',
-          zIndex: 9999,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'flex-end',
-        }}
-      >
-        {/* Quick Actions menu */}
+      <AnimatePresence>
         {isOpen && (
-          <>
-            {/* Overlay to close menu on click */}
-            <div
-              onClick={() => setIsOpen(false)}
-              style={{
-                position: 'fixed',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                backgroundColor: 'rgba(0, 0, 0, 0.4)',
-                zIndex: -1,
-                animation: 'fadeIn 0.2s ease',
-              }}
-            />
-
-            <div
-              className="fab-menu-container"
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '12px',
-                marginBottom: '16px',
-                alignItems: 'flex-end',
-              }}
-            >
-              {/* Create Project */}
-              <button
-                onClick={() => handleMenuAction('/projects?create=true')}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  background: '#FFFFFF',
-                  border: 'none',
-                  padding: '10px 16px',
-                  borderRadius: '24px',
-                  boxShadow: Shadows.md,
-                  cursor: 'pointer',
-                  fontWeight: 600,
-                  color: Colors.primaryText,
-                  fontSize: '14px',
-                }}
-              >
-                <span>Create Project</span>
-                <div style={{ color: Colors.primaryBlue, display: 'flex' }}><FolderKanban size={18} /></div>
-              </button>
-
-              {/* Create Task */}
-              <button
-                onClick={() => handleMenuAction('/tasks?create=true')}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  background: '#FFFFFF',
-                  border: 'none',
-                  padding: '10px 16px',
-                  borderRadius: '24px',
-                  boxShadow: Shadows.md,
-                  cursor: 'pointer',
-                  fontWeight: 600,
-                  color: Colors.primaryText,
-                  fontSize: '14px',
-                }}
-              >
-                <span>Create Task</span>
-                <div style={{ color: Colors.successGreen, display: 'flex' }}><ClipboardCheck size={18} /></div>
-              </button>
-
-              {/* Request Material */}
-              <button
-                onClick={() => handleMenuAction('/inventory?create=true')}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  background: '#FFFFFF',
-                  border: 'none',
-                  padding: '10px 16px',
-                  borderRadius: '24px',
-                  boxShadow: Shadows.md,
-                  cursor: 'pointer',
-                  fontWeight: 600,
-                  color: Colors.primaryText,
-                  fontSize: '14px',
-                }}
-              >
-                <span>Add Material</span>
-                <div style={{ color: Colors.warningAmber, display: 'flex' }}><Package size={18} /></div>
-              </button>
-
-              {/* Mark Attendance */}
-              <button
-                onClick={() => handleMenuAction('/attendance')}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  background: '#FFFFFF',
-                  border: 'none',
-                  padding: '10px 16px',
-                  borderRadius: '24px',
-                  boxShadow: Shadows.md,
-                  cursor: 'pointer',
-                  fontWeight: 600,
-                  color: Colors.primaryText,
-                  fontSize: '14px',
-                }}
-              >
-                <span>Mark Attendance</span>
-                <div style={{ color: Colors.primaryBlue, display: 'flex' }}><UserCheck size={18} /></div>
-              </button>
-
-              {/* Add Expense */}
-              <button
-                onClick={() => handleMenuAction('/finance?create=true')}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  background: '#FFFFFF',
-                  border: 'none',
-                  padding: '10px 16px',
-                  borderRadius: '24px',
-                  boxShadow: Shadows.md,
-                  cursor: 'pointer',
-                  fontWeight: 600,
-                  color: Colors.primaryText,
-                  fontSize: '14px',
-                }}
-              >
-                <span>Add Expense</span>
-                <div style={{ color: Colors.errorRed, display: 'flex' }}><Wallet size={18} /></div>
-              </button>
-
-              {/* Upload Document */}
-              <button
-                onClick={() => handleMenuAction('/documents?create=true')}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  background: '#FFFFFF',
-                  border: 'none',
-                  padding: '10px 16px',
-                  borderRadius: '24px',
-                  boxShadow: Shadows.md,
-                  cursor: 'pointer',
-                  fontWeight: 600,
-                  color: Colors.primaryText,
-                  fontSize: '14px',
-                }}
-              >
-                <span>Upload Document</span>
-                <div style={{ color: Colors.primaryBlue, display: 'flex' }}><FileText size={18} /></div>
-              </button>
-            </div>
-          </>
+          <motion.div
+            className="sd-fab-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            onClick={() => setIsOpen(false)}
+            aria-hidden
+          />
         )}
+      </AnimatePresence>
 
-        {/* Primary Blue FAB Button */}
-        <button
-          onClick={handleFabClick}
-          aria-label="Quick action"
-          style={{
-            width: '56px',
-            height: '56px',
-            borderRadius: '50%',
-            backgroundColor: Colors.primaryBlue,
-            color: '#FFFFFF',
-            border: 'none',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            boxShadow: '0 4px 16px rgba(10, 61, 145, 0.35)',
-            transition: 'background-color 0.2s ease, box-shadow 0.2s ease',
-          }}
+      <div
+        ref={containerRef}
+        className={`sd-fab-container ${isDesktop ? 'sd-fab-container--desktop' : 'sd-fab-container--mobile'}`}
+      >
+        <AnimatePresence>
+          {isOpen && (
+            <motion.div
+              className={`sd-fab-menu ${isDesktop ? 'sd-fab-menu--desktop' : 'sd-fab-menu--mobile'}`}
+              initial={{ opacity: 0, scale: 0.92, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 12 }}
+              transition={{ type: 'spring', stiffness: 420, damping: 30 }}
+            >
+              {actions.map((action, i) => {
+                const Icon = action.icon;
+                return (
+                  <motion.button
+                    key={action.label}
+                    type="button"
+                    className="sd-fab-item"
+                    onClick={() => handleAction(action)}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 6 }}
+                    transition={{ delay: i * 0.025, duration: 0.18 }}
+                  >
+                    <span className="sd-fab-item-icon" style={{ background: action.bg, color: action.color }}>
+                      <Icon size={16} />
+                    </span>
+                    <span className="sd-fab-item-label">{action.label}</span>
+                  </motion.button>
+                );
+              })}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <motion.button
+          type="button"
+          className="sd-fab-btn"
+          onClick={() => setIsOpen((o) => !o)}
+          aria-label={isOpen ? 'Close quick actions' : 'Open quick actions'}
+          aria-expanded={isOpen}
+          whileTap={{ scale: 0.92 }}
+          animate={{ rotate: isOpen ? 45 : 0 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 24 }}
         >
-          <div className={`fab-btn-rotate ${isOpen ? 'open' : ''}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Plus size={28} />
-          </div>
-        </button>
+          <Plus size={28} strokeWidth={2.5} />
+        </motion.button>
       </div>
     </>
   );

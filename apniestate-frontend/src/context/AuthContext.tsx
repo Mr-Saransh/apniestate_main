@@ -14,6 +14,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   updateUser: (userData: AuthUser) => void;
   updateUserRole: (role: string) => Promise<void>;
+  switchRole: (role: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -141,6 +142,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('user', JSON.stringify(userData));
   }, []);
 
+  const switchRole = useCallback(async (role: string) => {
+    const response = await authApi.updateRole(role);
+    if (response.success && response.data) {
+      setUser(response.data);
+      localStorage.setItem('user', JSON.stringify(response.data));
+      try {
+        const res = await permissionsApi.getMyPermissions();
+        if (res.success && res.data) {
+          setPermissions(res.data.permissions);
+        }
+      } catch (err) {
+        console.error('Failed to update permissions after role switch:', err);
+      }
+    }
+  }, []);
+
   return (
     <AuthContext.Provider
       value={{
@@ -155,6 +172,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         logout,
         updateUser,
         updateUserRole,
+        switchRole,
       }}
     >
       {children}

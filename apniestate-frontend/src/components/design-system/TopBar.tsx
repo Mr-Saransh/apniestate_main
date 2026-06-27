@@ -22,7 +22,12 @@ import {
   BarChart3,
   Settings,
   Building2,
-  ArrowLeft
+  ArrowLeft,
+  Search,
+  Shield,
+  Calculator,
+  Briefcase,
+  Check
 } from 'lucide-react';
 import { Colors } from './Colors';
 import { Shadows } from './Shadows';
@@ -34,7 +39,7 @@ interface TopBarProps {
 }
 
 export function TopBar({ title: customTitle, icon: customIcon, leftAction }: TopBarProps) {
-  const { user, logout } = useAuth();
+  const { user, logout, switchRole } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [showDropdown, setShowDropdown] = useState(false);
@@ -120,6 +125,14 @@ export function TopBar({ title: customTitle, icon: customIcon, leftAction }: Top
   const title = customTitle || pageInfo.title;
   const icon = customIcon || pageInfo.icon;
 
+  const roles = [
+    { id: 'BUILDER', label: 'Builder / Owner', icon: Building2 },
+    { id: 'PROJECT_MANAGER', label: 'Project Manager', icon: Briefcase },
+    { id: 'SITE_SUPERVISOR', label: 'Site Supervisor', icon: UserCheck },
+    { id: 'ACCOUNTANT', label: 'Accountant', icon: Calculator },
+    { id: 'ADMIN', label: 'Admin / Owner', icon: Shield },
+  ];
+
   return (
     <header
       className="unified-topbar"
@@ -172,6 +185,25 @@ export function TopBar({ title: customTitle, icon: customIcon, leftAction }: Top
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <button
+          type="button"
+          aria-label="Search"
+          onClick={() => window.dispatchEvent(new CustomEvent('open-search'))}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: Colors.secondaryText,
+            cursor: 'pointer',
+            padding: '8px',
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Search size={20} />
+        </button>
+
         <button
           type="button"
           aria-label="Notifications"
@@ -245,11 +277,53 @@ export function TopBar({ title: customTitle, icon: customIcon, leftAction }: Top
                 border: '1px solid #E2E8F0',
                 borderRadius: '12px',
                 boxShadow: Shadows.lg,
-                minWidth: '160px',
+                minWidth: '220px',
                 zIndex: 1000,
                 overflow: 'hidden',
               }}
             >
+              <div style={{ padding: '8px 16px', fontSize: '11px', fontWeight: 700, color: Colors.mutedText, textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid #E2E8F0', backgroundColor: '#F8FAFC' }}>
+                Switch Role
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {roles.map((r) => {
+                  const Icon = r.icon;
+                  const isCurrent = user?.role === r.id;
+                  return (
+                    <button
+                      key={r.id}
+                      type="button"
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        await switchRole(r.id);
+                        setShowDropdown(false);
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        width: '100%',
+                        padding: '10px 16px',
+                        fontSize: '13px',
+                        fontWeight: isCurrent ? 600 : 500,
+                        color: isCurrent ? Colors.primaryBlue : Colors.primaryText,
+                        background: isCurrent ? 'rgba(10, 61, 145, 0.04)' : 'transparent',
+                        border: 'none',
+                        textAlign: 'left',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Icon size={14} color={isCurrent ? Colors.primaryBlue : Colors.secondaryText} />
+                        <span>{r.label.split(' / ')[0]}</span>
+                      </div>
+                      {isCurrent && <Check size={14} color={Colors.primaryBlue} />}
+                    </button>
+                  );
+                })}
+              </div>
+              <div style={{ height: '1px', backgroundColor: '#E2E8F0' }} />
+              
               <button
                 type="button"
                 onClick={() => navigate('/settings')}
@@ -259,7 +333,7 @@ export function TopBar({ title: customTitle, icon: customIcon, leftAction }: Top
                   gap: '10px',
                   padding: '12px 16px',
                   color: Colors.primaryText,
-                  fontSize: '14px',
+                  fontSize: '13px',
                   border: 'none',
                   backgroundColor: 'transparent',
                   width: '100%',
@@ -281,7 +355,7 @@ export function TopBar({ title: customTitle, icon: customIcon, leftAction }: Top
                   gap: '10px',
                   padding: '12px 16px',
                   color: Colors.errorRed,
-                  fontSize: '14px',
+                  fontSize: '13px',
                   border: 'none',
                   backgroundColor: 'transparent',
                   width: '100%',

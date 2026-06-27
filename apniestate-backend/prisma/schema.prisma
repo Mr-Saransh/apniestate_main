@@ -61,6 +61,12 @@ enum MaterialRequestStatus {
   DELIVERED
 }
 
+enum MaterialStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
 enum PurchaseRequestStatus {
   DRAFT
   PENDING
@@ -68,6 +74,17 @@ enum PurchaseRequestStatus {
   REJECTED
   ORDERED
   DELIVERED
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+  SENT
+  PARTIAL
+  DELIVERED
+  CANCELLED
 }
 
 enum EquipmentStatus {
@@ -203,6 +220,7 @@ model User {
   role          Role     @default(SITE_SUPERVISOR)
   phone         String?
   is_active     Boolean  @default(true)
+  onboarded     Boolean  @default(false)
   created_at    DateTime @default(now())
   updated_at    DateTime @updatedAt
 
@@ -227,8 +245,14 @@ model User {
   budget_entries    Budget[]
   cashbook_entries  Cashbook[]
   reports           Report[]
+  reminders         Reminder[]
+  purchase_orders   PurchaseOrder[]
 
   @@map("users")
+  company_id    String?
+  company       Company? @relation(fields: [company_id], references: [id])
+
+  @@index([company_id], name: "idx_user_company_id")
 }
 
 model RefreshToken {
@@ -289,6 +313,8 @@ model Project {
   progress_percentage Int?          @default(0)
   address             String?
   city                String?
+  client_name         String?
+  gps_coordinates     String?
   created_at          DateTime      @default(now())
   updated_at          DateTime      @updatedAt
 
@@ -302,10 +328,17 @@ model Project {
   workers       Worker[]      @relation("ProjectWorkers")
   delays        ProjectDelay[]
   risks         ProjectRisk[]
+  purchase_orders PurchaseOrder[]
+  cashbook_entries Cashbook[]
+  expenses      Expense[]
 
   @@index([builder_id], name: "idx_projects_builder_id")
   @@index([manager_id], name: "idx_projects_manager_id")
   @@map("projects")
+  company_id    String?
+  company       Company? @relation(fields: [company_id], references: [id])
+
+  @@index([company_id], name: "idx_project_company_id")
 }
 
 model Site {
@@ -317,6 +350,9 @@ model Site {
   status              SiteStatus @default(NOT_STARTED)
   progress_percentage Int?       @default(0)
   phase               String?
+  gps_coordinates     String?
+  working_hours_start String?
+  working_hours_end   String?
   created_at          DateTime   @default(now())
   updated_at          DateTime   @updatedAt
 
@@ -333,10 +369,17 @@ model Site {
   labour_teams     LabourTeam[]
   worker_attendances WorkerAttendance[]
   worker_transfers WorkerTransfer[]
+  purchase_orders  PurchaseOrder[]
+  budgets          Budget[]
+  cashbook_entries Cashbook[]
 
   @@index([project_id], name: "idx_sites_project_id")
   @@index([supervisor_id], name: "idx_sites_supervisor_id")
   @@map("sites")
+  company_id    String?
+  company       Company? @relation(fields: [company_id], references: [id])
+
+  @@index([company_id], name: "idx_site_company_id")
 }
 
 // ─── Tasks & Milestones ──────────────────────────────────
@@ -372,6 +415,10 @@ model Task {
   @@index([assignee_id], name: "idx_tasks_assignee_id")
   @@index([status], name: "idx_tasks_status")
   @@map("tasks")
+  company_id    String?
+  company       Company? @relation(fields: [company_id], references: [id])
+
+  @@index([company_id], name: "idx_task_company_id")
 }
 
 model TaskComment {
@@ -475,10 +522,13 @@ model ProjectRisk {
 
 model Worker {
   id              String       @id @default(cuid())
+  employee_id     String?      @unique
   name            String
   phone           String?
   trade           String       // e.g. Mason, Electrician, Plumber
+  skill_level     String?
   daily_rate      Float?
+  overtime_rate_per_hour Float?
   contractor_id   String?
   site_id         String?
   project_id      String?
@@ -509,6 +559,10 @@ model Worker {
   @@index([project_id], name: "idx_workers_project_id")
   @@index([status], name: "idx_workers_status")
   @@map("workers")
+  company_id    String?
+  company       Company? @relation(fields: [company_id], references: [id])
+
+  @@index([company_id], name: "idx_worker_company_id")
 }
 
 model Contractor {
@@ -530,6 +584,10 @@ model Contractor {
   payments Payment[]
 
   @@map("contractors")
+  company_id    String?
+  owner_company Company? @relation(fields: [company_id], references: [id])
+
+  @@index([company_id], name: "idx_contractor_company_id")
 }
 
 model Subcontractor {
@@ -548,6 +606,10 @@ model Subcontractor {
   updated_at      DateTime @updatedAt
 
   @@map("subcontractors")
+  company_id    String?
+  owner_company Company? @relation(fields: [company_id], references: [id])
+
+  @@index([company_id], name: "idx_subcontractor_company_id")
 }
 
 model LabourTeam {
@@ -591,12 +653,16 @@ model WorkerWage {
   overtime_hours Float         @default(0)
   daily_rate     Float
   overtime_rate  Float?
+  bonus          Float         @default(0)
+  advances       Float         @default(0)
+  late_penalty   Float         @default(0)
   gross_amount   Float
   deductions     Float         @default(0)
   net_amount     Float
   status         PaymentStatus @default(PENDING)
   paid_at        DateTime?
   notes          String?
+  is_locked      Boolean       @default(false)
   created_at     DateTime      @default(now())
   updated_at     DateTime      @updatedAt
 
@@ -668,6 +734,7 @@ model WorkerAttendance {
   check_in        DateTime?
   check_out       DateTime?
   overtime_hours  Float?           @default(0)
+  daily_wage_snapshot Float?
   is_half_day     Boolean          @default(false)
   is_late         Boolean          @default(false)
   notes           String?
@@ -709,18 +776,33 @@ model Leave {
 // ─── Materials & Inventory ───────────────────────────────
 
 model Material {
-  id          String   @id @default(cuid())
-  name        String
-  unit        String
-  description String?
-  category    String?
-  created_at  DateTime @default(now())
+  id                  String         @id @default(cuid())
+  code                String?        @unique
+  name                String
+  category            String?
+  unit                String
+  brand               String?
+  specification       String?
+  preferred_vendor_id String?
+  min_stock           Float          @default(0)
+  reorder_level       Float          @default(0)
+  max_stock           Float          @default(0)
+  status              MaterialStatus @default(ACTIVE)
+  description         String?
+  created_at          DateTime       @default(now())
 
-  requests       MaterialRequest[]
-  inventory      InventoryItem[]
-  purchase_items PurchaseRequestItem[]
+  preferred_vendor Vendor?               @relation(fields: [preferred_vendor_id], references: [id])
+  requests         MaterialRequest[]
+  inventory        InventoryItem[]
+  purchase_items   PurchaseRequestItem[]
+  po_items         PurchaseOrderItem[]
 
   @@map("materials")
+  company_id    String?
+  company       Company? @relation(fields: [company_id], references: [id])
+
+  @@index([company_id], name: "idx_material_company_id")
+  @@index([preferred_vendor_id], name: "idx_material_vendor_id")
 }
 
 model MaterialRequest {
@@ -760,6 +842,10 @@ model InventoryItem {
   @@unique([material_id, site_id])
   @@index([site_id], name: "idx_inventory_site_id")
   @@map("inventory_items")
+  company_id    String?
+  company       Company? @relation(fields: [company_id], references: [id])
+
+  @@index([company_id], name: "idx_inventoryitem_company_id")
 }
 
 model InventoryTransaction {
@@ -812,6 +898,57 @@ model PurchaseRequestItem {
   @@map("purchase_request_items")
 }
 
+model PurchaseOrder {
+  id               String              @id @default(cuid())
+  po_number        String              @unique
+  vendor_id        String
+  project_id       String?
+  site_id          String?
+  created_by       String
+  status           PurchaseOrderStatus @default(DRAFT)
+  delivery_date    DateTime?           @db.Date
+  total_amount     Float               @default(0)
+  gst_amount       Float               @default(0)
+  discount_amount  Float               @default(0)
+  terms_conditions String?
+  notes            String?
+  created_at       DateTime            @default(now())
+  updated_at       DateTime            @updatedAt
+
+  vendor   Vendor              @relation(fields: [vendor_id], references: [id])
+  project  Project?            @relation(fields: [project_id], references: [id])
+  site     Site?               @relation(fields: [site_id], references: [id])
+  creator  User                @relation(fields: [created_by], references: [id])
+  items    PurchaseOrderItem[]
+
+  @@index([vendor_id], name: "idx_purchase_orders_vendor_id")
+  @@index([project_id], name: "idx_purchase_orders_project_id")
+  @@index([site_id], name: "idx_purchase_orders_site_id")
+  @@index([status], name: "idx_purchase_orders_status")
+  @@map("purchase_orders")
+  company_id    String?
+  company       Company? @relation(fields: [company_id], references: [id])
+
+  @@index([company_id], name: "idx_purchaseorder_company_id")
+}
+
+model PurchaseOrderItem {
+  id                String @id @default(cuid())
+  purchase_order_id String
+  material_id       String
+  quantity          Float
+  received_quantity Float  @default(0)
+  unit_price        Float
+  gst_rate          Float  @default(0)
+  total             Float
+
+  purchase_order PurchaseOrder @relation(fields: [purchase_order_id], references: [id], onDelete: Cascade)
+  material       Material      @relation(fields: [material_id], references: [id])
+
+  @@index([purchase_order_id], name: "idx_po_items_po_id")
+  @@map("purchase_order_items")
+}
+
 // ─── Vendors & Equipment ─────────────────────────────────
 
 model Vendor {
@@ -834,8 +971,16 @@ model Vendor {
   payments          Payment[]
   ratings           VendorRating[]
   purchase_requests PurchaseRequest[]
+  purchase_orders   PurchaseOrder[]
+  preferred_materials Material[]
+  expenses          Expense[]
+  cashbook_entries  Cashbook[]
 
   @@map("vendors")
+  company_id    String?
+  company       Company? @relation(fields: [company_id], references: [id])
+
+  @@index([company_id], name: "idx_vendor_company_id")
 }
 
 model VendorRating {
@@ -879,6 +1024,8 @@ model Expense {
   description String?
   site_id     String?
   project_id  String?
+  vendor_id   String?
+  invoice_id  String?
   user_id     String
   date        DateTime      @db.Date
   receipt_url String?
@@ -886,12 +1033,20 @@ model Expense {
   created_at  DateTime      @default(now())
   updated_at  DateTime      @updatedAt
 
-  site Site? @relation(fields: [site_id], references: [id])
-  user User  @relation(fields: [user_id], references: [id])
+  site    Site?    @relation(fields: [site_id], references: [id])
+  project Project? @relation(fields: [project_id], references: [id])
+  vendor  Vendor?  @relation(fields: [vendor_id], references: [id])
+  user    User     @relation(fields: [user_id], references: [id])
 
   @@index([site_id], name: "idx_expenses_site_id")
+  @@index([project_id], name: "idx_expenses_project_id")
+  @@index([vendor_id], name: "idx_expenses_vendor_id")
   @@index([date], name: "idx_expenses_date")
   @@map("expenses")
+  company_id    String?
+  company       Company? @relation(fields: [company_id], references: [id])
+
+  @@index([company_id], name: "idx_expense_company_id")
 }
 
 model Payment {
@@ -915,6 +1070,10 @@ model Payment {
   @@index([vendor_id], name: "idx_payments_vendor_id")
   @@index([date], name: "idx_payments_date")
   @@map("payments")
+  company_id    String?
+  company       Company? @relation(fields: [company_id], references: [id])
+
+  @@index([company_id], name: "idx_payment_company_id")
 }
 
 model Invoice {
@@ -936,11 +1095,16 @@ model Invoice {
   @@index([vendor_id], name: "idx_invoices_vendor_id")
   @@index([status], name: "idx_invoices_status")
   @@map("invoices")
+  company_id    String?
+  company       Company? @relation(fields: [company_id], references: [id])
+
+  @@index([company_id], name: "idx_invoice_company_id")
 }
 
 model Budget {
   id          String         @id @default(cuid())
   project_id  String
+  site_id     String?
   category    BudgetCategory @default(OTHER)
   allocated   Float          @default(0)
   spent       Float          @default(0)
@@ -950,10 +1114,16 @@ model Budget {
   updated_at  DateTime       @updatedAt
 
   project Project @relation(fields: [project_id], references: [id])
+  site    Site?   @relation(fields: [site_id], references: [id])
   creator User    @relation(fields: [created_by], references: [id])
 
   @@index([project_id], name: "idx_budgets_project_id")
+  @@index([site_id], name: "idx_budgets_site_id")
   @@map("budgets")
+  company_id    String?
+  company       Company? @relation(fields: [company_id], references: [id])
+
+  @@index([company_id], name: "idx_budget_company_id")
 }
 
 model Cashbook {
@@ -964,14 +1134,26 @@ model Cashbook {
   reference   String?
   description String?
   category    String?
+  project_id  String?
+  site_id     String?
+  vendor_id   String?
   recorded_by String
   created_at  DateTime     @default(now())
 
-  recorder User @relation(fields: [recorded_by], references: [id])
+  project  Project? @relation(fields: [project_id], references: [id])
+  site     Site?    @relation(fields: [site_id], references: [id])
+  vendor   Vendor?  @relation(fields: [vendor_id], references: [id])
+  recorder User     @relation(fields: [recorded_by], references: [id])
 
   @@index([date], name: "idx_cashbook_date")
   @@index([type], name: "idx_cashbook_type")
+  @@index([project_id], name: "idx_cashbook_project_id")
+  @@index([site_id], name: "idx_cashbook_site_id")
   @@map("cashbook")
+  company_id    String?
+  company       Company? @relation(fields: [company_id], references: [id])
+
+  @@index([company_id], name: "idx_cashbook_company_id")
 }
 
 model Account {
@@ -985,6 +1167,10 @@ model Account {
   updated_at DateTime    @updatedAt
 
   @@map("accounts")
+  company_id    String?
+  company       Company? @relation(fields: [company_id], references: [id])
+
+  @@index([company_id], name: "idx_account_company_id")
 }
 
 // ─── Documents & Notifications ───────────────────────────
@@ -1006,6 +1192,10 @@ model Document {
 
   @@index([entity_type, entity_id], name: "idx_documents_entity")
   @@map("documents")
+  company_id    String?
+  company       Company? @relation(fields: [company_id], references: [id])
+
+  @@index([company_id], name: "idx_document_company_id")
 }
 
 model DocumentVersion {
@@ -1040,6 +1230,8 @@ model Notification {
   title       String
   message     String
   type        String?
+  link        String?
+  priority    String?  @default("NORMAL")
   is_read     Boolean  @default(false)
   entity_type String?
   entity_id   String?
@@ -1050,6 +1242,10 @@ model Notification {
   @@index([user_id], name: "idx_notifications_user_id")
   @@index([is_read], name: "idx_notifications_is_read")
   @@map("notifications")
+  company_id    String?
+  company       Company? @relation(fields: [company_id], references: [id])
+
+  @@index([company_id], name: "idx_notification_company_id")
 }
 
 // ─── Reports & Change Orders ─────────────────────────────
@@ -1063,9 +1259,12 @@ model DailyReport {
   weather       String?
   workers_count Int?
   work_completed     String?
-  materials_consumed String?
-  issues_faced       String?
-  photos             String?
+  materials_consumed Json?
+  equipment_used     Json?
+  issues_faced       Json?
+  attendance_data    Json?
+  expenses_data      Json?
+  photos             Json?
   tomorrow_plan      String?
   created_at    DateTime @default(now())
   updated_at    DateTime @updatedAt
@@ -1076,6 +1275,10 @@ model DailyReport {
   @@index([site_id], name: "idx_daily_reports_site_id")
   @@index([report_date], name: "idx_daily_reports_date")
   @@map("daily_reports")
+  company_id    String?
+  company       Company? @relation(fields: [company_id], references: [id])
+
+  @@index([company_id], name: "idx_dailyreport_company_id")
 }
 
 model ChangeOrder {
@@ -1108,6 +1311,10 @@ model Report {
 
   @@index([type], name: "idx_reports_type")
   @@map("reports")
+  company_id    String?
+  company       Company? @relation(fields: [company_id], references: [id])
+
+  @@index([company_id], name: "idx_report_company_id")
 }
 
 // ─── Activity Logging ────────────────────────────────────
@@ -1127,6 +1334,10 @@ model ActivityLog {
   @@index([user_id], name: "idx_activity_logs_user_id")
   @@index([created_at], name: "idx_activity_logs_created_at")
   @@map("activity_logs")
+  company_id    String?
+  company       Company? @relation(fields: [company_id], references: [id])
+
+  @@index([company_id], name: "idx_activitylog_company_id")
 }
 
 // ─── Settings ────────────────────────────────────────────
@@ -1139,4 +1350,77 @@ model Setting {
   updated_at  DateTime @updatedAt
 
   @@map("settings")
+}
+
+
+// ─── Multi-Tenancy ────────────────────────────────────────
+
+model Company {
+  id         String   @id @default(cuid())
+  name       String
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  users             User[]
+  projects          Project[]
+  workers           Worker[]
+  contractors       Contractor[]
+  subcontractors    Subcontractor[]
+  cashbook_entries  Cashbook[]
+  vendors           Vendor[]
+  materials         Material[]
+  accounts          Account[]
+  settings          CompanySetting[]
+  expenses          Expense[]
+  payments          Payment[]
+  invoices          Invoice[]
+  budgets           Budget[]
+  documents         Document[]
+  notifications     Notification[]
+  daily_reports     DailyReport[]
+  reports           Report[]
+  activity_logs     ActivityLog[]
+  tasks             Task[]
+  sites             Site[]
+  inventory_items   InventoryItem[]
+  reminders         Reminder[]
+  purchase_orders   PurchaseOrder[]
+
+  @@map("companies")
+}
+
+model CompanySetting {
+  id          String   @id @default(cuid())
+  company_id  String
+  key         String
+  value       String
+  description String?
+  updated_at  DateTime @updatedAt
+
+  company Company @relation(fields: [company_id], references: [id], onDelete: Cascade)
+
+  @@unique([company_id, key])
+  @@map("company_settings")
+}
+
+model Reminder {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  date        DateTime
+  user_id     String
+  entity_type String?
+  entity_id   String?
+  status      String   @default("PENDING") // PENDING, SENT, CANCELLED
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  company_id    String?
+  company       Company? @relation(fields: [company_id], references: [id])
+
+  @@index([user_id], name: "idx_reminders_user_id")
+  @@index([date], name: "idx_reminders_date")
+  @@index([company_id], name: "idx_reminder_company_id")
+  @@map("reminders")
 }
