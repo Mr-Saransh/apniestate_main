@@ -7,24 +7,26 @@ import { ok, notFound, noContent } from "@/lib/response";
 
 type Ctx = { params: Promise<{ id: string }> };
 
-export const GET = withPermission("workers", "read")(async (_req: NextRequest, _user, ctx?: Ctx) => {
+export const GET = withPermission("workers", "read")(async (_req: NextRequest, user, ctx?: Ctx) => {
   const { id } = await ctx!.params;
-  const worker = await getWorkerById(id);
+  const worker = await getWorkerById(id, user.company_id);
   if (!worker) return notFound("Worker");
   return ok(worker);
 });
 
-export const PATCH = withPermission("workers", "update")(async (req: NextRequest, _user, ctx?: Ctx) => {
+export const PATCH = withPermission("workers", "update")(async (req: NextRequest, user, ctx?: Ctx) => {
   const { id } = await ctx!.params;
   const parsed = await validateBody(req, UpdateWorkerSchema);
   if ("error" in parsed) return parsed.error;
-  const worker = await updateWorker(id, parsed.data);
+  const worker = await updateWorker(id, parsed.data, user.company_id);
+  if (!worker) return notFound("Worker");
   return ok(worker, "Worker updated");
 });
 
-export const DELETE = withPermission("workers", "delete")(async (_req: NextRequest, _user, ctx?: Ctx) => {
+export const DELETE = withPermission("workers", "delete")(async (_req: NextRequest, user, ctx?: Ctx) => {
   const { id } = await ctx!.params;
-  await deleteWorker(id);
+  const success = await deleteWorker(id, user.company_id);
+  if (!success) return notFound("Worker");
   return noContent();
 });
 

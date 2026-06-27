@@ -13,7 +13,7 @@ export const GET = withAuth(async (req, user) => {
     assignee_id: url.searchParams.get("assignee_id") || undefined,
     status: url.searchParams.get("status") || undefined,
   };
-  const tasks = await getTasks(user.sub, user.role, filters);
+  const tasks = await getTasks(user.sub, user.role, filters, user.company_id);
   return ok(tasks);
 });
 
@@ -21,6 +21,6 @@ export const POST = withAuth(async (req, user) => {
   const parsed = await validateBody(req, CreateTaskSchema);
   if ("error" in parsed) return parsed.error;
 
-  const task = await createTask(parsed.data, user.sub);
+  const task = await createTask(parsed.data, user.sub, user.company_id);
   return created(task, "Task created successfully");
 });

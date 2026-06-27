@@ -1,12 +1,19 @@
 import { prisma } from "@/lib/prisma";
 
-export async function getTasks(userId: string, role: string, filters?: {
-  project_id?: string;
-  site_id?: string;
-  assignee_id?: string;
-  status?: string;
-}) {
-  const where: any = {};
+export async function getTasks(
+  userId: string,
+  role: string,
+  filters?: {
+    project_id?: string;
+    site_id?: string;
+    assignee_id?: string;
+    status?: string;
+  },
+  companyId?: string | null
+) {
+  if (!companyId) return [];
+
+  const where: any = { company_id: companyId };
 
   if (filters?.project_id) {
     where.project_id = filters.project_id;
@@ -21,20 +28,16 @@ export async function getTasks(userId: string, role: string, filters?: {
     where.status = filters.status;
   }
 
-  // If no filters are provided, check role-based scope
-  if (!filters?.project_id && !filters?.site_id && !filters?.assignee_id) {
-    if (role === "BUILDER") {
-      where.project = { builder_id: userId };
-    } else if (role === "PROJECT_MANAGER") {
-      where.project = { manager_id: userId };
-    } else if (role === "SITE_SUPERVISOR") {
-      where.site = { supervisor_id: userId };
-    } else if (role !== "ADMIN") {
-      where.OR = [
-        { assignee_id: userId },
-        { created_by: userId }
-      ];
-    }
+  // Scoping checks within the company boundary
+  if (role === "SITE_SUPERVISOR") {
+    where.site = { supervisor_id: userId };
+  } else if (role === "PROJECT_MANAGER") {
+    where.project = { manager_id: userId };
+  } else if (role !== "ADMIN" && role !== "BUILDER" && role !== "ACCOUNTANT") {
+    where.OR = [
+      { assignee_id: userId },
+      { created_by: userId }
+    ];
   }
 
   return prisma.task.findMany({
@@ -49,12 +52,13 @@ export async function getTasks(userId: string, role: string, filters?: {
   });
 }
 
-export async function createTask(data: any, userId: string) {
+export async function createTask(data: any, userId: string, companyId?: string | null) {
   const { due_date, ...rest } = data;
   return prisma.task.create({
     data: {
       ...rest,
       created_by: userId,
+      company_id: companyId || null,
       due_date: due_date ? new Date(due_date) : null,
       reminder_days: data.reminder_days || 1,
     },
@@ -67,7 +71,11 @@ export async function createTask(data: any, userId: string) {
   });
 }
 
-export async function updateTask(id: string, data: any) {
+export async function updateTask(id: string, data: any, companyId?: string | null) {
+  if (!companyId) return null;
+  const existing = await prisma.task.findFirst({ where: { id, company_id: companyId } });
+  if (!existing) return null;
+
   const { due_date, ...rest } = data;
   const updateData: any = { ...rest };
   if (due_date !== undefined) {
@@ -88,7 +96,10 @@ export async function updateTask(id: string, data: any) {
   });
 }
 
-export async function deleteTask(id: string) {
+export async function deleteTask(id: string, companyId?: string | null) {
+  if (!companyId) return null;
+  const existing = await prisma.task.findFirst({ where: { id, company_id: companyId } });
+  if (!existing) return null;
   return prisma.task.delete({
     where: { id },
   });

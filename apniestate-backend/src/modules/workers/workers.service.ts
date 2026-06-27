@@ -17,8 +17,9 @@ export async function getWorkers(filters?: {
   contractor_id?: string;
   status?: string;
   trade?: string;
-}) {
-  const where: any = {};
+}, companyId?: string | null) {
+  if (!companyId) return [];
+  const where: any = { company_id: companyId };
   if (filters?.site_id) where.site_id = filters.site_id;
   if (filters?.project_id) where.project_id = filters.project_id;
   if (filters?.contractor_id) where.contractor_id = filters.contractor_id;
@@ -38,9 +39,10 @@ export async function getWorkers(filters?: {
   });
 }
 
-export async function getWorkerById(id: string) {
-  return prisma.worker.findUnique({
-    where: { id },
+export async function getWorkerById(id: string, companyId?: string | null) {
+  if (!companyId) return null;
+  return prisma.worker.findFirst({
+    where: { id, company_id: companyId },
     include: {
       contractor: { select: { id: true, name: true, company: true } },
       site: { select: { id: true, name: true } },
@@ -53,10 +55,11 @@ export async function getWorkerById(id: string) {
   });
 }
 
-export async function createWorker(data: z.infer<typeof CreateWorkerSchema>) {
+export async function createWorker(data: z.infer<typeof CreateWorkerSchema>, companyId?: string | null) {
   return prisma.worker.create({
     data: {
       ...data,
+      company_id: companyId || null,
       date_of_joining: data.date_of_joining ? new Date(data.date_of_joining) : null,
     },
     include: {
@@ -66,7 +69,11 @@ export async function createWorker(data: z.infer<typeof CreateWorkerSchema>) {
   });
 }
 
-export async function updateWorker(id: string, data: z.infer<typeof UpdateWorkerSchema>) {
+export async function updateWorker(id: string, data: z.infer<typeof UpdateWorkerSchema>, companyId?: string | null) {
+  if (!companyId) return null;
+  const existing = await prisma.worker.findFirst({ where: { id, company_id: companyId } });
+  if (!existing) return null;
+
   const updateData: any = { ...data };
   if (data.date_of_joining) updateData.date_of_joining = new Date(data.date_of_joining);
   return prisma.worker.update({
@@ -79,7 +86,11 @@ export async function updateWorker(id: string, data: z.infer<typeof UpdateWorker
   });
 }
 
-export async function deleteWorker(id: string) {
+export async function deleteWorker(id: string, companyId?: string | null) {
+  if (!companyId) return null;
+  const existing = await prisma.worker.findFirst({ where: { id, company_id: companyId } });
+  if (!existing) return null;
+
   return prisma.worker.update({
     where: { id },
     data: { is_active: false, status: "TERMINATED" },

@@ -11,7 +11,7 @@ export async function loginUser(input: LoginInput) {
   const valid = await bcrypt.compare(input.password, user.password_hash);
   if (!valid) return null;
 
-  const accessToken = signAccessToken({ sub: user.id, email: user.email, role: user.role });
+  const accessToken = signAccessToken({ sub: user.id, email: user.email, role: user.role, company_id: user.company_id });
   const refreshToken = signRefreshToken(user.id);
 
   const tokenHash = await hashToken(refreshToken);
@@ -49,7 +49,7 @@ export async function signupUser(input: import("./auth.schema").SignupInput) {
     },
   });
 
-  const accessToken = signAccessToken({ sub: user.id, email: user.email, role: user.role });
+  const accessToken = signAccessToken({ sub: user.id, email: user.email, role: user.role, company_id: user.company_id });
   const refreshToken = signRefreshToken(user.id);
 
   const tokenHash = await hashToken(refreshToken);

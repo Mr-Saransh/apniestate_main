@@ -18,11 +18,13 @@ function calculateProjectProgress(project: {
   return 0;
 }
 
-export const getProjects = async (userId: string, role: string) => {
-  const where: any = {};
+export const getProjects = async (userId: string, role: string, companyId?: string | null) => {
+  if (!companyId) return [];
+
+  const where: any = { company_id: companyId };
 
   if (role === "BUILDER") {
-    where.builder_id = userId;
+    // Builders see all projects under their company namespace
   } else if (role === "PROJECT_MANAGER") {
     where.manager_id = userId;
   } else if (role === "SITE_SUPERVISOR") {
@@ -61,9 +63,11 @@ export const getProjects = async (userId: string, role: string) => {
   });
 };
 
-export const getProjectById = async (id: string) => {
-  const project = await prisma.project.findUnique({
-    where: { id },
+export const getProjectById = async (id: string, companyId?: string | null) => {
+  if (!companyId) return null;
+
+  const project = await prisma.project.findFirst({
+    where: { id, company_id: companyId },
     include: {
       builder: { select: { id: true, name: true, email: true, phone: true } },
       manager: { select: { id: true, name: true, email: true, phone: true } },
@@ -95,19 +99,24 @@ export const getProjectById = async (id: string) => {
   };
 };
 
-export const createProject = (data: CreateProjectInput, builderId: string) => {
+export const createProject = (data: CreateProjectInput, builderId: string, companyId?: string | null) => {
   const { start_date, end_date, ...rest } = data;
   return prisma.project.create({
     data: {
       ...rest,
       builder_id: builderId,
+      company_id: companyId || null,
       start_date: new Date(start_date),
       end_date: end_date ? new Date(end_date) : null,
     }
   });
 };
 
-export const updateProject = (id: string, data: UpdateProjectInput) => {
+export const updateProject = async (id: string, data: UpdateProjectInput, companyId?: string | null) => {
+  if (!companyId) return null;
+  const existing = await prisma.project.findFirst({ where: { id, company_id: companyId } });
+  if (!existing) return null;
+
   const { start_date, end_date, ...rest } = data;
   const updateData: any = { ...rest };
   if (start_date) updateData.start_date = new Date(start_date);
@@ -115,6 +124,9 @@ export const updateProject = (id: string, data: UpdateProjectInput) => {
   return prisma.project.update({ where: { id }, data: updateData });
 };
 
-export const deleteProject = (id: string) =>
-  prisma.project.delete({ where: { id } });
-
+export const deleteProject = async (id: string, companyId?: string | null) => {
+  if (!companyId) return null;
+  const existing = await prisma.project.findFirst({ where: { id, company_id: companyId } });
+  if (!existing) return null;
+  return prisma.project.delete({ where: { id } });
+};

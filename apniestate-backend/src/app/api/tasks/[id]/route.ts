@@ -12,12 +12,14 @@ export const PATCH = withAuth(async (req: NextRequest, user: any, context?: Ctx)
   const parsed = await validateBody(req, UpdateTaskSchema);
   if ("error" in parsed) return parsed.error;
 
-  const task = await updateTask(id, parsed.data);
+  const task = await updateTask(id, parsed.data, user.company_id);
+  if (!task) return ok(null, "Task not found or access denied");
   return ok(task, "Task updated successfully");
 });
 
 export const DELETE = withAuth(async (_req: NextRequest, user: any, context?: Ctx) => {
   const { id } = await context!.params;
-  await deleteTask(id);
+  const success = await deleteTask(id, user.company_id);
+  if (!success) return ok(null, "Task not found or access denied");
   return ok(null, "Task deleted successfully");
 });

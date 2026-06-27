@@ -1,9 +1,15 @@
 import { prisma } from "@/lib/prisma";
-import { z } from "zod";
-import { CreateSiteSchema, UpdateSiteSchema } from "./sites.schema";
 
-export async function getSites(userId: string) {
+export async function getSites(userId: string, role: string, companyId?: string | null) {
+  if (!companyId) return [];
+  const where: any = { company_id: companyId };
+
+  if (role === "SITE_SUPERVISOR") {
+    where.supervisor_id = userId;
+  }
+
   return prisma.site.findMany({
+    where,
     include: {
       project: { select: { name: true } },
       supervisor: { select: { name: true, role: true } }
@@ -12,9 +18,10 @@ export async function getSites(userId: string) {
   });
 }
 
-export async function getSiteById(id: string) {
-  return prisma.site.findUnique({
-    where: { id },
+export async function getSiteById(id: string, companyId?: string | null) {
+  if (!companyId) return null;
+  return prisma.site.findFirst({
+    where: { id, company_id: companyId },
     include: {
       project: { select: { name: true } },
       supervisor: { select: { name: true, role: true } }
@@ -22,9 +29,12 @@ export async function getSiteById(id: string) {
   });
 }
 
-export async function createSite(data: any, userId: string) {
+export async function createSite(data: any, userId: string, companyId?: string | null) {
   return prisma.site.create({
-    data,
+    data: {
+      ...data,
+      company_id: companyId || null
+    },
     include: {
       project: { select: { name: true } },
       supervisor: { select: { name: true, role: true } }
@@ -32,7 +42,11 @@ export async function createSite(data: any, userId: string) {
   });
 }
 
-export async function updateSite(id: string, data: any) {
+export async function updateSite(id: string, data: any, companyId?: string | null) {
+  if (!companyId) return null;
+  const existing = await prisma.site.findFirst({ where: { id, company_id: companyId } });
+  if (!existing) return null;
+
   return prisma.site.update({
     where: { id },
     data,
@@ -43,6 +57,9 @@ export async function updateSite(id: string, data: any) {
   });
 }
 
-export async function deleteSite(id: string) {
+export async function deleteSite(id: string, companyId?: string | null) {
+  if (!companyId) return null;
+  const existing = await prisma.site.findFirst({ where: { id, company_id: companyId } });
+  if (!existing) return null;
   return prisma.site.delete({ where: { id } });
 }

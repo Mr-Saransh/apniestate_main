@@ -7,16 +7,18 @@ import { ok } from "@/lib/response";
 
 type Ctx = { params: Promise<{ id: string }> };
 
-export const PATCH = withAuth(async (req: NextRequest, _user: any, context?: Ctx) => {
+export const PATCH = withAuth(async (req: NextRequest, user: any, context?: Ctx) => {
   const { id } = await context!.params;
   const parsed = await validateBody(req, UpdateSiteSchema);
   if ("error" in parsed) return parsed.error;
-  const item = await updateSite(id, parsed.data);
+  const item = await updateSite(id, parsed.data, user.company_id);
+  if (!item) return ok(null, "Site not found or access denied");
   return ok(item, "Site updated");
 });
 
-export const DELETE = withAuth(async (_req: NextRequest, _user: any, context?: Ctx) => {
+export const DELETE = withAuth(async (_req: NextRequest, user: any, context?: Ctx) => {
   const { id } = await context!.params;
-  await deleteSite(id);
+  const success = await deleteSite(id, user.company_id);
+  if (!success) return ok(null, "Site not found or access denied");
   return ok(null, "Site deleted");
 });

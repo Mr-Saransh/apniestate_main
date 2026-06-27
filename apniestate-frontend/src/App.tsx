@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '@/context/AuthContext';
 import AppLayout from '@/components/layout/AppLayout';
 import LoginPage from '@/pages/LoginPage';
@@ -31,10 +32,21 @@ import DprPage from '@/pages/DprPage';
 import PayrollPage from '@/pages/PayrollPage';
 import RouteGuard from '@/components/shared/RouteGuard';
 
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      retry: 1,
+      staleTime: 5000,
+    },
+  },
+});
+
 export default function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <BrowserRouter>
         <Routes>
           {/* Public */}
           <Route path="/" element={<LandingPage />} />
@@ -110,6 +122,7 @@ export default function App() {
         </Routes>
       </BrowserRouter>
     </AuthProvider>
+    </QueryClientProvider>
   );
 }
 

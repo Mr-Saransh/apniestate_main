@@ -14,14 +14,14 @@ export const GET = withPermission("workers", "read")(async (req, user) => {
     status: url.searchParams.get("status") || undefined,
     trade: url.searchParams.get("trade") || undefined,
   };
-  const workers = await getWorkers(filters);
+  const workers = await getWorkers(filters, user.company_id);
   return ok(workers);
 });
 
 export const POST = withPermission("workers", "create")(async (req, user) => {
   const parsed = await validateBody(req, CreateWorkerSchema);
   if ("error" in parsed) return parsed.error;
-  const worker = await createWorker(parsed.data);
+  const worker = await createWorker(parsed.data, user.company_id);
   return created(worker, "Worker created");
 });
 
