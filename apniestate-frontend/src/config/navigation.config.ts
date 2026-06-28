@@ -26,7 +26,13 @@ import {
   TrendingUp,
   AlertTriangle,
   Plus,
-  Building2
+  Building2,
+  Bell,
+  Activity,
+  HardHat,
+  Wrench,
+  CreditCard,
+  BookOpen
 } from 'lucide-react';
 
 export interface NavigationItem {
@@ -35,6 +41,7 @@ export interface NavigationItem {
   label: string;
   permission?: string;
   action?: string;
+  badge?: boolean; // Show notification badge
 }
 
 export interface NavigationSection {
@@ -62,26 +69,38 @@ const builderSidebar: NavigationSection[] = [
     ],
   },
   {
-    label: 'Intelligence',
+    label: 'Operations',
     items: [
-      { to: '/reports', icon: BarChart3, label: 'Reports', permission: 'reports.read' },
-      { to: '/budgets', icon: BarChart3, label: 'Budgets', permission: 'budgets.read' },
+      { to: '/tasks', icon: ClipboardList, label: 'Tasks', permission: 'tasks.read' },
+      { to: '/attendance', icon: UserCheck, label: 'Attendance', permission: 'attendance.read' },
+      { to: '/workers', icon: Users, label: 'Workers', permission: 'workers.read' },
+      { to: '/inventory', icon: Package, label: 'Inventory', permission: 'inventory.read' },
+      { to: '/materials', icon: Boxes, label: 'Materials', permission: 'materials.read' },
     ],
   },
   {
-    label: 'Operations',
+    label: 'Procurement',
     items: [
-      { to: '/purchase-orders', icon: Truck, label: 'Purchase Orders', permission: 'materials.read' },
       { to: '/vendors', icon: Truck, label: 'Vendors', permission: 'vendors.read' },
+      { to: '/contractors', icon: HardHat, label: 'Contractors', permission: 'contractors.read' },
       { to: '/documents', icon: FileText, label: 'Documents', permission: 'documents.read' },
     ],
   },
   {
     label: 'Finance',
     items: [
-      { to: '/finance', icon: Wallet, label: 'Expenses', permission: 'finance.read' },
-      { to: '/invoices', icon: FileText, label: 'Invoices', permission: 'invoices.read' },
-      { to: '/payments', icon: Wallet, label: 'Payments', permission: 'payments.read' },
+      { to: '/finance', icon: Wallet, label: 'Cashbook', permission: 'finance.read' },
+      { to: '/invoices', icon: Receipt, label: 'Invoices', permission: 'invoices.read' },
+      { to: '/payments', icon: CreditCard, label: 'Payments', permission: 'payments.read' },
+      { to: '/budgets', icon: BarChart3, label: 'Budgets', permission: 'budgets.read' },
+      { to: '/payroll', icon: Calculator, label: 'Payroll', permission: 'workers.read' },
+    ],
+  },
+  {
+    label: 'Intelligence',
+    items: [
+      { to: '/reports', icon: TrendingUp, label: 'Reports', permission: 'reports.read' },
+      { to: '/notifications', icon: Bell, label: 'Notifications', badge: true },
     ],
   },
   {
@@ -101,31 +120,41 @@ const supervisorSidebar: NavigationSection[] = [
       { to: '/sites', icon: MapPin, label: 'Sites', permission: 'sites.read' },
       { to: '/tasks', icon: ClipboardList, label: 'Tasks', permission: 'tasks.read' },
       { to: '/attendance', icon: UserCheck, label: 'Attendance', permission: 'attendance.read' },
-      { to: '/more', icon: Layers, label: 'Management' },
+      { to: '/dpr', icon: ClipboardCheck, label: 'DPR' },
     ],
   },
   {
-    label: 'Management',
+    label: 'Workforce',
     items: [
-      { to: '/inventory', icon: Package, label: 'Inventory', permission: 'inventory.read' },
-      { to: '/materials', icon: Boxes, label: 'Materials', permission: 'materials.read' },
-      { to: '/purchase-orders', icon: Truck, label: 'Purchase Orders', permission: 'materials.read' },
-      { to: '/vendors', icon: Truck, label: 'Vendors', permission: 'vendors.read' },
       { to: '/workers', icon: Users, label: 'Workers', permission: 'workers.read' },
-      { to: '/contractors', icon: Layers, label: 'Contractors', permission: 'contractors.read' },
+      { to: '/contractors', icon: HardHat, label: 'Contractors', permission: 'contractors.read' },
       { to: '/leaves', icon: Calendar, label: 'Leaves', permission: 'leaves.read' },
       { to: '/payroll', icon: Calculator, label: 'Payroll', permission: 'workers.read' },
     ],
   },
   {
+    label: 'Materials',
+    items: [
+      { to: '/inventory', icon: Package, label: 'Inventory', permission: 'inventory.read' },
+      { to: '/materials', icon: Boxes, label: 'Materials', permission: 'materials.read' },
+      { to: '/vendors', icon: Truck, label: 'Vendors', permission: 'vendors.read' },
+    ],
+  },
+  {
     label: 'Finance',
     items: [
-      { to: '/finance', icon: Wallet, label: 'Expenses', permission: 'finance.read' },
-      { to: '/invoices', icon: FileText, label: 'Invoices', permission: 'invoices.read' },
-      { to: '/payments', icon: Wallet, label: 'Payments', permission: 'payments.read' },
+      { to: '/finance', icon: Wallet, label: 'Cashbook', permission: 'finance.read' },
+      { to: '/invoices', icon: Receipt, label: 'Invoices', permission: 'invoices.read' },
+      { to: '/payments', icon: CreditCard, label: 'Payments', permission: 'payments.read' },
       { to: '/budgets', icon: BarChart3, label: 'Budgets', permission: 'budgets.read' },
+    ],
+  },
+  {
+    label: 'Reports',
+    items: [
       { to: '/documents', icon: FileText, label: 'Documents', permission: 'documents.read' },
-      { to: '/reports', icon: BarChart3, label: 'Reports', permission: 'reports.read' },
+      { to: '/reports', icon: TrendingUp, label: 'Reports', permission: 'reports.read' },
+      { to: '/notifications', icon: Bell, label: 'Notifications', badge: true },
     ],
   },
   {
@@ -147,19 +176,35 @@ const pmSidebar: NavigationSection[] = [
     ],
   },
   {
-    label: 'Management',
+    label: 'Resources',
     items: [
       { to: '/workers', icon: Users, label: 'Workers', permission: 'workers.read' },
+      { to: '/attendance', icon: UserCheck, label: 'Attendance', permission: 'attendance.read' },
+      { to: '/contractors', icon: HardHat, label: 'Contractors', permission: 'contractors.read' },
+    ],
+  },
+  {
+    label: 'Materials',
+    items: [
       { to: '/materials', icon: Boxes, label: 'Materials', permission: 'materials.read' },
-      { to: '/purchase-orders', icon: Truck, label: 'Purchase Orders', permission: 'materials.read' },
+      { to: '/inventory', icon: Package, label: 'Inventory', permission: 'inventory.read' },
+      { to: '/vendors', icon: Truck, label: 'Vendors', permission: 'vendors.read' },
+    ],
+  },
+  {
+    label: 'Finance',
+    items: [
       { to: '/budgets', icon: BarChart3, label: 'Budgets', permission: 'budgets.read' },
+      { to: '/finance', icon: Wallet, label: 'Cashbook', permission: 'finance.read' },
+      { to: '/payments', icon: CreditCard, label: 'Payments', permission: 'payments.read' },
     ],
   },
   {
     label: 'Reports',
     items: [
-      { to: '/reports', icon: BarChart3, label: 'Reports', permission: 'reports.read' },
+      { to: '/reports', icon: TrendingUp, label: 'Reports', permission: 'reports.read' },
       { to: '/documents', icon: FileText, label: 'Documents', permission: 'documents.read' },
+      { to: '/notifications', icon: Bell, label: 'Notifications', badge: true },
     ],
   },
   {
@@ -175,26 +220,90 @@ const accountantSidebar: NavigationSection[] = [
     label: 'Main',
     items: [
       { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+      { to: '/projects', icon: FolderKanban, label: 'Projects', permission: 'projects.read' },
     ],
   },
   {
     label: 'Finance',
     items: [
-      { to: '/finance', icon: Wallet, label: 'Expenses', permission: 'finance.read' },
-      { to: '/invoices', icon: FileText, label: 'Invoices', permission: 'invoices.read' },
-      { to: '/payments', icon: Wallet, label: 'Payments', permission: 'payments.read' },
+      { to: '/finance', icon: Wallet, label: 'Cashbook', permission: 'finance.read' },
+      { to: '/invoices', icon: Receipt, label: 'Invoices', permission: 'invoices.read' },
+      { to: '/payments', icon: CreditCard, label: 'Payments', permission: 'payments.read' },
       { to: '/budgets', icon: BarChart3, label: 'Budgets', permission: 'budgets.read' },
+      { to: '/payroll', icon: Calculator, label: 'Payroll', permission: 'workers.read' },
+    ],
+  },
+  {
+    label: 'Operations',
+    items: [
+      { to: '/vendors', icon: Truck, label: 'Vendors', permission: 'vendors.read' },
+      { to: '/workers', icon: Users, label: 'Workers', permission: 'workers.read' },
+      { to: '/materials', icon: Boxes, label: 'Materials', permission: 'materials.read' },
     ],
   },
   {
     label: 'Reports',
     items: [
-      { to: '/reports', icon: BarChart3, label: 'Reports', permission: 'reports.read' },
+      { to: '/reports', icon: TrendingUp, label: 'Reports', permission: 'reports.read' },
       { to: '/documents', icon: FileText, label: 'Documents', permission: 'documents.read' },
+      { to: '/notifications', icon: Bell, label: 'Notifications', badge: true },
     ],
   },
   {
     label: 'Admin',
+    items: [
+      { to: '/settings', icon: Settings, label: 'Settings' },
+    ],
+  },
+];
+
+const adminSidebar: NavigationSection[] = [
+  {
+    label: 'Main',
+    items: [
+      { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+      { to: '/projects', icon: FolderKanban, label: 'Projects', permission: 'projects.read' },
+      { to: '/sites', icon: MapPin, label: 'Sites', permission: 'sites.read' },
+    ],
+  },
+  {
+    label: 'People',
+    items: [
+      { to: '/users', icon: Shield, label: 'Users & Roles', permission: 'users.read' },
+      { to: '/workers', icon: Users, label: 'Workers', permission: 'workers.read' },
+      { to: '/contractors', icon: HardHat, label: 'Contractors', permission: 'contractors.read' },
+      { to: '/attendance', icon: UserCheck, label: 'Attendance', permission: 'attendance.read' },
+    ],
+  },
+  {
+    label: 'Operations',
+    items: [
+      { to: '/tasks', icon: ClipboardList, label: 'Tasks', permission: 'tasks.read' },
+      { to: '/inventory', icon: Package, label: 'Inventory', permission: 'inventory.read' },
+      { to: '/materials', icon: Boxes, label: 'Materials', permission: 'materials.read' },
+      { to: '/vendors', icon: Truck, label: 'Vendors', permission: 'vendors.read' },
+    ],
+  },
+  {
+    label: 'Finance',
+    items: [
+      { to: '/finance', icon: Wallet, label: 'Cashbook', permission: 'finance.read' },
+      { to: '/invoices', icon: Receipt, label: 'Invoices', permission: 'invoices.read' },
+      { to: '/payments', icon: CreditCard, label: 'Payments', permission: 'payments.read' },
+      { to: '/budgets', icon: BarChart3, label: 'Budgets', permission: 'budgets.read' },
+      { to: '/payroll', icon: Calculator, label: 'Payroll', permission: 'workers.read' },
+    ],
+  },
+  {
+    label: 'Intelligence',
+    items: [
+      { to: '/reports', icon: TrendingUp, label: 'Reports', permission: 'reports.read' },
+      { to: '/documents', icon: FileText, label: 'Documents', permission: 'documents.read' },
+      { to: '/notifications', icon: Bell, label: 'Notifications', badge: true },
+    ],
+  },
+  {
+    label: 'System',
     items: [
       { to: '/settings', icon: Settings, label: 'Settings' },
     ],
@@ -206,7 +315,7 @@ export function getSidebarConfig(role: string): NavigationSection[] {
     case 'BUILDER': return builderSidebar;
     case 'PROJECT_MANAGER': return pmSidebar;
     case 'ACCOUNTANT': return accountantSidebar;
-    case 'ADMIN': return supervisorSidebar;
+    case 'ADMIN': return adminSidebar;
     default: return supervisorSidebar;
   }
 }

@@ -37,7 +37,14 @@ export const GET = withAuth(async (req: NextRequest, user) => {
         present: 0,
         absent: 0
       },
-      calendarEvents: []
+      calendarEvents: [],
+      revenueTrend: [],
+      budgetBurn: [],
+      vendorPerformance: [],
+      upcomingMilestones: [],
+      materialShortages: [],
+      labourTrend: [],
+      approvalsPending: { total: 0, expenses: 0, leaves: 0, materialRequests: 0 }
     });
   }
 
@@ -246,6 +253,111 @@ export const GET = withAuth(async (req: NextRequest, user) => {
     });
   }
 
+  // 10. ENRICHMENT FOR MILESTONE 16 & 17
+  // Revenue Trend (Cashbook credits vs debits, last 6 months)
+  const revenueTrend: any[] = [];
+  for (let i = 5; i >= 0; i--) {
+    const date = new Date();
+    date.setMonth(date.getMonth() - i);
+    const y = date.getFullYear();
+    const m = date.getMonth();
+    const start = new Date(y, m, 1);
+    const end = new Date(y, m + 1, 1);
+    const monthLabel = date.toLocaleDateString("en-US", { month: "short" });
+
+    const monthCredits = cashbookEntries.filter(c => c.date >= start && c.date < end && c.type === "CREDIT").reduce((s, c) => s + c.amount, 0);
+    const monthDebits = cashbookEntries.filter(c => c.date >= start && c.date < end && c.type === "DEBIT").reduce((s, c) => s + c.amount, 0);
+
+    revenueTrend.push({
+      month: monthLabel,
+      revenue: monthCredits,
+      expenses: monthDebits
+    });
+  }
+
+  // Budget Burn Chart data per project
+  const budgetBurn = projects.map(p => {
+    const projBudgets = budgets.filter(b => b.project_id === p.id);
+    const allocated = projBudgets.reduce((s, b) => s + b.allocated, 0);
+    const spent = projBudgets.reduce((s, b) => s + b.spent, 0);
+    return {
+      projectName: p.name,
+      allocated: allocated || p.budget || 0,
+      spent: spent || p.actual_cost || 0
+    };
+  });
+
+  // Vendor Performance (average ratings, active status)
+  const vendors = await prisma.vendor.findMany({
+    where: { company_id, is_active: true },
+    include: { ratings: true },
+    take: 5
+  });
+  const vendorPerformance = vendors.map(v => {
+    const avgScore = v.ratings.length > 0 ? Math.round((v.ratings.reduce((s, r) => s + r.score, 0) / v.ratings.length) * 10) / 10 : 4.0;
+    return {
+      name: v.name,
+      type: v.type,
+      rating: avgScore
+    };
+  });
+
+  // Material Shortages
+  const materialShortages = lowStockItems.map(item => ({
+    name: item.material.name,
+    unit: item.material.unit,
+    quantity: item.quantity,
+    minQuantity: item.min_quantity,
+    siteName: item.site.name
+  }));
+
+  // Labour trend (last 7 days counts)
+  const labourTrend: any[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const date = new Date();
+    date.setDate(date.getDate() - i);
+    date.setUTCHours(0,0,0,0);
+    const next = new Date(date);
+    next.setDate(next.getDate() + 1);
+
+    const attendances = await prisma.workerAttendance.findMany({
+      where: {
+        site: { company_id },
+        date: date
+      },
+      include: { worker: true }
+    });
+
+    const present = attendances.filter(a => a.status === "PRESENT").length;
+    let cost = 0;
+    for (const a of attendances.filter(att => att.status === "PRESENT")) {
+      cost += a.daily_wage_snapshot || a.worker.daily_rate || 0;
+    }
+
+    labourTrend.push({
+      date: date.toLocaleDateString("en-US", { weekday: "short" }),
+      workers: present,
+      cost
+    });
+  }
+
+  // Upcoming Milestones (next 30 days)
+  const thirtyDaysLater = new Date();
+  thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30);
+  const upcomingMilestones = allMilestones
+    .filter(m => m.target_date >= new Date() && m.target_date <= thirtyDaysLater && m.status !== "COMPLETED")
+    .map(m => ({
+      name: m.name,
+      projectName: m.project.name,
+      targetDate: m.target_date.toISOString(),
+      status: m.status
+    }));
+
+  // Approvals Pending counts
+  const pendingLeaves = await prisma.leave.count({ where: { worker: { company_id }, status: "PENDING" } });
+  const pendingExpenses = await prisma.expense.count({ where: { company_id, status: "PENDING" } });
+  const pendingMRsCount = await prisma.materialRequest.count({ where: { site: { company_id }, status: "PENDING" } });
+
   return ok({
     overview: {
       totalProjects,
@@ -260,6 +372,18 @@ export const GET = withAuth(async (req: NextRequest, user) => {
     projectIntelligence,
     financialIntelligence,
     workforceIntelligence,
-    calendarEvents
+    calendarEvents,
+    revenueTrend,
+    budgetBurn,
+    vendorPerformance,
+    upcomingMilestones,
+    materialShortages,
+    labourTrend,
+    approvalsPending: {
+      total: pendingLeaves + pendingExpenses + pendingMRsCount,
+      expenses: pendingExpenses,
+      leaves: pendingLeaves,
+      materialRequests: pendingMRsCount
+    }
   });
 });

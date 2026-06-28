@@ -28,6 +28,10 @@ export default function AppLayout() {
     return <Navigate to="/onboarding" replace />;
   }
 
+  if (user && user.onboarded && !user.company_id) {
+    return <Navigate to="/select-company" replace />;
+  }
+
   return (
     <div className="app-layout">
       {isDesktop ? <Sidebar /> : <BottomNav />}

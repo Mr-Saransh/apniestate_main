@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 import { authApi, type AuthUser, type LoginCredentials } from '@/api/auth';
 import { permissionsApi } from '@/api/permissions';
+import { companiesApi } from '@/api/companies';
 
 interface AuthContextType {
   user: AuthUser | null;
@@ -15,6 +16,8 @@ interface AuthContextType {
   updateUser: (userData: AuthUser) => void;
   updateUserRole: (role: string) => Promise<void>;
   switchRole: (role: string) => Promise<void>;
+  selectCompany: (companyId: string) => Promise<void>;
+  createCompany: (name: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -161,6 +164,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const selectCompany = useCallback(async (companyId: string) => {
+    const response = await companiesApi.selectCompany(companyId);
+    if (response.success && response.data) {
+      const { user: updatedUser, accessToken } = response.data;
+      setUser(updatedUser);
+      setToken(accessToken);
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      localStorage.setItem('access_token', accessToken);
+    }
+  }, []);
+
+  const createCompany = useCallback(async (name: string) => {
+    const response = await companiesApi.createCompany(name);
+    if (response.success && response.data) {
+      const { user: updatedUser, accessToken } = response.data;
+      setUser(updatedUser);
+      setToken(accessToken);
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      localStorage.setItem('access_token', accessToken);
+    }
+  }, []);
+
   return (
     <AuthContext.Provider
       value={{
@@ -176,6 +201,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         updateUser,
         updateUserRole,
         switchRole,
+        selectCompany,
+        createCompany,
       }}
     >
       {children}

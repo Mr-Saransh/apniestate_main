@@ -6,6 +6,7 @@ import LoginPage from '@/pages/LoginPage';
 import LandingPage from '@/pages/LandingPage';
 import SignupPage from '@/pages/SignupPage';
 import OnboardingPage from '@/pages/OnboardingPage';
+import CompanySelectionPage from '@/pages/CompanySelectionPage';
 import DashboardPage from '@/pages/DashboardPage';
 import ProjectsPage from '@/pages/ProjectsPage';
 import ProjectDetailPage from '@/pages/ProjectDetailPage';
@@ -53,6 +54,7 @@ export default function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
           <Route path="/onboarding" element={<OnboardingPage />} />
+          <Route path="/select-company" element={<CompanySelectionPage />} />
 
           {/* Protected — wrapped by AppLayout which handles auth check */}
           <Route element={<AppLayout />}>

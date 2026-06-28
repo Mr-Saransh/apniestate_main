@@ -449,3 +449,155 @@ export function TasksSummaryWidget({ tasks, loading }: { tasks?: TaskItem[]; loa
     </div>
   );
 }
+
+// 10. TIMELINE WIDGET
+interface TimelineEvent {
+  title: string;
+  projectName?: string;
+  targetDate: string;
+  status: string;
+}
+export function TimelineWidget({ events, title = "Upcoming Milestones" }: { events?: TimelineEvent[]; title?: string }) {
+  return (
+    <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '20px', padding: '24px' }}>
+      <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text)', marginBottom: '16px' }}>{title}</h3>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', position: 'relative' }}>
+        <div style={{ position: 'absolute', left: '7px', top: '10px', bottom: '10px', width: '2px', background: 'var(--color-border)' }} />
+        {!events || events.length === 0 ? (
+          <div style={{ padding: '20px', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '13px' }}>
+            No timeline milestones scheduled
+          </div>
+        ) : (
+          events.map((evt, idx) => (
+            <div key={idx} style={{ display: 'flex', gap: '16px', position: 'relative', zIndex: 1 }}>
+              <div style={{
+                width: '16px',
+                height: '16px',
+                borderRadius: '50%',
+                background: evt.status === 'COMPLETED' ? '#10B981' : '#3B82F6',
+                border: '4px solid var(--color-surface)',
+                boxShadow: '0 0 0 1px var(--color-border)',
+                flexShrink: 0,
+                marginTop: '2px'
+              }} />
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '4px' }}>
+                  <span style={{ fontSize: '13px', fontWeight: 650, color: 'var(--color-text)' }}>{evt.title}</span>
+                  <span style={{
+                    fontSize: '10px',
+                    fontWeight: 700,
+                    padding: '2px 6px',
+                    borderRadius: '4px',
+                    background: evt.status === 'COMPLETED' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(59, 130, 246, 0.1)',
+                    color: evt.status === 'COMPLETED' ? '#10B981' : '#3B82F6'
+                  }}>{evt.status}</span>
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
+                  {evt.projectName && <span>Project: {evt.projectName} • </span>}
+                  Target: {new Date(evt.targetDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+// 11. MINI CHART CARD / TREND SPARKLINE CARD
+import { SparklineWidget } from '@/components/charts/ChartComponents';
+export function MiniChartCard({ title, value, prefix, suffix, trend, data, dataKey, color = '#3B82F6' }: { title: string; value: number; prefix?: string; suffix?: string; trend?: string; data?: any[]; dataKey?: string; color?: string }) {
+  return (
+    <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '20px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <span style={{ fontSize: '12px', color: 'var(--color-text-muted)', fontWeight: 550 }}>{title}</span>
+          <h4 style={{ fontSize: '22px', fontWeight: 800, color: 'var(--color-text)', margin: '4px 0 0 0', letterSpacing: '-0.02em' }}>
+            <AnimatedNumber value={value} prefix={prefix} suffix={suffix} />
+          </h4>
+        </div>
+        {trend && (
+          <span style={{
+            fontSize: '11px',
+            fontWeight: 700,
+            color: trend.startsWith('+') ? '#10B981' : '#EF4444',
+            background: trend.startsWith('+') ? 'rgba(16, 185, 129, 0.08)' : 'rgba(239, 68, 68, 0.08)',
+            padding: '2px 6px',
+            borderRadius: '6px'
+          }}>{trend}</span>
+        )}
+      </div>
+      {data && dataKey && (
+        <div style={{ marginTop: 'auto', paddingTop: '8px' }}>
+          <SparklineWidget data={data} dataKey={dataKey} color={color} width={120} height={32} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// 12. ELEGANT EMPTY STATE WIDGET
+export function EmptyStateWidget({ title, message }: { title: string; message: string }) {
+  return (
+    <div style={{
+      background: 'var(--color-surface)',
+      border: '1px dashed var(--color-border)',
+      borderRadius: '20px',
+      padding: '40px 24px',
+      textAlign: 'center',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: '200px'
+    }}>
+      <div style={{
+        width: '48px',
+        height: '48px',
+        borderRadius: '50%',
+        background: 'rgba(255,255,255,0.03)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: '16px',
+        color: 'var(--color-text-muted)',
+        fontSize: '24px'
+      }}>
+        📭
+      </div>
+      <h4 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-text)', margin: '0 0 4px 0' }}>{title}</h4>
+      <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: 0, maxWidth: '280px', lineHeight: 1.5 }}>{message}</p>
+    </div>
+  );
+}
+
+// 13. PROGRESS RING CARD
+import { ProgressRingWidget } from '@/components/charts/ChartComponents';
+export function ProgressRingCard({ title, percentage, color = '#3B82F6', subtitle }: { title: string; percentage: number; color?: string; subtitle?: string }) {
+  return (
+    <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '20px', padding: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
+      <div>
+        <h4 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-text)', margin: '0 0 4px 0' }}>{title}</h4>
+        {subtitle && <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', margin: 0 }}>{subtitle}</p>}
+      </div>
+      <ProgressRingWidget percentage={percentage} size={64} strokeWidth={6} color={color} />
+    </div>
+  );
+}
+
+// 14. TREND INDICATOR
+export function TrendIndicator({ value, isPositive }: { value: string; isPositive: boolean }) {
+  return (
+    <span style={{
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '4px',
+      fontSize: '11px',
+      fontWeight: 700,
+      color: isPositive ? '#10B981' : '#EF4444'
+    }}>
+      {isPositive ? '▲' : '▼'} {value}
+    </span>
+  );
+}

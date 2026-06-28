@@ -340,21 +340,24 @@
   color: var(--color-text-secondary);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
-  transition: all var(--transition-fast);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   text-decoration: none;
   white-space: nowrap;
   min-height: 44px;
+  position: relative;
 }
 
 .sidebar-link:hover {
-  background: var(--color-surface-hover);
+  background: rgba(59, 130, 246, 0.06);
   color: var(--color-text);
+  transform: translateX(2px);
 }
 
 .sidebar-link.active {
-  background: var(--color-primary-50);
-  color: var(--color-primary);
+  background: rgba(59, 130, 246, 0.1);
+  color: #3B82F6;
   font-weight: var(--font-weight-semibold);
+  box-shadow: inset 3px 0 0 #3B82F6;
 }
 
 .sidebar-link-icon {
@@ -364,6 +367,11 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: transform 0.2s ease;
+}
+
+.sidebar-link:hover .sidebar-link-icon {
+  transform: scale(1.05);
 }
 
 .sidebar-link-text {
@@ -378,6 +386,95 @@
   opacity: 1;
 }
 
+/* Notification Badge */
+.sidebar-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: #EF4444;
+  color: #FFFFFF;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  margin-left: auto;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.sidebar:hover .sidebar-badge,
+.sidebar.expanded .sidebar-badge {
+  opacity: 1;
+}
+
+/* Company Badge */
+.sidebar-company-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 8px 4px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(59, 130, 246, 0.06);
+  border: 1px solid rgba(59, 130, 246, 0.1);
+  color: #3B82F6;
+  font-size: 12px;
+  font-weight: 700;
+  overflow: hidden;
+  white-space: nowrap;
+  opacity: 0;
+  max-height: 0;
+  padding: 0;
+  margin: 0;
+  transition: all var(--transition-fast);
+}
+
+.sidebar:hover .sidebar-company-badge,
+.sidebar.expanded .sidebar-company-badge {
+  opacity: 1;
+  max-height: 40px;
+  padding: 8px 12px;
+  margin: 0 8px 4px;
+}
+
+.sidebar-company-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Switch Company */
+.sidebar-switch-company {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  margin-bottom: 4px;
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  overflow: hidden;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity var(--transition-fast), background 0.2s ease;
+}
+
+.sidebar:hover .sidebar-switch-company,
+.sidebar.expanded .sidebar-switch-company {
+  opacity: 1;
+}
+
+.sidebar-switch-company:hover {
+  background: rgba(59, 130, 246, 0.06);
+  color: #3B82F6;
+}
+
 .sidebar-footer {
   padding: var(--space-3) var(--space-2);
   border-top: 1px solid var(--color-border-light);
@@ -389,12 +486,12 @@
   gap: var(--space-3);
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-md);
-  transition: background var(--transition-fast);
+  transition: background 0.2s ease;
   cursor: pointer;
 }
 
 .sidebar-user:hover {
-  background: var(--color-surface-hover);
+  background: rgba(239, 68, 68, 0.06);
 }
 
 .sidebar-user-avatar {
