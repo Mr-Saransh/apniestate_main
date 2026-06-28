@@ -96,7 +96,7 @@ export default function AdminDashboard() {
       <KPIWidget items={kpis} />
 
       {/* 2. Interactive Charts Section */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: 'var(--space-5)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 'var(--space-5)' }}>
         {/* Users by Role Bar Chart */}
         <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '20px', padding: '24px' }}>
           <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -117,14 +117,14 @@ export default function AdminDashboard() {
       </div>
 
       {/* Entity Database Statistics & Security Audit */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 'var(--space-5)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 'var(--space-5)' }}>
         {/* Storage / Entity usage metrics */}
         <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '20px', padding: '24px' }}>
           <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Database size={18} color="#8B5CF6" />
             Workspace Entity Storage Count Ledger
           </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '16px' }}>
             <div style={{ padding: '12px 14px', border: '1px solid var(--color-border)', borderRadius: '12px' }}>
               <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Tasks Created</span>
               <h4 style={{ fontSize: '18px', fontWeight: 800, color: 'var(--color-text)', margin: '4px 0 0 0' }}>{data.storageStats.tasks}</h4>

@@ -157,7 +157,7 @@ export default function BuilderDashboard() {
             <ClipboardList size={18} color="#EF4444" />
             Pending Approval Action Center
           </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
             <ProgressRingCard title="Expense Vouchers" percentage={data.approvalsPending.expenses > 0 ? 35 : 100} color="#F59E0B" subtitle={`${data.approvalsPending.expenses} pending`} />
             <ProgressRingCard title="Leave Requests" percentage={data.approvalsPending.leaves > 0 ? 50 : 100} color="#3B82F6" subtitle={`${data.approvalsPending.leaves} pending`} />
           </div>

@@ -183,7 +183,7 @@ export default function SupervisorDashboard() {
       <CriticalAlertsWidget alerts={data.alerts} />
 
       {/* 5. DYNAMIC ANALYTICS & BAR CHARTS GRID (ENRICHED) */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: 'var(--space-5)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 'var(--space-5)' }}>
         {/* Attendance Graph Bar Chart */}
         <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '20px', padding: '24px' }}>
           <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -204,7 +204,7 @@ export default function SupervisorDashboard() {
       </div>
 
       {/* Worker Distribution and Equipment Usage */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 'var(--space-5)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 'var(--space-5)' }}>
         {/* Worker Trade Distribution Donut Chart */}
         <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '20px', padding: '24px' }}>
           <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -220,7 +220,7 @@ export default function SupervisorDashboard() {
             <Wrench size={18} color="#10B981" />
             Equipment Usage & Health
           </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '16px', marginBottom: '16px' }}>
             <div style={{ padding: '16px', border: '1px solid var(--color-border)', borderRadius: '12px', textAlign: 'center' }}>
               <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>Available</span>
               <h4 style={{ fontSize: '24px', fontWeight: 800, margin: '6px 0 0 0', color: '#10B981' }}>{data.equipmentUsage?.available || 0}</h4>
@@ -238,7 +238,7 @@ export default function SupervisorDashboard() {
       </div>
 
       {/* Tasks and Material Requests */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 'var(--space-5)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 'var(--space-5)' }}>
         <TasksSummaryWidget tasks={data.tasks} />
         
         {/* Material Requests list */}
@@ -273,7 +273,7 @@ export default function SupervisorDashboard() {
       </div>
 
       {/* Inventory Status and Cashbook balance */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 'var(--space-5)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 'var(--space-5)' }}>
         {/* Inventory status list */}
         <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '20px', padding: '24px' }}>
           <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -307,7 +307,7 @@ export default function SupervisorDashboard() {
             <Wallet size={18} color="#10B981" />
             Site Petty Cashbook Float Balance
           </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '12px' }}>
             <div style={{ padding: '12px', border: '1px solid var(--color-border)', borderRadius: '12px' }}>
               <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Received (Credits)</span>
               <h4 style={{ fontSize: '16px', fontWeight: 700, color: '#10B981', margin: '4px 0 0 0' }}>₹{data.cashbookSummary?.credit?.toLocaleString() || 0}</h4>
@@ -325,7 +325,7 @@ export default function SupervisorDashboard() {
       </div>
 
       {/* Deliveries & Activities Footer */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 'var(--space-5)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 'var(--space-5)' }}>
         {/* Upcoming Deliveries */}
         <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '20px', padding: '24px' }}>
           <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
