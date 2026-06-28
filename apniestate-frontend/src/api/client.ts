@@ -17,7 +17,8 @@ class ApiClient {
 
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
+    retries = 2
   ): Promise<ApiResponse<T>> {
     const token = this.getToken();
     const headers: Record<string, string> = {
@@ -29,29 +30,50 @@ class ApiClient {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const response = await fetch(`${API_BASE}${endpoint}`, {
-      ...options,
-      headers,
-    });
+    try {
+      const response = await fetch(`${API_BASE}${endpoint}`, {
+        ...options,
+        headers,
+      });
 
-    if (response.status === 204) {
-      return { success: true };
-    }
-
-    const json = await response.json();
-
-    if (!response.ok) {
-      if (response.status === 401) {
-        window.dispatchEvent(new CustomEvent('auth:unauthorized'));
+      // Retry on 5xx server errors
+      if (response.status >= 500 && retries > 0) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        return this.request<T>(endpoint, options, retries - 1);
       }
-      throw new ApiError(
-        json.error?.message || 'Something went wrong',
-        response.status,
-        json.error?.code
-      );
-    }
 
-    return json;
+      if (response.status === 204) {
+        return { success: true };
+      }
+
+      let json;
+      try {
+        json = await response.json();
+      } catch (e) {
+        throw new ApiError('Invalid JSON response from server', response.status);
+      }
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          window.dispatchEvent(new CustomEvent('auth:unauthorized'));
+        }
+        throw new ApiError(
+          json.error?.message || 'Something went wrong',
+          response.status,
+          json.error?.code
+        );
+      }
+
+      return json;
+    } catch (error) {
+      // Retry on Network Errors (fetch throws TypeError)
+      if (error instanceof TypeError && retries > 0) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        return this.request<T>(endpoint, options, retries - 1);
+      }
+      if (error instanceof ApiError) throw error;
+      throw new ApiError('Network Error or Backend Unavailable', 0);
+    }
   }
 
   async get<T>(endpoint: string): Promise<ApiResponse<T>> {
