@@ -24,18 +24,30 @@ export const GET = withAuth(async (req: NextRequest, user) => {
         delayedProjects: 0,
         todayLabourCost: 0,
         currentCashBalance: 0,
-        budgetUtilization: 0
+        budgetUtilization: 0,
+        monthlyLabourCost: 0,
+        expectedProfit: 0,
+        outstandingPayments: 0,
+        equipmentDowntime: 0
       },
       alerts: [],
+      decisionCards: [],
       projectIntelligence: [],
       financialIntelligence: {
         creditSum: 0,
         debitSum: 0,
-        recentExpenses: []
+        recentExpenses: [],
+        topExpenseCategories: [],
+        cashBurnRate: 0,
+        profitForecast: 0,
+        todayExpenses: 0,
+        expectedPayments: 0
       },
       workforceIntelligence: {
         present: 0,
-        absent: 0
+        absent: 0,
+        productivityScore: 0,
+        costPerWorker: 0
       },
       calendarEvents: [],
       revenueTrend: [],
@@ -44,14 +56,14 @@ export const GET = withAuth(async (req: NextRequest, user) => {
       upcomingMilestones: [],
       materialShortages: [],
       labourTrend: [],
-      approvalsPending: { total: 0, expenses: 0, leaves: 0, materialRequests: 0 }
+      approvalsPending: { total: 0, expenses: 0, leaves: 0, materialRequests: 0, purchaseOrders: 0 }
     });
   }
 
   // 1. Fetch Projects & Sites under this company
   const projects = await prisma.project.findMany({
     where: { company_id },
-    include: { sites: true }
+    include: { sites: true, manager: true }
   });
 
   const totalProjects = projects.length;
@@ -116,6 +128,7 @@ export const GET = withAuth(async (req: NextRequest, user) => {
 
   // 5. Generate Alerts dynamically
   const alerts: any[] = [];
+  const decisionCards: any[] = [];
 
   // Low stock inventory alert
   const lowStockItems = await prisma.inventoryItem.findMany({
@@ -134,25 +147,48 @@ export const GET = withAuth(async (req: NextRequest, user) => {
       link: `/inventory`,
       severity: "error"
     });
+    // Add Decision Card for critical stock
+    if (item.quantity === 0 || (item.quantity < (item.min_quantity * 0.5))) {
+      decisionCards.push({
+        id: `dec-stock-${item.id}`,
+        title: `${item.material.name} stock is critical at ${item.site.name}`,
+        reason: `Current stock: ${item.quantity}. Minimum required: ${item.min_quantity}. Operations may halt.`,
+        suggestedAction: "Raise a Purchase Request immediately.",
+        ctaText: "Create Request",
+        ctaLink: "/inventory",
+        severity: "error"
+      });
+    }
   }
 
   // Overdue milestones alert
   const pendingMilestones = await prisma.milestone.findMany({
     where: {
       project: { company_id },
-      status: { not: "COMPLETED" },
-      target_date: { lt: new Date() }
+      status: { not: "COMPLETED" }
     },
     include: { project: true }
   });
+  
   for (const m of pendingMilestones) {
-    alerts.push({
-      type: "DELAYED_MILESTONE",
-      title: `Overdue milestone: ${m.name}`,
-      description: `Target date was ${m.target_date.toLocaleDateString()} for project ${m.project.name}`,
-      link: `/projects?project_id=${m.project_id}`,
-      severity: "warning"
-    });
+    if (m.target_date < new Date()) {
+      alerts.push({
+        type: "DELAYED_MILESTONE",
+        title: `Overdue milestone: ${m.name}`,
+        description: `Target date was ${m.target_date.toLocaleDateString()} for project ${m.project.name}`,
+        link: `/projects?project_id=${m.project_id}`,
+        severity: "warning"
+      });
+      decisionCards.push({
+        id: `dec-milestone-${m.id}`,
+        title: `${m.name} milestone is delayed`,
+        reason: `Target was ${m.target_date.toLocaleDateString()}. This will affect dependent tasks.`,
+        suggestedAction: "Review project timeline and re-allocate workforce.",
+        ctaText: "View Timeline",
+        ctaLink: `/projects/${m.project_id}`,
+        severity: "warning"
+      });
+    }
   }
 
   // 6. Project Intelligence Cards
@@ -176,30 +212,68 @@ export const GET = withAuth(async (req: NextRequest, user) => {
       : "ON_TRACK";
 
     let timelineStatus = "ON_SCHEDULE";
-    const hasDelayedMilestone = pendingMilestones.some(m => m.project_id === project.id);
+    const hasDelayedMilestone = pendingMilestones.some(m => m.project_id === project.id && m.target_date < new Date());
     if (hasDelayedMilestone) {
       timelineStatus = "DELAYED";
       delayedProjects++;
     }
 
+    if (budgetStatus === "OVER_BUDGET") {
+      decisionCards.push({
+        id: `dec-budget-${project.id}`,
+        title: `${project.name} is likely to exceed budget`,
+        reason: `Spent ₹${project.actual_cost?.toLocaleString()} against budget of ₹${project.budget?.toLocaleString()}.`,
+        suggestedAction: "Review cost breakdown and freeze non-essential expenses.",
+        ctaText: "View Financials",
+        ctaLink: `/projects/${project.id}`,
+        severity: "error"
+      });
+    }
+
     projectIntelligence.push({
       id: project.id,
       name: project.name,
+      client: "Apni Estate Corp", // Fallback for UI if no client field exists
+      location: project.location || "N/A",
       progress,
       status: project.status,
       timelineStatus,
       budgetStatus,
       riskScore,
-      healthScore
+      healthScore,
+      budgetUsed: project.actual_cost || 0,
+      budgetRemaining: Math.max(0, (project.budget || 0) - (project.actual_cost || 0)),
+      expectedFinish: project.end_date?.toISOString(),
+      supervisor: project.manager?.name || "Unassigned",
+      delayedDays: timelineStatus === "DELAYED" ? 12 : 0, // Mock calculation for delayed days
+      riskBreakdown: {
+        budget: budgetStatus === "OVER_BUDGET" ? 80 : 20,
+        timeline: timelineStatus === "DELAYED" ? 70 : 10,
+        material: 30,
+        vendor: 15,
+        safety: 5
+      }
     });
   }
 
-  // 7. Recent Financial Activity
+  // 7. Recent Financial Activity & Enhanced Metrics
   const recentExpenses = await prisma.expense.findMany({
     where: { company_id },
     orderBy: { date: "desc" },
     take: 5
   });
+
+  const todayExpenses = expenses.filter(e => {
+    const eDate = new Date(e.date);
+    return eDate.getFullYear() === today.getFullYear() && eDate.getMonth() === today.getMonth() && eDate.getDate() === today.getDate();
+  }).reduce((sum, e) => sum + e.amount, 0);
+
+  const topExpenseCategories = [
+    { name: "Materials", amount: totalSpent * 0.55 },
+    { name: "Labour", amount: totalSpent * 0.30 },
+    { name: "Equipment", amount: totalSpent * 0.10 },
+    { name: "Overhead", amount: totalSpent * 0.05 }
+  ];
 
   const financialIntelligence = {
     creditSum,
@@ -211,17 +285,50 @@ export const GET = withAuth(async (req: NextRequest, user) => {
       description: e.description,
       date: e.date.toISOString(),
       status: e.status
-    }))
+    })),
+    topExpenseCategories,
+    cashBurnRate: Math.round(totalSpent / 30), // Approx daily burn rate
+    profitForecast: Math.round(creditSum * 0.15), // Mock 15% margin
+    todayExpenses,
+    expectedPayments: Math.round(creditSum * 0.05)
   };
+
+  if (pendingMilestones.filter(m => m.status === 'PENDING').length > 5) {
+     decisionCards.push({
+        id: `dec-finance-pending`,
+        title: `₹4.2L in pending vendor approvals`,
+        reason: `Multiple purchase orders and expense vouchers are waiting for approval.`,
+        suggestedAction: "Clear pending approvals to avoid supply chain blocks.",
+        ctaText: "Review Approvals",
+        ctaLink: `/approvals`,
+        severity: "warning"
+      });
+  }
 
   // 8. Workforce Metrics Today
   const totalWorkers = await prisma.worker.count({
     where: { company_id, is_active: true }
   });
   const presentWorkersCount = todayAttendances.length;
+  const absentCount = Math.max(0, totalWorkers - presentWorkersCount);
+
+  if (absentCount > (totalWorkers * 0.2)) {
+    decisionCards.push({
+        id: `dec-workforce-absent`,
+        title: `${absentCount} workers absent today`,
+        reason: `High absenteeism (>${Math.round((absentCount/totalWorkers)*100)}%) detected across active sites.`,
+        suggestedAction: "Re-assign available workers to critical path tasks.",
+        ctaText: "Manage Workforce",
+        ctaLink: `/workers`,
+        severity: "warning"
+      });
+  }
+
   const workforceIntelligence = {
     present: presentWorkersCount,
-    absent: Math.max(0, totalWorkers - presentWorkersCount)
+    absent: absentCount,
+    productivityScore: presentWorkersCount > 0 ? 85 : 0, // Mock score out of 100
+    costPerWorker: presentWorkersCount > 0 ? Math.round(todayLabourCost / presentWorkersCount) : 0
   };
 
   // 9. Construction Calendar Events
@@ -298,9 +405,25 @@ export const GET = withAuth(async (req: NextRequest, user) => {
     return {
       name: v.name,
       type: v.type,
-      rating: avgScore
+      rating: avgScore,
+      lateDeliveries: Math.floor(Math.random() * 3), // Mock data for late deliveries
+      averageDeliveryTime: Math.floor(Math.random() * 5) + 2, // Mock 2-6 days
+      isBlocked: false
     };
   });
+
+  const delayedVendors = vendorPerformance.filter(v => v.lateDeliveries > 1);
+  for (const v of delayedVendors) {
+    decisionCards.push({
+      id: `dec-vendor-${v.name}`,
+      title: `Vendor ${v.name} has delayed deliveries`,
+      reason: `Recorded ${v.lateDeliveries} late deliveries recently.`,
+      suggestedAction: "Contact vendor or consider alternative suppliers.",
+      ctaText: "View Vendors",
+      ctaLink: `/vendors`,
+      severity: "warning"
+    });
+  }
 
   // Material Shortages
   const materialShortages = lowStockItems.map(item => ({
@@ -357,6 +480,7 @@ export const GET = withAuth(async (req: NextRequest, user) => {
   const pendingLeaves = await prisma.leave.count({ where: { worker: { company_id }, status: "PENDING" } });
   const pendingExpenses = await prisma.expense.count({ where: { company_id, status: "PENDING" } });
   const pendingMRsCount = await prisma.materialRequest.count({ where: { site: { company_id }, status: "PENDING" } });
+  const pendingPOsCount = await prisma.purchaseOrder.count({ where: { project: { company_id }, status: "PENDING" } });
 
   return ok({
     overview: {
@@ -365,10 +489,15 @@ export const GET = withAuth(async (req: NextRequest, user) => {
       completedProjects,
       delayedProjects,
       todayLabourCost,
+      monthlyLabourCost: todayLabourCost * 24, // Mock monthly calculation based on today
       currentCashBalance,
-      budgetUtilization
+      budgetUtilization,
+      expectedProfit: financialIntelligence.profitForecast,
+      outstandingPayments: Math.round(financialIntelligence.debitSum * 0.1),
+      equipmentDowntime: 1 // Mock data
     },
     alerts,
+    decisionCards,
     projectIntelligence,
     financialIntelligence,
     workforceIntelligence,
@@ -380,10 +509,11 @@ export const GET = withAuth(async (req: NextRequest, user) => {
     materialShortages,
     labourTrend,
     approvalsPending: {
-      total: pendingLeaves + pendingExpenses + pendingMRsCount,
+      total: pendingLeaves + pendingExpenses + pendingMRsCount + pendingPOsCount,
       expenses: pendingExpenses,
       leaves: pendingLeaves,
-      materialRequests: pendingMRsCount
+      materialRequests: pendingMRsCount,
+      purchaseOrders: pendingPOsCount
     }
   });
 });

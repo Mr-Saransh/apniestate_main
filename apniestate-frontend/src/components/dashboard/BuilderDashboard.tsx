@@ -1,48 +1,20 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useDashboardQuery } from '@/hooks/useDashboardQuery';
-import {
-  FolderKanban,
-  Briefcase,
-  Users,
-  Wallet,
-  BarChart3,
-  Clock,
-  ClipboardList,
-  AlertTriangle,
-  TrendingUp,
-  Boxes,
-  Activity,
-  ArrowUpRight,
-  TrendingDown,
-  ThumbsUp,
-  FileCheck
-} from 'lucide-react';
-import {
-  KPIWidget,
-  CriticalAlertsWidget,
-  ProjectHealthWidget,
-  CalendarWidget,
-  AttendanceWidget,
-  RecentActivityWidget,
-  TimelineWidget,
-  MiniChartCard,
-  ProgressRingCard,
-  EmptyStateWidget
-} from './widgets';
-import {
-  AreaChartWidget,
-  BarChartWidget,
-  DonutChartWidget,
-  LineChartWidget
-} from '@/components/charts/ChartComponents';
+import { Search } from 'lucide-react';
+import { BuilderDashboardOverview } from './BuilderDashboardOverview';
+import { BuilderIntelligenceCenter } from './BuilderIntelligenceCenter';
+import { UniversalSearchWidget } from './builder/UniversalSearchWidget';
 import { KpiGridSkeleton } from './DashboardSkeletons';
 
 export default function BuilderDashboard() {
   const { user } = useAuth();
   const { data, isLoading } = useDashboardQuery<any>('/dashboard/builder', {
-    refetchInterval: 12000
+    refetchInterval: 30000
   });
+
+  const [activeTab, setActiveTab] = useState<'overview' | 'intelligence'>('overview');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   const formattedDate = new Date().toLocaleDateString('en-GB', {
     weekday: 'long',
@@ -51,34 +23,29 @@ export default function BuilderDashboard() {
     year: 'numeric'
   });
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setIsSearchOpen(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   if (isLoading || !data) {
-    return <KpiGridSkeleton />;
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
+        <KpiGridSkeleton />
+      </div>
+    );
   }
 
-  const kpis = [
-    { title: 'Total Portfolio Projects', value: data.overview.totalProjects || 0, suffix: ' Projects', icon: FolderKanban, color: '#3B82F6', bg: 'rgba(59, 132, 246, 0.06)' },
-    { title: 'Active Construction Sites', value: data.overview.activeSites || 0, suffix: ' Sites', icon: Briefcase, color: '#10B981', bg: 'rgba(16, 185, 129, 0.06)' },
-    { title: "Today's Labor Cost", value: data.overview.todayLabourCost || 0, prefix: '₹', icon: Users, color: '#F59E0B', bg: 'rgba(245, 158, 11, 0.06)' },
-    { title: 'Current Cash Balance', value: data.overview.currentCashBalance || 0, prefix: '₹', icon: Wallet, color: '#8B5CF6', bg: 'rgba(139, 92, 246, 0.06)' },
-    { title: 'Budget Burn Rate', value: data.overview.budgetUtilization || 0, suffix: '%', icon: BarChart3, color: '#EF4444', bg: 'rgba(239, 68, 68, 0.06)' },
-    { title: 'Delayed Projects', value: data.overview.delayedProjects || 0, suffix: ' Delayed', icon: Clock, color: '#EC4899', bg: 'rgba(236, 72, 153, 0.06)' },
-  ];
-
-  // Portfolio health distribution chart
-  const activeCount = data.projectIntelligence?.filter((p: any) => p.status === 'ACTIVE').length || 0;
-  const planningCount = data.projectIntelligence?.filter((p: any) => p.status === 'PLANNING').length || 0;
-  const completedCount = data.projectIntelligence?.filter((p: any) => p.status === 'COMPLETED').length || 0;
-  const holdCount = data.projectIntelligence?.filter((p: any) => p.status === 'ON_HOLD').length || 0;
-
-  const healthData = [
-    { name: 'Active', value: activeCount },
-    { name: 'Planning', value: planningCount },
-    { name: 'Completed', value: completedCount },
-    { name: 'On Hold', value: holdCount }
-  ];
-
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)', paddingBottom: '60px' }}>
+      <UniversalSearchWidget isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} data={data} />
+      
       {/* 1. DYNAMIC LARGE HERO CONTROL CARD (PRESERVED) */}
       <div style={{
         background: 'linear-gradient(135deg, var(--color-primary, #0A3D91) 0%, #1E40AF 100%)',
@@ -105,131 +72,59 @@ export default function BuilderDashboard() {
             Workspace: <strong style={{ color: '#F4B400' }}>Apni Estate Enterprise</strong> • {formattedDate}
           </p>
         </div>
-      </div>
-
-      {/* KPI Stats Block */}
-      <KPIWidget items={kpis} />
-
-      {/* Critical Alerts Block */}
-      <CriticalAlertsWidget alerts={data.alerts} />
-
-      {/* 2. Interactive Charts Section (Enriched below Hero) */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 'var(--space-5)' }}>
-        {/* Revenue & Expenses Trend Area Chart */}
-        <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '20px', padding: '24px' }}>
-          <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <TrendingUp size={18} color="#3B82F6" />
-            Revenue & Expense Monthly Trend
-          </h3>
-          <AreaChartWidget data={data.revenueTrend} xKey="month" dataKeys={['revenue', 'expenses']} colors={['#10B981', '#EF4444']} />
-        </div>
-
-        {/* Budget Burn Rate Bar Chart */}
-        <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '20px', padding: '24px' }}>
-          <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <BarChart3 size={18} color="#F59E0B" />
-            Project Budget Burn Breakdown
-          </h3>
-          <BarChartWidget data={data.budgetBurn} xKey="projectName" dataKeys={['allocated', 'spent']} colors={['#3B82F6', '#EF4444']} />
-        </div>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 'var(--space-5)' }}>
-        {/* Portfolio Health Donut Chart */}
-        <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '20px', padding: '24px' }}>
-          <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Activity size={18} color="#8B5CF6" />
-            Portfolio Project Distribution
-          </h3>
-          <DonutChartWidget data={healthData} colors={['#10B981', '#3B82F6', '#8B5CF6', '#F59E0B']} />
-        </div>
-
-        {/* Upcoming Milestones */}
-        <TimelineWidget events={data.upcomingMilestones} title="Upcoming Project Milestones" />
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 'var(--space-5)' }}>
-        <ProjectHealthWidget projects={data.projectIntelligence} />
-
-        {/* Approval Center */}
-        <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '20px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <ClipboardList size={18} color="#EF4444" />
-            Pending Approval Action Center
-          </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
-            <ProgressRingCard title="Expense Vouchers" percentage={data.approvalsPending.expenses > 0 ? 35 : 100} color="#F59E0B" subtitle={`${data.approvalsPending.expenses} pending`} />
-            <ProgressRingCard title="Leave Requests" percentage={data.approvalsPending.leaves > 0 ? 50 : 100} color="#3B82F6" subtitle={`${data.approvalsPending.leaves} pending`} />
-          </div>
-          <a
-            href="/settings"
-            style={{
-              padding: '12px',
-              borderRadius: '12px',
-              background: 'rgba(59, 130, 246, 0.08)',
-              color: '#3B82F6',
-              fontWeight: 700,
-              fontSize: '13px',
-              textAlign: 'center',
-              textDecoration: 'none',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px'
-            }}
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <button 
+            onClick={() => setIsSearchOpen(true)}
+            style={{ padding: '10px 16px', borderRadius: '12px', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: 'white', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 600 }}
           >
-            Review Approval Ledger <ArrowUpRight size={16} />
-          </a>
+            <Search size={16} /> Search (Cmd+K)
+          </button>
         </div>
       </div>
 
-      {/* Labor trends and material shortages */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 'var(--space-5)' }}>
-        {/* Labour Trend line chart */}
-        <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '20px', padding: '24px' }}>
-          <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Users size={18} color="#10B981" />
-            Labour Trend (Last 7 Days)
-          </h3>
-          <LineChartWidget data={data.labourTrend} xKey="date" dataKeys={['workers']} colors={['#10B981']} />
-        </div>
-
-        {/* Material Shortages */}
-        <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '20px', padding: '24px' }}>
-          <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Boxes size={18} color="#EF4444" />
-            Critical Material Shortages
-          </h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {data.materialShortages.length === 0 ? (
-              <EmptyStateWidget title="No Shortages" message="All active sites have adequate material stock levels." />
-            ) : (
-              data.materialShortages.map((item: any, idx: number) => (
-                <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', border: '1px solid var(--color-border)', borderRadius: '12px' }}>
-                  <div>
-                    <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text)' }}>{item.name}</span>
-                    <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>Site: {item.siteName}</div>
-                  </div>
-                  <span style={{ fontSize: '12px', fontWeight: 700, color: '#EF4444' }}>
-                    {item.quantity} / {item.minQuantity} {item.unit}
-                  </span>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
+      {/* Main Tabs Navigation */}
+      <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid var(--color-border)', paddingBottom: '12px', marginBottom: '8px' }}>
+        <button 
+          onClick={() => setActiveTab('overview')}
+          style={{
+            padding: '10px 20px',
+            borderRadius: '12px',
+            background: activeTab === 'overview' ? 'var(--color-primary)' : 'transparent',
+            color: activeTab === 'overview' ? '#FFF' : 'var(--color-text-muted)',
+            border: 'none',
+            fontWeight: 700,
+            fontSize: '14px',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          Dashboard Overview
+        </button>
+        <button 
+          onClick={() => setActiveTab('intelligence')}
+          style={{
+            padding: '10px 20px',
+            borderRadius: '12px',
+            background: activeTab === 'intelligence' ? 'var(--color-primary)' : 'transparent',
+            color: activeTab === 'intelligence' ? '#FFF' : 'var(--color-text-muted)',
+            border: 'none',
+            fontWeight: 700,
+            fontSize: '14px',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          More (Intelligence Center)
+        </button>
       </div>
 
-      {/* Calendar & Activities footer */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 'var(--space-5)' }}>
-        <CalendarWidget events={data.calendarEvents} />
-        <RecentActivityWidget activities={data.financialIntelligence?.recentExpenses.map((e: any) => ({
-          id: e.id,
-          details: `${e.category} voucher for ₹${e.amount.toLocaleString()} was ${e.status.toLowerCase()}`,
-          timestamp: e.date,
-          userName: 'Finance'
-        }))} />
-      </div>
+      {/* Render Active View */}
+      {activeTab === 'overview' ? (
+        <BuilderDashboardOverview />
+      ) : (
+        <BuilderIntelligenceCenter data={data} />
+      )}
+
     </div>
   );
 }
