@@ -98,7 +98,7 @@ export default function BuilderDashboard() {
           <span style={{ fontSize: '11px', fontWeight: 700, color: '#F4B400', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
             Executive Dashboard
           </span>
-          <h1 style={{ fontSize: '26px', fontWeight: 800, margin: '6px 0 2px 0', letterSpacing: '-0.02em' }}>
+          <h1 style={{ color: '#FFFFFF', fontSize: '26px', fontWeight: 800, margin: '6px 0 2px 0', letterSpacing: '-0.02em' }}>
             Welcome back, {user?.name || 'Lead Builder'}
           </h1>
           <p style={{ opacity: 0.85, fontSize: '13px', fontWeight: 500 }}>
@@ -150,7 +150,7 @@ export default function BuilderDashboard() {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 'var(--space-5)' }}>
         <ProjectHealthWidget projects={data.projectIntelligence} />
-        
+
         {/* Approval Center */}
         <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '20px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text)', display: 'flex', alignItems: 'center', gap: '8px' }}>

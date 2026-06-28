@@ -89,7 +89,7 @@ export default function AccountantDashboard() {
           <span style={{ fontSize: '11px', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
             Accountant Dashboard
           </span>
-          <h1 style={{ fontSize: '26px', fontWeight: 800, margin: '6px 0 2px 0', letterSpacing: '-0.02em' }}>
+          <h1 style={{ color: '#FFFFFF', fontSize: '26px', fontWeight: 800, margin: '6px 0 2px 0', letterSpacing: '-0.02em' }}>
             Welcome back, {user?.name || 'Accountant'}
           </h1>
           <p style={{ opacity: 0.85, fontSize: '13px', fontWeight: 500 }}>

@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { apiClient, ApiError } from '@/api/client';
-import { HardHat, Briefcase, Calculator, Shield, Building2, ArrowRight, AlertCircle } from 'lucide-react';
+import { HardHat, Briefcase, Calculator, Shield, ArrowRight, AlertCircle, Building2 } from 'lucide-react';
+import Logo from '@/components/shared/Logo';
 import '@/styles/login.css'; 
 
 export default function OnboardingPage() {
@@ -70,6 +71,9 @@ export default function OnboardingPage() {
   return (
     <div className="login-page-premium" style={{ alignItems: 'center', padding: '40px 20px', minHeight: '100vh', display: 'flex', justifyContent: 'center' }}>
       <div style={{ maxWidth: '800px', width: '100%', background: 'var(--color-surface)', borderRadius: '24px', padding: '40px', boxShadow: '0 20px 40px rgba(0,0,0,0.2)', border: '1px solid var(--color-border)' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '24px' }}>
+          <Logo size="lg" />
+        </div>
         
         {step === 1 ? (
           <>

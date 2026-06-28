@@ -1,6 +1,7 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
-import { Bell, Building2 } from 'lucide-react';
+import { Bell } from 'lucide-react';
+import Logo from '@/components/shared/Logo';
 
 export default function MobileHeader() {
   const { user } = useAuth();
@@ -29,10 +30,8 @@ export default function MobileHeader() {
 
   return (
     <header className="mobile-header premium-header" id="mobile-header">
-      <div className="mobile-header-left" onClick={() => navigate('/dashboard')}>
-        <div className="mobile-header-logo-minimal">
-          <Building2 size={20} color="var(--color-primary)" />
-        </div>
+      <div className="mobile-header-left" onClick={() => navigate('/dashboard')} style={{ display: 'flex', alignItems: 'center' }}>
+        <Logo size="sm" />
       </div>
 
       <div className="mobile-header-center">

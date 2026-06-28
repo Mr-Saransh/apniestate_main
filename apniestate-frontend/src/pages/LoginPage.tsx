@@ -2,7 +2,8 @@ import { useState, type FormEvent } from 'react';
 import { Navigate, Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { ApiError } from '@/api/client';
-import { Building2, AlertCircle, Eye, EyeOff, ShieldCheck, MapPin, TrendingUp, Users } from 'lucide-react';
+import { AlertCircle, Eye, EyeOff, ShieldCheck, MapPin, TrendingUp, Users } from 'lucide-react';
+import Logo from '@/components/shared/Logo';
 import '@/styles/login.css';
 
 export default function LoginPage() {
@@ -57,10 +58,9 @@ export default function LoginPage() {
                 {/* You can put an actual img here, using a placeholder gradient for now */}
                 <div className="login-placeholder-img"></div>
               </div>
-              <div className="login-brand">
-                <Building2 size={48} color="var(--color-cta)" className="mb-2" />
-                <h1 className="login-brand-name">APNI ESTATE</h1>
-                <p className="login-brand-tagline">BUILDING TOMORROW, TOGETHER</p>
+              <div className="login-brand" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <Logo size="xl" />
+                <p className="login-brand-tagline" style={{ marginTop: '12px' }}>BUILDING TOMORROW, TOGETHER</p>
               </div>
             </div>
           </div>
