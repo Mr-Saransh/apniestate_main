@@ -184,7 +184,6 @@ export default function InventoryPage() {
   });
 
   // Calculate statistics
-  const totalVolume = inventory.reduce((sum, item) => sum + item.quantity, 0);
   const lowStockCount = inventory.filter(i => i.is_low_stock).length;
   
   const itemsWithUsage = inventory.filter(i => i.avg_daily_usage && i.avg_daily_usage > 0);
@@ -208,11 +207,18 @@ export default function InventoryPage() {
       {/* Stats Cards */}
       <div className="stats-grid" style={{ marginBottom: 'var(--space-6)' }}>
         <StatCard
-          icon={<Package size={20} />}
-          label="Total Available Volume"
-          value={totalVolume}
+          icon={<Layers size={20} />}
+          label="Material Categories"
+          value={new Set(inventory.map(i => i.name)).size}
           color="#3B82F6"
           bgColor="rgba(59, 130, 246, 0.1)"
+        />
+        <StatCard
+          icon={<AlertTriangle size={20} />}
+          label="Low Stock Items"
+          value={lowStockCount}
+          color={lowStockCount > 0 ? '#EF4444' : '#10B981'}
+          bgColor={lowStockCount > 0 ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)'}
         />
         <StatCard
           icon={<Calendar size={20} />}
@@ -222,11 +228,11 @@ export default function InventoryPage() {
           bgColor={minDays < 15 ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)'}
         />
         <StatCard
-          icon={<AlertTriangle size={20} />}
-          label="Low Stock Alerts"
-          value={lowStockCount}
-          color={lowStockCount > 0 ? '#F59E0B' : '#6B7280'}
-          bgColor={lowStockCount > 0 ? 'rgba(245, 158, 11, 0.1)' : 'rgba(107, 114, 128, 0.1)'}
+          icon={<BarChart3 size={20} />}
+          label="Critical Stock Alerts"
+          value={inventory.filter(i => i.is_low_stock && i.quantity <= (i.minQuantity * 0.5)).length}
+          color="#F59E0B"
+          bgColor="rgba(245, 158, 11, 0.1)"
         />
       </div>
 
@@ -288,8 +294,23 @@ export default function InventoryPage() {
                       {item.site?.name || 'Unknown Site'} · {item.category}
                     </div>
                     {item.avg_daily_usage && item.avg_daily_usage > 0 ? (
-                      <div className="text-muted" style={{ fontSize: '12px', marginTop: '4px' }}>
-                        Daily usage: {item.avg_daily_usage.toFixed(1)} {item.unit}/day · Forecast: {daysLeft === 999 ? '999+' : daysLeft} days left
+                      <div className="text-muted" style={{ fontSize: '12px', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                        <span>Daily usage: {item.avg_daily_usage.toFixed(1)} {item.unit}/day · Forecast: {daysLeft === 999 ? '999+' : daysLeft} days left</span>
+                        {item.is_estimated && (
+                          <span style={{
+                            fontSize: '10px',
+                            fontWeight: 600,
+                            color: '#F59E0B',
+                            background: 'rgba(245, 158, 11, 0.1)',
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            whiteSpace: 'nowrap'
+                          }}
+                          title="Based on industry averages. Will auto-switch to actual usage once enough project data is available."
+                          >
+                            ⚡ Estimated
+                          </span>
+                        )}
                       </div>
                     ) : null}
                   </div>
@@ -298,9 +319,8 @@ export default function InventoryPage() {
                       color: isLow ? 'var(--color-danger)' : 'var(--color-text)',
                       fontWeight: 'bold'
                     }}>
-                      {item.quantity}
+                      {item.quantity} {item.unit}
                     </div>
-                    <div className="list-card-date">{item.unit}</div>
                     {isLow && (
                       <div style={{ color: 'var(--color-danger)', fontSize: '11px', fontWeight: '500', marginTop: '2px' }}>
                         Low Stock Alert

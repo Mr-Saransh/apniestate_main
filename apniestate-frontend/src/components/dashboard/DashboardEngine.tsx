@@ -12,6 +12,7 @@ export default function DashboardEngine() {
 
   switch (role) {
     case 'BUILDER':
+    case 'ADMIN':
       return <BuilderDashboard />;
     case 'SITE_SUPERVISOR':
       return <SupervisorDashboard />;
@@ -19,8 +20,6 @@ export default function DashboardEngine() {
       return <ProjectManagerDashboard />;
     case 'ACCOUNTANT':
       return <AccountantDashboard />;
-    case 'ADMIN':
-      return <AdminDashboard />;
     default:
       return <SupervisorDashboard />;
   }

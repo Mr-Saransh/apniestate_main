@@ -15,6 +15,7 @@ export interface InventoryItem {
   avg_daily_usage?: number;
   days_remaining?: number;
   is_low_stock?: boolean;
+  is_estimated?: boolean;
 }
 
 export interface InventoryTransactionInput {

@@ -1,5 +1,33 @@
 import { prisma } from "@/lib/prisma";
 
+// Industry-standard default consumption rates for common construction materials
+// Used when insufficient historical transaction data is available
+const INDUSTRY_DEFAULTS: Record<string, { rate: number; unit: string }> = {
+  'steel': { rate: 175, unit: 'kg' },       // 150-200 kg/day
+  'cement': { rate: 35, unit: 'bags' },      // 30-40 bags/day
+  'bricks': { rate: 600, unit: 'pcs' },      // 400-800 pcs/day
+  'sand': { rate: 100, unit: 'cft' },        // 80-120 cft/day
+  'aggregate': { rate: 50, unit: 'cubic meter' },
+  'paint': { rate: 10, unit: 'litre' },
+  'tiles': { rate: 80, unit: 'sqft' },
+  'plywood': { rate: 20, unit: 'sqft' },
+  'pipes': { rate: 30, unit: 'pcs' },
+  'wiring': { rate: 50, unit: 'meter' },
+  'rebar': { rate: 175, unit: 'kg' },
+  'concrete': { rate: 5, unit: 'cubic meter' },
+  'gravel': { rate: 80, unit: 'cft' },
+};
+
+function getDefaultRate(materialName: string): number | null {
+  const nameLower = materialName.toLowerCase();
+  for (const [key, config] of Object.entries(INDUSTRY_DEFAULTS)) {
+    if (nameLower.includes(key)) {
+      return config.rate;
+    }
+  }
+  return null;
+}
+
 export async function getInventoryItems(userId: string, role?: string) {
   const where: any = {};
   if (role === "BUILDER" || role === "ADMIN") {
@@ -33,7 +61,29 @@ export async function getInventoryItems(userId: string, role?: string) {
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     const recentOutTxns = item.transactions.filter(t => t.type === "OUT" && new Date(t.created_at) >= thirtyDaysAgo);
     const totalRecentOut = recentOutTxns.reduce((s, t) => s + t.quantity, 0);
-    const avgDailyUsage = totalRecentOut > 0 ? (totalRecentOut / 30) : 0;
+    
+    // Check if we have sufficient historical data (>14 days of OUT transactions)
+    const fourteenDaysAgo = new Date();
+    fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+    const hasSufficientHistory = item.transactions.filter(
+      t => t.type === "OUT" && new Date(t.created_at) >= fourteenDaysAgo
+    ).length >= 3; // At least 3 OUT transactions in 14 days
+    
+    let avgDailyUsage = 0;
+    let isEstimated = false;
+    
+    if (hasSufficientHistory && totalRecentOut > 0) {
+      // Use actual historical data
+      avgDailyUsage = totalRecentOut / 30;
+      isEstimated = false;
+    } else {
+      // Fall back to industry defaults
+      const defaultRate = getDefaultRate(item.material?.name || "");
+      if (defaultRate !== null) {
+        avgDailyUsage = defaultRate;
+        isEstimated = true;
+      }
+    }
     
     const daysRemaining = avgDailyUsage > 0 ? Math.round(availableStock / avgDailyUsage) : 999;
 
@@ -51,7 +101,8 @@ export async function getInventoryItems(userId: string, role?: string) {
       stock_out: stockOut,
       avg_daily_usage: avgDailyUsage,
       days_remaining: daysRemaining,
-      is_low_stock: availableStock <= item.min_quantity
+      is_low_stock: availableStock <= item.min_quantity,
+      is_estimated: isEstimated
     };
   });
 }

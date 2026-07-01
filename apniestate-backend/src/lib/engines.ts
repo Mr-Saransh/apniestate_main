@@ -118,3 +118,18 @@ export async function calculateProjectRiskScore(projectId: string): Promise<"LOW
   if (riskPoints >= 2) return "MEDIUM";
   return "LOW";
 }
+
+export async function calculateMonthlyLabourCost(companyId: string): Promise<number> {
+  const startOfMonth = new Date();
+  startOfMonth.setDate(1);
+  startOfMonth.setHours(0, 0, 0, 0);
+
+  const wages = await prisma.workerWage.findMany({
+    where: {
+      worker: { company_id: companyId },
+      period_start: { gte: startOfMonth }
+    }
+  });
+
+  return wages.reduce((sum, w) => sum + w.net_amount, 0);
+}

@@ -133,7 +133,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const hasPermission = useCallback((permission: string) => {
-    if (user?.role === 'ADMIN') return true;
+    if (user?.role === 'ADMIN' || user?.role === 'BUILDER') return true;
     if (user?.role === 'SITE_SUPERVISOR') {
       if (permission.startsWith('users.')) {
         return permissions.includes(permission);

@@ -32,6 +32,7 @@ import PaymentsPage from '@/pages/PaymentsPage';
 import BudgetsPage from '@/pages/BudgetsPage';
 import DprPage from '@/pages/DprPage';
 import PayrollPage from '@/pages/PayrollPage';
+import ApprovalsPage from '@/pages/ApprovalsPage';
 import RouteGuard from '@/components/shared/RouteGuard';
 
 const queryClient = new QueryClient({
@@ -121,6 +122,9 @@ export default function App() {
                 </Route>
                 <Route element={<RouteGuard permission="workers.read" />}>
                   <Route path="/payroll" element={<PayrollPage />} />
+                </Route>
+                <Route element={<RouteGuard permission="finance.read" />}>
+                  <Route path="/approvals" element={<ApprovalsPage />} />
                 </Route>
               </Route>
             </Routes>

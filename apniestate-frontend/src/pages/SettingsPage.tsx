@@ -38,8 +38,10 @@ export default function SettingsPage() {
   const [emailAlerts, setEmailAlerts] = useState(true);
   const [pushAlerts, setPushAlerts] = useState(true);
 
-  const formatRole = (role: string) =>
-    role.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  const formatRole = (role: string) => {
+    if (role === 'BUILDER' || role === 'ADMIN') return 'Builder (Owner)';
+    return role.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  };
 
   const getInitials = (name: string) =>
     name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);

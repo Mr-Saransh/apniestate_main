@@ -130,7 +130,6 @@ export function TopBar({ title: customTitle, icon: customIcon, leftAction }: Top
     { id: 'PROJECT_MANAGER', label: 'Project Manager', icon: Briefcase },
     { id: 'SITE_SUPERVISOR', label: 'Site Supervisor', icon: UserCheck },
     { id: 'ACCOUNTANT', label: 'Accountant', icon: Calculator },
-    { id: 'ADMIN', label: 'Admin / Owner', icon: Shield },
   ];
 
   return (

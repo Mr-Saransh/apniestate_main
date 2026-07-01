@@ -6,7 +6,8 @@ import { ok } from "@/lib/response";
 import {
   calculateProjectProgress,
   calculateSiteHealthScore,
-  calculateProjectRiskScore
+  calculateProjectRiskScore,
+  calculateMonthlyLabourCost
 } from "@/lib/engines";
 
 export const GET = withAuth(async (req: NextRequest, user) => {
@@ -246,7 +247,7 @@ export const GET = withAuth(async (req: NextRequest, user) => {
       budgetRemaining: Math.max(0, (project.budget || 0) - (project.actual_cost || 0)),
       expectedFinish: project.end_date?.toISOString(),
       supervisor: project.manager?.name || "Unassigned",
-      delayedDays: timelineStatus === "DELAYED" ? 12 : 0, // Mock calculation for delayed days
+      delayedDays: timelineStatus === "DELAYED" && project.end_date ? Math.max(0, Math.floor((new Date().getTime() - project.end_date.getTime()) / (1000 * 3600 * 24))) : 0,
       riskBreakdown: {
         budget: budgetStatus === "OVER_BUDGET" ? 80 : 20,
         timeline: timelineStatus === "DELAYED" ? 70 : 10,
@@ -269,12 +270,23 @@ export const GET = withAuth(async (req: NextRequest, user) => {
     return eDate.getFullYear() === today.getFullYear() && eDate.getMonth() === today.getMonth() && eDate.getDate() === today.getDate();
   }).reduce((sum, e) => sum + e.amount, 0);
 
-  const topExpenseCategories = [
-    { name: "Materials", amount: totalSpent * 0.55 },
-    { name: "Labour", amount: totalSpent * 0.30 },
-    { name: "Equipment", amount: totalSpent * 0.10 },
-    { name: "Overhead", amount: totalSpent * 0.05 }
-  ];
+  const expenseCategories = await prisma.expense.groupBy({
+    by: ['category'],
+    where: { company_id },
+    _sum: { amount: true },
+    orderBy: { _sum: { amount: 'desc' } },
+    take: 4
+  });
+
+  const topExpenseCategories = expenseCategories.map(c => ({
+    name: c.category,
+    amount: c._sum.amount || 0
+  }));
+
+  const pendingInvoicesTotal = await prisma.invoice.aggregate({
+    where: { company_id, status: "DRAFT" }, // or PENDING/SENT depending on your logic
+    _sum: { total: true }
+  });
 
   const financialIntelligence = {
     creditSum,
@@ -289,9 +301,9 @@ export const GET = withAuth(async (req: NextRequest, user) => {
     })),
     topExpenseCategories,
     cashBurnRate: Math.round(totalSpent / 30), // Approx daily burn rate
-    profitForecast: Math.round(creditSum * 0.15), // Mock 15% margin
+    profitForecast: creditSum - debitSum, // Net cash flow instead of arbitrary profit forecast
     todayExpenses,
-    expectedPayments: Math.round(creditSum * 0.05)
+    expectedPayments: pendingInvoicesTotal._sum.total || 0
   };
 
   if (pendingMilestones.filter(m => m.status === 'PENDING').length > 5) {
@@ -325,10 +337,17 @@ export const GET = withAuth(async (req: NextRequest, user) => {
       });
   }
 
+  // Calculate productivity score based on attendance and task completion
+  const totalTasks = await prisma.task.count({ where: { company_id } });
+  const completedTasks = await prisma.task.count({ where: { company_id, status: "DONE" } });
+  const taskCompletionRate = totalTasks > 0 ? completedTasks / totalTasks : 1;
+  const attendanceRate = totalWorkers > 0 ? presentWorkersCount / totalWorkers : 1;
+  const productivityScore = Math.round((taskCompletionRate * 0.5 + attendanceRate * 0.5) * 100);
+
   const workforceIntelligence = {
     present: presentWorkersCount,
     absent: absentCount,
-    productivityScore: presentWorkersCount > 0 ? 85 : 0, // Mock score out of 100
+    productivityScore: presentWorkersCount > 0 ? productivityScore : 0,
     costPerWorker: presentWorkersCount > 0 ? Math.round(todayLabourCost / presentWorkersCount) : 0
   };
 
@@ -407,8 +426,8 @@ export const GET = withAuth(async (req: NextRequest, user) => {
       name: v.name,
       type: v.type,
       rating: avgScore,
-      lateDeliveries: Math.floor(Math.random() * 3), // Mock data for late deliveries
-      averageDeliveryTime: Math.floor(Math.random() * 5) + 2, // Mock 2-6 days
+      lateDeliveries: 0, // Will be updated when PO delivery dates vs actual receive dates are tracked
+      averageDeliveryTime: 0, // Same as above
       isBlocked: false
     };
   });
@@ -483,6 +502,12 @@ export const GET = withAuth(async (req: NextRequest, user) => {
   const pendingMRsCount = await prisma.materialRequest.count({ where: { site: { company_id }, status: "PENDING" } });
   const pendingPOsCount = await prisma.purchaseOrder.count({ where: { project: { company_id }, status: "PENDING" } });
 
+  const monthlyLabourCost = await calculateMonthlyLabourCost(company_id);
+  
+  const underMaintenanceEquipment = await prisma.equipment.count({
+    where: { site: { company_id }, status: "UNDER_MAINTENANCE" }
+  });
+
   return ok({
     overview: {
       totalProjects,
@@ -490,12 +515,12 @@ export const GET = withAuth(async (req: NextRequest, user) => {
       completedProjects,
       delayedProjects,
       todayLabourCost,
-      monthlyLabourCost: todayLabourCost * 24, // Mock monthly calculation based on today
+      monthlyLabourCost,
       currentCashBalance,
       budgetUtilization,
       expectedProfit: financialIntelligence.profitForecast,
-      outstandingPayments: Math.round(financialIntelligence.debitSum * 0.1),
-      equipmentDowntime: 1 // Mock data
+      outstandingPayments: Math.round(financialIntelligence.debitSum * 0.1), // This could also be a real sum
+      equipmentDowntime: underMaintenanceEquipment
     },
     alerts,
     decisionCards,

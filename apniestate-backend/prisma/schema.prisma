@@ -247,6 +247,8 @@ model User {
   reports           Report[]
   reminders         Reminder[]
   purchase_orders   PurchaseOrder[]
+  attachments       Attachment[]
+  approval_logs     ApprovalLog[]
 
   @@map("users")
   company_id    String?
@@ -1385,8 +1387,86 @@ model Company {
   inventory_items   InventoryItem[]
   reminders         Reminder[]
   purchase_orders   PurchaseOrder[]
+  attachments       Attachment[]
+  approval_chains   ApprovalChain[]
+  approval_logs     ApprovalLog[]
 
   @@map("companies")
+}
+
+// ─── Attachments (Photo Evidence System) ───────────────
+
+model Attachment {
+  id          String   @id @default(cuid())
+  entity_type String   // "EXPENSE", "INVENTORY_TXN", "PO", "CASHBOOK", "DPR", "INVOICE", "SITE_VISIT"
+  entity_id   String
+  file_name   String
+  file_url    String
+  file_type   String   // "image/jpeg", "application/pdf", etc.
+  file_size   Int?
+  uploaded_by String
+  created_at  DateTime @default(now())
+
+  uploader User @relation(fields: [uploaded_by], references: [id])
+
+  @@index([entity_type, entity_id], name: "idx_attachments_entity")
+  @@map("attachments")
+  company_id    String?
+  company       Company? @relation(fields: [company_id], references: [id])
+
+  @@index([company_id], name: "idx_attachment_company_id")
+}
+
+// ─── Approval Workflow ────────────────────────────
+
+model ApprovalChain {
+  id          String   @id @default(cuid())
+  company_id  String
+  entity_type String   // "EXPENSE", "PO", "BUDGET_CHANGE", "LEAVE", "CASHBOOK", "ADVANCE_SALARY", "VENDOR_PAYMENT", "INVOICE"
+  name        String
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  company Company         @relation(fields: [company_id], references: [id])
+  steps   ApprovalStep[]
+
+  @@unique([company_id, entity_type])
+  @@map("approval_chains")
+}
+
+model ApprovalStep {
+  id         String @id @default(cuid())
+  chain_id   String
+  step_order Int
+  role       Role
+  label      String? // e.g. "Supervisor Review", "Manager Approval"
+
+  chain ApprovalChain @relation(fields: [chain_id], references: [id], onDelete: Cascade)
+
+  @@unique([chain_id, step_order])
+  @@map("approval_steps")
+}
+
+model ApprovalLog {
+  id          String   @id @default(cuid())
+  entity_type String
+  entity_id   String
+  step_order  Int
+  role        Role
+  action      String   // "APPROVED", "REJECTED", "ESCALATED"
+  user_id     String
+  comments    String?
+  created_at  DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id])
+
+  @@index([entity_type, entity_id], name: "idx_approval_logs_entity")
+  @@map("approval_logs")
+  company_id    String?
+  company       Company? @relation(fields: [company_id], references: [id])
+
+  @@index([company_id], name: "idx_approvallog_company_id")
 }
 
 model CompanySetting {

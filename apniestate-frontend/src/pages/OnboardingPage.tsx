@@ -20,11 +20,10 @@ export default function OnboardingPage() {
   }
 
   const roles = [
-    { id: 'BUILDER', name: 'Builder / Owner', icon: Building2, description: 'Strategic oversight of all construction projects, budgets, and approvals.', active: true },
+    { id: 'BUILDER', name: 'Builder (Owner)', icon: Building2, description: 'Complete business control over projects, finance, approvals, workforce, and analytics.', active: true },
     { id: 'SITE_SUPERVISOR', name: 'Site Supervisor', icon: HardHat, description: 'Manage sites, workers, and inventory on the ground.', active: true },
     { id: 'PROJECT_MANAGER', name: 'Project Manager', icon: Briefcase, description: 'Oversee entire projects, budgets, and milestones.', active: true },
     { id: 'ACCOUNTANT', name: 'Accountant', icon: Calculator, description: 'Handle finances, invoices, and expense approvals.', active: true },
-    { id: 'ADMIN', name: 'Admin / Owner', icon: Shield, description: 'Full system access and company configuration.', active: true },
   ];
 
   const handleNext = () => {

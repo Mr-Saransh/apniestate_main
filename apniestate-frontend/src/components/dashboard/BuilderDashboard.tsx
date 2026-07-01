@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useDashboardQuery } from '@/hooks/useDashboardQuery';
-import { Search } from 'lucide-react';
+import { ClipboardList, CloudSun } from 'lucide-react';
 import { BuilderDashboardOverview } from './BuilderDashboardOverview';
 import { BuilderIntelligenceCenter } from './BuilderIntelligenceCenter';
+import { PortfolioOverview } from './builder/PortfolioOverview';
 import { UniversalSearchWidget } from './builder/UniversalSearchWidget';
 import { KpiGridSkeleton } from './DashboardSkeletons';
 
@@ -13,7 +14,7 @@ export default function BuilderDashboard() {
     refetchInterval: 30000
   });
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'intelligence'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'intelligence' | 'portfolio'>('overview');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   const formattedDate = new Date().toLocaleDateString('en-GB', {
@@ -41,6 +42,12 @@ export default function BuilderDashboard() {
       </div>
     );
   }
+
+  const tabs = [
+    { id: 'overview' as const, label: 'Dashboard Overview' },
+    { id: 'portfolio' as const, label: 'Portfolio' },
+    { id: 'intelligence' as const, label: 'Intelligence Center' }
+  ];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)', paddingBottom: '60px' }}>
@@ -74,53 +81,56 @@ export default function BuilderDashboard() {
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
           <button 
-            onClick={() => setIsSearchOpen(true)}
-            style={{ padding: '10px 16px', borderRadius: '12px', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: 'white', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 600 }}
+            onClick={() => window.location.href = '/approvals'}
+            style={{ padding: '10px 16px', borderRadius: '12px', background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', color: 'white', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 600, backdropFilter: 'blur(10px)', transition: 'all 0.2s ease' }}
           >
-            <Search size={16} /> Search (Cmd+K)
+            <ClipboardList size={16} /> Pending Approvals
+            {(data.approvalsPending?.expenses > 0 || data.approvalsPending?.leaves > 0) && (
+              <span style={{ background: '#EF4444', padding: '2px 8px', borderRadius: '10px', fontSize: '11px', fontWeight: 700 }}>
+                {data.approvalsPending.expenses + data.approvalsPending.leaves}
+              </span>
+            )}
           </button>
+          <div 
+            style={{ padding: '8px 16px', borderRadius: '12px', background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.2)', color: 'white', display: 'flex', alignItems: 'center', gap: '12px', backdropFilter: 'blur(10px)' }}
+          >
+            <CloudSun size={24} color="#F4B400" />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <span style={{ fontSize: '13px', fontWeight: 700, lineHeight: 1 }}>28°C • Mostly Sunny</span>
+              <span style={{ fontSize: '11px', opacity: 0.85, lineHeight: 1 }}>Optimal for concrete works</span>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Main Tabs Navigation */}
       <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid var(--color-border)', paddingBottom: '12px', marginBottom: '8px' }}>
-        <button 
-          onClick={() => setActiveTab('overview')}
-          style={{
-            padding: '10px 20px',
-            borderRadius: '12px',
-            background: activeTab === 'overview' ? 'var(--color-primary)' : 'transparent',
-            color: activeTab === 'overview' ? '#FFF' : 'var(--color-text-muted)',
-            border: 'none',
-            fontWeight: 700,
-            fontSize: '14px',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease'
-          }}
-        >
-          Dashboard Overview
-        </button>
-        <button 
-          onClick={() => setActiveTab('intelligence')}
-          style={{
-            padding: '10px 20px',
-            borderRadius: '12px',
-            background: activeTab === 'intelligence' ? 'var(--color-primary)' : 'transparent',
-            color: activeTab === 'intelligence' ? '#FFF' : 'var(--color-text-muted)',
-            border: 'none',
-            fontWeight: 700,
-            fontSize: '14px',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease'
-          }}
-        >
-          More (Intelligence Center)
-        </button>
+        {tabs.map(tab => (
+          <button 
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            style={{
+              padding: '10px 20px',
+              borderRadius: '12px',
+              background: activeTab === tab.id ? 'var(--color-primary)' : 'transparent',
+              color: activeTab === tab.id ? '#FFF' : 'var(--color-text-muted)',
+              border: 'none',
+              fontWeight: 700,
+              fontSize: '14px',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       {/* Render Active View */}
       {activeTab === 'overview' ? (
         <BuilderDashboardOverview />
+      ) : activeTab === 'portfolio' ? (
+        <PortfolioOverview data={data} />
       ) : (
         <BuilderIntelligenceCenter data={data} />
       )}

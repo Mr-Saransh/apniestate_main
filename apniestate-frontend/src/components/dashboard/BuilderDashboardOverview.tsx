@@ -37,6 +37,8 @@ import {
   LineChartWidget
 } from '@/components/charts/ChartComponents';
 import { KpiGridSkeleton } from './DashboardSkeletons';
+import { FinancialKPIGrid } from './builder/FinancialKPIGrid';
+import { ConstructionInsights } from './builder/ConstructionInsights';
 
 export const BuilderDashboardOverview: React.FC = () => {
   const { user } = useAuth();
@@ -74,6 +76,12 @@ export const BuilderDashboardOverview: React.FC = () => {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
       {/* KPI Stats Block */}
       <KPIWidget items={kpis} />
+
+      {/* Executive Financial Snapshot — Milestone 3 */}
+      <FinancialKPIGrid data={data} />
+
+      {/* Construction Insights — Rule-based recommendations */}
+      <ConstructionInsights data={data} />
 
       {/* Critical Alerts Block */}
       <CriticalAlertsWidget alerts={data.alerts} />

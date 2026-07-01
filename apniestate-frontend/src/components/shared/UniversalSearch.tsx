@@ -172,8 +172,9 @@ export default function UniversalSearch() {
             style={{
               position: 'fixed',
               top: '15%',
-              left: '50%',
-              transform: 'translateX(-50%)',
+              left: 0,
+              right: 0,
+              margin: '0 auto',
               zIndex: 9999,
               width: '90%',
               maxWidth: '580px',
