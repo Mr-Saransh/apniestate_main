@@ -6,6 +6,7 @@ import ProjectManagerDashboard from './ProjectManagerDashboard';
 import AccountantDashboard from './AccountantDashboard';
 import AdminDashboard from './AdminDashboard';
 
+
 export default function DashboardEngine() {
   const { user } = useAuth();
   const role = user?.role || 'SITE_SUPERVISOR';
@@ -20,6 +21,7 @@ export default function DashboardEngine() {
       return <ProjectManagerDashboard />;
     case 'ACCOUNTANT':
       return <AccountantDashboard />;
+
     default:
       return <SupervisorDashboard />;
   }

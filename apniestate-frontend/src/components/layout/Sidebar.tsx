@@ -135,9 +135,7 @@ export default function Sidebar() {
             // Clear company_id to trigger company selection
             const userData = user ? { ...user, company_id: null } : null;
             if (userData) {
-              localStorage.setItem('user', JSON.stringify(userData));
-              navigate('/select-company');
-              window.location.reload();
+              navigate('/select-workspace');
             }
           }}
           title="Switch Company"

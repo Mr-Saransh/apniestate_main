@@ -44,6 +44,25 @@ export function TopBar({ title: customTitle, icon: customIcon, leftAction }: Top
   const navigate = useNavigate();
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const [assignedRoles, setAssignedRoles] = useState<string[]>([]);
+
+  useEffect(() => {
+    // Fetch user's workspaces to get roles for current company
+    if (user?.company_id) {
+      import('@/api/client').then(({ apiClient }) => {
+        apiClient.get<{ memberships: any[] }>('/auth/workspaces')
+          .then(res => {
+            if (res.success && res.data) {
+              const currentMembership = res.data.memberships.find((m: any) => m.company_id === user.company_id);
+              if (currentMembership) {
+                setAssignedRoles(currentMembership.roles);
+              }
+            }
+          })
+          .catch(() => {});
+      });
+    }
+  }, [user?.company_id]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -125,12 +144,14 @@ export function TopBar({ title: customTitle, icon: customIcon, leftAction }: Top
   const title = customTitle || pageInfo.title;
   const icon = customIcon || pageInfo.icon;
 
-  const roles = [
+  const allRolesConfig = [
     { id: 'BUILDER', label: 'Builder / Owner', icon: Building2 },
     { id: 'PROJECT_MANAGER', label: 'Project Manager', icon: Briefcase },
     { id: 'SITE_SUPERVISOR', label: 'Site Supervisor', icon: UserCheck },
     { id: 'ACCOUNTANT', label: 'Accountant', icon: Calculator },
   ];
+
+  const roles = allRolesConfig.filter(r => assignedRoles.includes(r.id) || user?.role === r.id);
 
   return (
     <header

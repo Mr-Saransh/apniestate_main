@@ -13,11 +13,10 @@ interface AuthContextType {
   login: (credentials: LoginCredentials) => Promise<void>;
   signup: (credentials: LoginCredentials) => Promise<void>;
   logout: () => Promise<void>;
+  setAuthSession: (token: string, user: AuthUser) => void;
   updateUser: (userData: AuthUser) => void;
   updateUserRole: (role: string) => Promise<void>;
   switchRole: (role: string) => Promise<void>;
-  selectCompany: (companyId: string) => Promise<void>;
-  createCompany: (name: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -107,6 +106,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const setAuthSession = useCallback((newToken: string, newUser: AuthUser) => {
+    setToken(newToken);
+    setUser(newUser);
+    localStorage.setItem('access_token', newToken);
+    localStorage.setItem('user', JSON.stringify(newUser));
+  }, []);
+
   const updateUserRole = useCallback(async (role: string) => {
     const response = await authApi.updateRole(role);
     if (response.success && response.data) {
@@ -133,13 +139,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const hasPermission = useCallback((permission: string) => {
-    if (user?.role === 'ADMIN' || user?.role === 'BUILDER') return true;
-    if (user?.role === 'SITE_SUPERVISOR') {
-      if (permission.startsWith('users.')) {
-        return permissions.includes(permission);
-      }
-      return true;
-    }
+    if (user?.role === 'ADMIN') return true;
     return permissions.includes(permission);
   }, [permissions, user]);
 
@@ -164,27 +164,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const selectCompany = useCallback(async (companyId: string) => {
-    const response = await companiesApi.selectCompany(companyId);
-    if (response.success && response.data) {
-      const { user: updatedUser, accessToken } = response.data;
-      setUser(updatedUser);
-      setToken(accessToken);
-      localStorage.setItem('user', JSON.stringify(updatedUser));
-      localStorage.setItem('access_token', accessToken);
-    }
-  }, []);
 
-  const createCompany = useCallback(async (name: string) => {
-    const response = await companiesApi.createCompany(name);
-    if (response.success && response.data) {
-      const { user: updatedUser, accessToken } = response.data;
-      setUser(updatedUser);
-      setToken(accessToken);
-      localStorage.setItem('user', JSON.stringify(updatedUser));
-      localStorage.setItem('access_token', accessToken);
-    }
-  }, []);
 
   return (
     <AuthContext.Provider
@@ -198,11 +178,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         signup,
         logout,
+        setAuthSession,
         updateUser,
         updateUserRole,
         switchRole,
-        selectCompany,
-        createCompany,
       }}
     >
       {children}

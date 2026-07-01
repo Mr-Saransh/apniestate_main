@@ -43,28 +43,8 @@ export default function MorePage() {
   const { hasPermission, user } = useAuth();
 
   const checkAccess = (path: string) => {
-    if (user?.role === 'ADMIN') return true;
-    switch (path) {
-      case '/finance': return hasPermission('finance.read');
-      case '/invoices': return hasPermission('invoices.read');
-      case '/payments': return hasPermission('payments.read');
-      case '/budgets': return hasPermission('budgets.read');
-      case '/vendors': return hasPermission('vendors.read');
-      case '/workers': return hasPermission('workers.read');
-      case '/contractors': return hasPermission('contractors.read');
-      case '/leaves': return hasPermission('leaves.read');
-      case '/payroll': return hasPermission('workers.read');
-      case '/attendance': return hasPermission('attendance.read');
-      case '/materials': return hasPermission('materials.read');
-      case '/sites': return hasPermission('sites.read');
-      case '/documents': return hasPermission('documents.read');
-      case '/reports': return hasPermission('reports.read');
-      case '/users': return hasPermission('users.read');
-      case '/dpr': return true;
-      case '/notifications': return true;
-      case '/settings': return true;
-      default: return false;
-    }
+    // Return true for all features as requested to undo role-based restrictions
+    return true;
   };
 
   const availableItems = moreItems.filter(item => checkAccess(item.to));

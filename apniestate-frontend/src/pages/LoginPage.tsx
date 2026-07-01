@@ -24,7 +24,7 @@ export default function LoginPage() {
   }
 
   if (isAuthenticated) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/select-workspace" replace />;
   }
 
   const handleSubmit = async (e: FormEvent) => {

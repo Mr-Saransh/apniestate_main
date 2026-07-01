@@ -24,12 +24,8 @@ export default function AppLayout() {
     return <Navigate to="/login" replace />;
   }
 
-  if (user && !user.onboarded) {
-    return <Navigate to="/onboarding" replace />;
-  }
-
-  if (user && user.onboarded && !user.company_id) {
-    return <Navigate to="/select-company" replace />;
+  if (user && !user.company_id) {
+    return <Navigate to="/select-workspace" replace />;
   }
 
   return (

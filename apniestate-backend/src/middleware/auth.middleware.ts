@@ -1,8 +1,11 @@
 import { NextRequest } from "next/server";
 import { verifyAccessToken } from "@/lib/jwt";
-import { unauthorized } from "@/lib/response";
+import { unauthorized, forbidden } from "@/lib/response";
 import { prisma } from "@/lib/prisma";
 import type { JWTPayload } from "@/types";
+
+import { getRolePermissions } from "@/modules/permissions/permissions.service";
+import { Role } from "@prisma/client";
 
 type RouteHandler = (req: NextRequest, user: JWTPayload, context?: any) => Promise<Response>;
 
@@ -26,4 +29,21 @@ export function withAuth(handler: RouteHandler) {
 
     return handler(req, payload, context);
   };
+}
+
+export function withPermission(requiredPermission: string, handler: RouteHandler) {
+  return withAuth(async (req, user, context) => {
+    if (user.role === "ADMIN") {
+      return handler(req, user, context);
+    }
+
+    const perms = await getRolePermissions(user.role as Role);
+    const hasPerm = perms.some(p => `${p.permission.module}.${p.permission.action}` === requiredPermission);
+
+    if (!hasPerm) {
+      return forbidden("You do not have permission to perform this action.");
+    }
+
+    return handler(req, user, context);
+  });
 }

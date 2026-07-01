@@ -1,11 +1,11 @@
 import { NextRequest } from "next/server";
-import { withAuth } from "@/middleware/auth.middleware";
+import { withAuth, withPermission } from "@/middleware/auth.middleware";
 import { validateBody } from "@/middleware/validate.middleware";
 import { CreateFinanceSchema } from "@/modules/finance/finance.schema";
 import { getExpenses, createExpense } from "@/modules/finance/finance.service";
 import { ok, created } from "@/lib/response";
 
-export const GET = withAuth(async (req, user) => {
+export const GET = withPermission("finance.read", async (req, user) => {
   const url = new URL(req.url);
   const projectId = url.searchParams.get("project_id") || undefined;
   const siteId = url.searchParams.get("site_id") || undefined;
@@ -13,7 +13,7 @@ export const GET = withAuth(async (req, user) => {
   return ok(items);
 });
 
-export const POST = withAuth(async (req, user) => {
+export const POST = withPermission("finance.create", async (req, user) => {
   const parsed = await validateBody(req, CreateFinanceSchema);
   if ("error" in parsed) return parsed.error;
   const item = await createExpense(parsed.data, user.sub);

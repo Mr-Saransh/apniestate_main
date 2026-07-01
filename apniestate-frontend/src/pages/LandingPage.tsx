@@ -9,7 +9,7 @@ import Logo from '@/components/shared/Logo';
 import '@/styles/landing.css';
 
 export default function LandingPage() {
-  const [activeRole, setActiveRole] = useState<'builder' | 'supervisor' | 'manager' | 'accountant' | 'admin'>('builder');
+  const [activeRole, setActiveRole] = useState<'builder' | 'supervisor' | 'manager' | 'accountant'>('builder');
 
   // Intersection Observer for fade-in animations
   useEffect(() => {
@@ -165,8 +165,7 @@ export default function LandingPage() {
             { id: 'builder', label: 'Builder / Owner' },
             { id: 'supervisor', label: 'Site Supervisor' },
             { id: 'manager', label: 'Project Manager' },
-            { id: 'accountant', label: 'Accountant' },
-            { id: 'admin', label: 'System Admin' }
+            { id: 'accountant', label: 'Accountant' }
           ].map(role => (
             <button
               key={role.id}
@@ -246,20 +245,6 @@ export default function LandingPage() {
                 <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <li style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 500 }}><CheckCircle2 size={18} color="var(--lp-accent)" /> Milestone Tracking</li>
                   <li style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 500 }}><CheckCircle2 size={18} color="var(--lp-accent)" /> Task Delegation</li>
-                </ul>
-              </>
-            )}
-            {activeRole === 'admin' && (
-              <>
-                <h3 className="lp-h3" style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <ShieldCheck color="var(--lp-primary)" /> System Administration
-                </h3>
-                <p style={{ color: 'var(--lp-text-muted)', marginBottom: '24px', lineHeight: 1.6 }}>
-                  Manage users, roles, and company settings. Full control over access permissions and master data configuration for your enterprise.
-                </p>
-                <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <li style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 500 }}><CheckCircle2 size={18} color="var(--lp-accent)" /> User & Role Management</li>
-                  <li style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 500 }}><CheckCircle2 size={18} color="var(--lp-accent)" /> Company Settings</li>
                 </ul>
               </>
             )}

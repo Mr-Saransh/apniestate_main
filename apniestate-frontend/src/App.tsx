@@ -6,8 +6,7 @@ import AppLayout from '@/components/layout/AppLayout';
 import LoginPage from '@/pages/LoginPage';
 import LandingPage from '@/pages/LandingPage';
 import SignupPage from '@/pages/SignupPage';
-import OnboardingPage from '@/pages/OnboardingPage';
-import CompanySelectionPage from '@/pages/CompanySelectionPage';
+import WorkspaceSelectPage from '@/pages/WorkspaceSelectPage';
 import DashboardPage from '@/pages/DashboardPage';
 import ProjectsPage from '@/pages/ProjectsPage';
 import ProjectDetailPage from '@/pages/ProjectDetailPage';
@@ -56,18 +55,20 @@ export default function App() {
               <Route path="/" element={<LandingPage />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/signup" element={<SignupPage />} />
-              <Route path="/onboarding" element={<OnboardingPage />} />
-              <Route path="/select-company" element={<CompanySelectionPage />} />
+              <Route path="/select-workspace" element={<WorkspaceSelectPage />} />
 
               {/* Protected — wrapped by AppLayout which handles auth check */}
               <Route element={<AppLayout />}>
-                <Route path="/dashboard" element={<DashboardPage />} />
-                <Route path="/projects" element={<ProjectsPage />} />
-                <Route path="/projects/:id" element={<ProjectDetailPage />} />
-                <Route path="/more" element={<MorePage />} />
-                <Route path="/notifications" element={<NotificationsPage />} />
-                <Route path="/settings" element={<SettingsPage />} />
-                <Route path="/dpr" element={<DprPage />} />
+                {/* Universally checked by config */}
+                <Route element={<RouteGuard />}>
+                  <Route path="/dashboard" element={<DashboardPage />} />
+                  <Route path="/projects" element={<ProjectsPage />} />
+                  <Route path="/projects/:id" element={<ProjectDetailPage />} />
+                  <Route path="/more" element={<MorePage />} />
+                  <Route path="/notifications" element={<NotificationsPage />} />
+                  <Route path="/settings" element={<SettingsPage />} />
+                  <Route path="/dpr" element={<DprPage />} />
+                </Route>
 
                 {/* Guarded Modules */}
                 <Route element={<RouteGuard permission="tasks.read" />}>

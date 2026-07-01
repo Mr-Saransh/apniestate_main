@@ -142,67 +142,141 @@ export async function seedPermissions() {
   };
 
   // 3. Define mapping per Role
-  // BUILDER role permissions
+
+  // BUILDER role permissions (Executive Command Center)
   await assignRolePermissions(Role.BUILDER, [
+    // Users & Company Management
+    { module: "users", action: "create" },
     { module: "users", action: "read" },
-    ...DEFAULT_PERMISSIONS.filter((p) => p.module !== "users").map((p) => ({ module: p.module, action: p.action })),
+    { module: "users", action: "update" },
+    { module: "users", action: "delete" },
+    
+    // Core (View & Create)
+    { module: "projects", action: "create" },
+    { module: "projects", action: "read" },
+    { module: "projects", action: "update" },
+    { module: "sites", action: "create" },
+    { module: "sites", action: "read" },
+    { module: "sites", action: "update" },
+    { module: "tasks", action: "read" }, // View only
+
+    // Approvals
+    { module: "leaves", action: "approve" },
+    { module: "finance", action: "approve" },
+    { module: "material-requests", action: "approve" },
+    
+    // Financials & Others (View & Manage Budgets/Approvals)
+    { module: "finance", action: "read" },
+    { module: "invoices", action: "read" },
+    { module: "payments", action: "read" },
+    { module: "budgets", action: "create" },
+    { module: "budgets", action: "read" },
+    { module: "budgets", action: "update" },
+    
+    // View Everything Else
+    { module: "attendance", action: "read" },
+    { module: "leaves", action: "read" },
+    { module: "inventory", action: "read" },
+    { module: "material-requests", action: "read" },
+    { module: "vendors", action: "read" },
+    { module: "workers", action: "read" },
+    { module: "contractors", action: "read" },
+    { module: "documents", action: "read" },
+    { module: "reports", action: "read" }
   ]);
 
   // PROJECT_MANAGER role permissions
   await assignRolePermissions(Role.PROJECT_MANAGER, [
-    { module: "users", action: "read" },
     { module: "projects", action: "read" },
-    { module: "projects", action: "update" },
-    ...DEFAULT_PERMISSIONS.filter((p) => ["sites", "tasks", "attendance", "leaves", "finance", "budgets", "inventory", "material-requests", "workers", "documents", "reports"].includes(p.module)).map((p) => ({ module: p.module, action: p.action })),
-    { module: "vendors", action: "read" },
-    { module: "contractors", action: "read" },
+    { module: "sites", action: "read" },
+    
+    // Tasks (Execution management)
+    { module: "tasks", action: "create" },
+    { module: "tasks", action: "read" },
+    { module: "tasks", action: "update" },
+    { module: "tasks", action: "delete" },
+    
+    // Reviews
+    { module: "attendance", action: "read" },
+    { module: "material-requests", action: "read" },
+    { module: "inventory", action: "read" },
+    { module: "workers", action: "read" },
+    
+    // Reports
+    { module: "reports", action: "read" }
   ]);
 
-  // SITE_SUPERVISOR role permissions
+  // SITE_SUPERVISOR role permissions (Execution focused)
   await assignRolePermissions(Role.SITE_SUPERVISOR, [
     { module: "projects", action: "read" },
     { module: "sites", action: "read" },
+    
+    // Tasks & Daily execution
     { module: "tasks", action: "read" },
     { module: "tasks", action: "update" },
+    
+    // Attendance
     { module: "attendance", action: "create" },
     { module: "attendance", action: "read" },
     { module: "attendance", action: "update" },
-    { module: "leaves", action: "create" },
-    { module: "leaves", action: "read" },
+    
+    // Inventory & Materials
     { module: "inventory", action: "read" },
-    { module: "inventory", action: "update" },
+    { module: "inventory", action: "update" }, // issue materials
     { module: "material-requests", action: "create" },
     { module: "material-requests", action: "read" },
-    { module: "workers", action: "read" },
+    
+    // Site expenses & Cashbook
+    { module: "finance", action: "create" }, // record site expenses
+    { module: "finance", action: "read" },
+    
+    // Documents (DPR, site photos)
     { module: "documents", action: "create" },
     { module: "documents", action: "read" },
-    { module: "reports", action: "read" },
+    
+    // Reports
+    { module: "reports", action: "read" }
   ]);
 
-  // ACCOUNTANT role permissions
+  // ACCOUNTANT role permissions (Finance only)
   await assignRolePermissions(Role.ACCOUNTANT, [
     { module: "finance", action: "create" },
     { module: "finance", action: "read" },
     { module: "finance", action: "update" },
-    { module: "finance", action: "approve" },
-    ...DEFAULT_PERMISSIONS.filter((p) => ["invoices", "payments"].includes(p.module)).map((p) => ({ module: p.module, action: p.action })),
+    // Notice: no "approve" for expenses
+    
+    { module: "invoices", action: "create" },
+    { module: "invoices", action: "read" },
+    { module: "invoices", action: "update" },
+    
+    { module: "payments", action: "create" },
+    { module: "payments", action: "read" },
+    { module: "payments", action: "update" },
+    
     { module: "budgets", action: "read" },
     { module: "vendors", action: "read" },
     { module: "vendors", action: "update" },
     { module: "contractors", action: "read" },
     { module: "contractors", action: "update" },
-    { module: "reports", action: "read" },
+    
+    // View attendance for payroll
+    { module: "attendance", action: "read" },
+    { module: "workers", action: "read" },
+    
+    { module: "reports", action: "read" }
   ]);
 
   // INVENTORY_MANAGER role permissions
   await assignRolePermissions(Role.INVENTORY_MANAGER, [
-    ...DEFAULT_PERMISSIONS.filter((p) => p.module === "inventory").map((p) => ({ module: p.module, action: p.action })),
+    { module: "inventory", action: "create" },
+    { module: "inventory", action: "read" },
+    { module: "inventory", action: "update" },
+    { module: "inventory", action: "delete" },
     { module: "material-requests", action: "read" },
     { module: "material-requests", action: "update" },
-    { module: "material-requests", action: "approve" },
     { module: "vendors", action: "read" },
-    { module: "reports", action: "read" },
   ]);
+
 
   console.log("Permissions seeded successfully.");
 }

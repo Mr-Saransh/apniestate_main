@@ -7,13 +7,35 @@ import {
   PackageSearch,
   HardHat,
   Wallet,
-  FileText
+  FileText,
+  UserCheck,
+  Package,
+  Boxes,
+  Users,
+  Calendar,
+  AlertTriangle,
+  Receipt,
+  Calculator,
+  Shield,
+  Layers,
+  Building2,
+  TrendingUp,
+  Settings,
+  Home
 } from 'lucide-react';
 import '@/styles/floating-actions.css';
+import { useAuth } from '@/context/AuthContext';
+import { getFabConfig } from '@/config/navigation.config';
 
 export default function FloatingQuickActions() {
   const [isOpen, setIsOpen] = useState(false);
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const fabActions = getFabConfig(user?.role || 'SITE_SUPERVISOR');
+
+  if (!fabActions || fabActions.length === 0) {
+    return null; // Don't render FAB if no actions available for this role
+  }
 
   const handleAction = (path: string) => {
     setIsOpen(false);
@@ -25,65 +47,21 @@ export default function FloatingQuickActions() {
       {isOpen && <div className="floating-overlay" onClick={() => setIsOpen(false)} />}
       
       <div className={`floating-menu ${isOpen ? 'is-open' : ''}`}>
-        <button 
-          className="floating-menu-item item-1"
-          onClick={() => handleAction('/projects?create=true')}
-        >
-          <span className="floating-menu-label">Create Project</span>
-          <div className="floating-menu-icon text-primary">
-            <FolderKanban size={20} />
-          </div>
-        </button>
-
-        <button 
-          className="floating-menu-item item-2"
-          onClick={() => handleAction('/tasks?create=true')}
-        >
-          <span className="floating-menu-label">Create Task</span>
-          <div className="floating-menu-icon text-success">
-            <ClipboardCheck size={20} />
-          </div>
-        </button>
-
-        <button 
-          className="floating-menu-item item-3"
-          onClick={() => handleAction('/inventory?create=true')}
-        >
-          <span className="floating-menu-label">Add Material</span>
-          <div className="floating-menu-icon text-warning">
-            <PackageSearch size={20} />
-          </div>
-        </button>
-
-        <button 
-          className="floating-menu-item item-4"
-          onClick={() => handleAction('/attendance')}
-        >
-          <span className="floating-menu-label">Mark Attendance</span>
-          <div className="floating-menu-icon text-info">
-            <HardHat size={20} />
-          </div>
-        </button>
-
-        <button 
-          className="floating-menu-item item-5"
-          onClick={() => handleAction('/finance?create=true')}
-        >
-          <span className="floating-menu-label">Add Expense</span>
-          <div className="floating-menu-icon" style={{ color: '#E11D48' }}>
-            <Wallet size={20} />
-          </div>
-        </button>
-
-        <button 
-          className="floating-menu-item item-6"
-          onClick={() => handleAction('/documents?create=true')}
-        >
-          <span className="floating-menu-label">Upload Document</span>
-          <div className="floating-menu-icon" style={{ color: '#6366F1' }}>
-            <FileText size={20} />
-          </div>
-        </button>
+        {fabActions.map((action, index) => {
+          const Icon = action.icon;
+          return (
+            <button 
+              key={index}
+              className={`floating-menu-item item-${index + 1}`}
+              onClick={() => handleAction(action.path)}
+            >
+              <span className="floating-menu-label">{action.label}</span>
+              <div className="floating-menu-icon" style={{ color: action.color, backgroundColor: action.bg }}>
+                <Icon size={20} />
+              </div>
+            </button>
+          );
+        })}
       </div>
 
       <button 
