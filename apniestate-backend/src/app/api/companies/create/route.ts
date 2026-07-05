@@ -5,7 +5,7 @@ import { ok, badRequest } from "@/lib/response";
 
 export const POST = withAuth(async (req: NextRequest, user) => {
   const body = await req.json();
-  const { name, role = 'BUILDER' } = body;
+  const { name } = body; // Role is always BUILDER for company creation
 
   if (!name) {
     return badRequest("Company name is required");
@@ -16,19 +16,26 @@ export const POST = withAuth(async (req: NextRequest, user) => {
     data: { name }
   });
 
-  // Assign user to this company with selected role
+  // Assign user to this company with BUILDER role, active status
   const membership = await prisma.companyMembership.create({
     data: {
       user_id: user.sub,
       company_id: company.id,
-      roles: [role]
+      roles: ["BUILDER"],
+      status: "ACTIVE",
+      last_active_at: new Date()
     }
   });
 
-  // Automatically switch them to the new workspace
+  // Automatically switch them to the new workspace and mark onboarded
   await prisma.user.update({
     where: { id: user.sub },
-    data: { company_id: company.id, role }
+    data: { 
+      company_id: company.id, 
+      role: "BUILDER",
+      last_workspace_id: company.id,
+      onboarded: true
+    }
   });
 
   return ok({ company, membership }, "Company created successfully");

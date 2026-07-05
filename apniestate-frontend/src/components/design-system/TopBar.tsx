@@ -39,7 +39,7 @@ interface TopBarProps {
 }
 
 export function TopBar({ title: customTitle, icon: customIcon, leftAction }: TopBarProps) {
-  const { user, logout, switchRole } = useAuth();
+  const { user, logout, switchWorkspace } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [showDropdown, setShowDropdown] = useState(false);
@@ -315,7 +315,9 @@ export function TopBar({ title: customTitle, icon: customIcon, leftAction }: Top
                       type="button"
                       onClick={async (e) => {
                         e.stopPropagation();
-                        await switchRole(r.id);
+                        if (user?.company_id) {
+                          await switchWorkspace(user.company_id, r.id);
+                        }
                         setShowDropdown(false);
                       }}
                       style={{

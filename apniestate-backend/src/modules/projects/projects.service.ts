@@ -146,5 +146,178 @@ export const deleteProject = async (id: string, companyId?: string | null) => {
   if (!companyId) return null;
   const existing = await prisma.project.findFirst({ where: { id, company_id: companyId } });
   if (!existing) return null;
-  return prisma.project.delete({ where: { id } });
+
+  // Find all sites under this project
+  const projectSites = await prisma.site.findMany({
+    where: { project_id: id },
+    select: { id: true }
+  });
+  const siteIds = projectSites.map(s => s.id);
+
+  // Find all labour teams under these sites
+  const labourTeams = await prisma.labourTeam.findMany({
+    where: { site_id: { in: siteIds } },
+    select: { id: true }
+  });
+  const teamIds = labourTeams.map(t => t.id);
+
+  // Execute cascade delete in a transaction to guarantee atomicity and foreign key constraint safety
+  return prisma.$transaction(async (tx) => {
+    // 1. Unassign workers from labour teams
+    if (teamIds.length > 0) {
+      await tx.worker.updateMany({
+        where: { labour_team_id: { in: teamIds } },
+        data: { labour_team_id: null }
+      });
+    }
+
+    // 2. Delete labour teams
+    if (teamIds.length > 0) {
+      await tx.labourTeam.deleteMany({
+        where: { id: { in: teamIds } }
+      });
+    }
+
+    // 3. Unassign workers from project/site
+    await tx.worker.updateMany({
+      where: {
+        OR: [
+          { project_id: id },
+          { site_id: { in: siteIds } }
+        ]
+      },
+      data: { project_id: null, site_id: null }
+    });
+
+    // 4. Delete worker attendances
+    await tx.workerAttendance.deleteMany({
+      where: { site_id: { in: siteIds } }
+    });
+
+    // 5. Delete site attendances
+    await tx.siteAttendance.deleteMany({
+      where: { site_id: { in: siteIds } }
+    });
+
+    // 6. Delete daily reports
+    await tx.dailyReport.deleteMany({
+      where: { site_id: { in: siteIds } }
+    });
+
+    // 7. Delete material requests
+    await tx.materialRequest.deleteMany({
+      where: { site_id: { in: siteIds } }
+    });
+
+    // 8. Delete inventory items
+    await tx.inventoryItem.deleteMany({
+      where: { site_id: { in: siteIds } }
+    });
+
+    // 9. Unassign equipment from site
+    await tx.equipment.updateMany({
+      where: { site_id: { in: siteIds } },
+      data: { site_id: null }
+    });
+
+    // 10. Delete worker transfers
+    await tx.workerTransfer.deleteMany({
+      where: {
+        OR: [
+          { from_site_id: { in: siteIds } },
+          { to_site_id: { in: siteIds } }
+        ]
+      }
+    });
+
+    // 11. Delete site assignments
+    await tx.siteAssignment.deleteMany({
+      where: { site_id: { in: siteIds } }
+    });
+
+    // 12. Delete project assignments
+    await tx.projectAssignment.deleteMany({
+      where: { project_id: id }
+    });
+
+    // 13. Delete milestones
+    await tx.milestone.deleteMany({
+      where: { project_id: id }
+    });
+
+    // 14. Delete project delays
+    await tx.projectDelay.deleteMany({
+      where: { project_id: id }
+    });
+
+    // 15. Delete project risks
+    await tx.projectRisk.deleteMany({
+      where: { project_id: id }
+    });
+
+    // 16. Delete change orders
+    await tx.changeOrder.deleteMany({
+      where: { project_id: id }
+    });
+
+    // 17. Delete tasks
+    await tx.task.deleteMany({
+      where: {
+        OR: [
+          { project_id: id },
+          { site_id: { in: siteIds } }
+        ]
+      }
+    });
+
+    // 18. Delete budgets
+    await tx.budget.deleteMany({
+      where: {
+        OR: [
+          { project_id: id },
+          { site_id: { in: siteIds } }
+        ]
+      }
+    });
+
+    // 19. Delete expenses
+    await tx.expense.deleteMany({
+      where: {
+        OR: [
+          { project_id: id },
+          { site_id: { in: siteIds } }
+        ]
+      }
+    });
+
+    // 20. Delete cashbook entries
+    await tx.cashbook.deleteMany({
+      where: {
+        OR: [
+          { project_id: id },
+          { site_id: { in: siteIds } }
+        ]
+      }
+    });
+
+    // 21. Delete purchase orders
+    await tx.purchaseOrder.deleteMany({
+      where: {
+        OR: [
+          { project_id: id },
+          { site_id: { in: siteIds } }
+        ]
+      }
+    });
+
+    // 22. Delete sites
+    await tx.site.deleteMany({
+      where: { project_id: id }
+    });
+
+    // 23. Finally, delete the project
+    return tx.project.delete({
+      where: { id }
+    });
+  }, { timeout: 30000 });
 };

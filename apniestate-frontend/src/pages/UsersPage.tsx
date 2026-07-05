@@ -3,7 +3,8 @@ import { usersApi, type User, type CreateUserData } from '@/api/users';
 import Modal from '@/components/shared/Modal';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import EmptyState from '@/components/shared/EmptyState';
-import { Plus, Users, Search, MoreVertical, UserCheck, UserX } from 'lucide-react';
+import { Plus, Users, Search, MoreVertical, UserCheck, UserX, Mail, UserMinus, ChevronRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
@@ -90,6 +91,33 @@ export default function UsersPage() {
           <Plus size={18} />
           Add User
         </button>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '32px' }}>
+        <Link to="/users/invitations" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '24px', background: 'var(--color-surface)', borderRadius: '16px', border: '1px solid var(--color-border)', color: 'inherit' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'var(--color-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Mail size={24} color="var(--color-primary)" />
+            </div>
+            <div>
+              <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '4px' }}>Invitations</h3>
+              <p style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>Manage pending invites to your workspace</p>
+            </div>
+          </div>
+          <ChevronRight size={20} color="var(--color-text-muted)" />
+        </Link>
+        <Link to="/users/resignations" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '24px', background: 'var(--color-surface)', borderRadius: '16px', border: '1px solid var(--color-border)', color: 'inherit' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'var(--color-danger-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <UserMinus size={24} color="var(--color-danger)" />
+            </div>
+            <div>
+              <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '4px' }}>Resignations</h3>
+              <p style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>Review employee resignation requests</p>
+            </div>
+          </div>
+          <ChevronRight size={20} color="var(--color-text-muted)" />
+        </Link>
       </div>
 
       {users.length > 0 && (

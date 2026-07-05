@@ -179,9 +179,11 @@ export function getBottomNavConfig(role: string): NavigationItem[] {
 
 const masterFab: FabAction[] = [
   { label: 'Create Project', icon: Plus, path: '/projects?create=true', color: '#FFFFFF', bg: '#0891B2' },
+  { label: 'Create Task', icon: ClipboardList, path: '/tasks', color: '#FFFFFF', bg: '#3B82F6' },
   { label: 'Mark Attendance', icon: UserCheck, path: '/attendance', color: '#FFFFFF', bg: '#16A34A' },
   { label: 'Create DPR', icon: ClipboardCheck, path: '/dpr', color: '#111827', bg: '#F4B400' },
   { label: 'Record Expense', icon: Receipt, path: '/finance', color: '#FFFFFF', bg: '#DC2626' },
+  { label: 'Req Material', icon: Package, path: '/materials', color: '#FFFFFF', bg: '#8B5CF6' },
 ];
 
 export function getFabConfig(role: string): FabAction[] {

@@ -175,13 +175,13 @@ export const GET = withAuth(async (req: NextRequest, user) => {
 
   // 7. Dynamic Site Alerts (e.g. low stock, pending reviews)
   const alerts: any[] = [];
-  const lowStockItems = await prisma.inventoryItem.findMany({
+  const allInventoryItems = await prisma.inventoryItem.findMany({
     where: {
-      site_id: site.id,
-      quantity: { lte: prisma.inventoryItem.fields.min_quantity }
+      site_id: site.id
     },
     include: { material: true }
   });
+  const lowStockItems = allInventoryItems.filter(item => item.quantity <= item.min_quantity);
   for (const item of lowStockItems) {
     alerts.push({
       type: "LOW_STOCK",

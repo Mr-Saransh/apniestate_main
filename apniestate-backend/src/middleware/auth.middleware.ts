@@ -18,13 +18,15 @@ export function withAuth(handler: RouteHandler) {
     const payload = verifyAccessToken(token);
     if (!payload) return unauthorized();
 
-    // Database fallback if company_id is not in active token payload or is null
+    // Database validation to check if the user exists and retrieve company_id
+    const dbUser = await prisma.user.findUnique({
+      where: { id: payload.sub },
+      select: { company_id: true }
+    });
+    if (!dbUser) return unauthorized();
+
     if (!payload.company_id) {
-      const dbUser = await prisma.user.findUnique({
-        where: { id: payload.sub },
-        select: { company_id: true }
-      });
-      payload.company_id = dbUser?.company_id || null;
+      payload.company_id = dbUser.company_id || null;
     }
 
     return handler(req, payload, context);

@@ -14,19 +14,25 @@ export const POST = withAuth(async (req: NextRequest, user) => {
     return badRequest("Missing company_id or role");
   }
 
-  // Verify membership
+  // Verify ACTIVE membership
   const membership = await prisma.companyMembership.findUnique({
     where: { user_id_company_id: { user_id: user.sub, company_id } }
   });
 
-  if (!membership || !membership.roles.includes(role)) {
+  if (!membership || membership.status !== "ACTIVE" || !membership.roles.includes(role)) {
     return unauthorized();
   }
 
-  // Update active session pointers in the User record
+  // Update active session pointers + last workspace tracking
   const dbUser = await prisma.user.update({
     where: { id: user.sub },
-    data: { company_id, role }
+    data: { company_id, role, last_workspace_id: company_id }
+  });
+
+  // Update membership last_active_at
+  await prisma.companyMembership.update({
+    where: { id: membership.id },
+    data: { last_active_at: new Date() }
   });
 
   const accessToken = signAccessToken({ sub: user.sub, email: user.email, role, company_id });
@@ -49,7 +55,21 @@ export const POST = withAuth(async (req: NextRequest, user) => {
     maxAge: 7 * 24 * 60 * 60,
   });
 
-  const response = ok({ accessToken, user: { id: user.sub, name: dbUser.name, email: user.email, role, company_id } }, "Switched workspace successfully");
+  const response = ok(
+    {
+      accessToken,
+      user: {
+        id: user.sub,
+        name: dbUser.name,
+        email: user.email,
+        role,
+        company_id,
+        onboarded: dbUser.onboarded,
+        last_workspace_id: company_id,
+      },
+    },
+    "Switched workspace successfully"
+  );
   response.headers.set("Set-Cookie", refreshCookie);
   return response;
 });

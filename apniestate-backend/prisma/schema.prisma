@@ -212,19 +212,41 @@ enum DependencyType {
   START_TO_FINISH
 }
 
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  EXPIRED
+  CANCELLED
+  APPROVED
+}
+
+enum ResignationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum MembershipStatus {
+  ACTIVE
+  INACTIVE
+  RESIGNED
+}
+
 // ─── Core Models ─────────────────────────────────────────
 
 model User {
-  id            String   @id @default(cuid())
-  name          String
-  email         String   @unique
-  password_hash String
-  role          Role     @default(SITE_SUPERVISOR)
-  phone         String?
-  is_active     Boolean  @default(true)
-  onboarded     Boolean  @default(false)
-  created_at    DateTime @default(now())
-  updated_at    DateTime @updatedAt
+  id                String   @id @default(cuid())
+  name              String
+  email             String   @unique
+  password_hash     String
+  role              Role     @default(SITE_SUPERVISOR)
+  phone             String?
+  is_active         Boolean  @default(true)
+  onboarded         Boolean  @default(false)
+  last_workspace_id String?
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
 
   projects          Project[]              @relation("BuilderProjects")
   managed_projects  Project[]              @relation("ManagerProjects")
@@ -251,6 +273,15 @@ model User {
   purchase_orders   PurchaseOrder[]
   attachments       Attachment[]
   approval_logs     ApprovalLog[]
+
+  // Enterprise membership relations
+  invitations_sent     Invitation[]        @relation("InvitationSender")
+  project_assignments  ProjectAssignment[] @relation("AssignedUser")
+  assignments_given    ProjectAssignment[] @relation("AssignmentGiver")
+  site_assignments     SiteAssignment[]    @relation("SiteAssignedUser")
+  site_assignments_given SiteAssignment[]  @relation("SiteAssignmentGiver")
+  resignations         Resignation[]       @relation("ResigningUser")
+  resignation_reviews  Resignation[]       @relation("ResignationReviewer")
 
   @@map("users")
   company_id    String?
@@ -336,6 +367,7 @@ model Project {
   purchase_orders PurchaseOrder[]
   cashbook_entries Cashbook[]
   expenses      Expense[]
+  project_assignments ProjectAssignment[]
 
   @@index([builder_id], name: "idx_projects_builder_id")
   @@index([manager_id], name: "idx_projects_manager_id")
@@ -377,6 +409,7 @@ model Site {
   purchase_orders  PurchaseOrder[]
   budgets          Budget[]
   cashbook_entries Cashbook[]
+  site_assignments SiteAssignment[]
 
   @@index([project_id], name: "idx_sites_project_id")
   @@index([supervisor_id], name: "idx_sites_supervisor_id")
@@ -1395,16 +1428,24 @@ model Company {
   approval_logs     ApprovalLog[]
   memberships       CompanyMembership[]
 
+  // Enterprise membership relations
+  invitations          Invitation[]
+  project_assignments  ProjectAssignment[]
+  site_assignments     SiteAssignment[]
+  resignations         Resignation[]
+
   @@map("companies")
 }
 
 model CompanyMembership {
-  id         String   @id @default(cuid())
-  user_id    String
-  company_id String
-  roles      Role[]
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
+  id             String           @id @default(cuid())
+  user_id        String
+  company_id     String
+  roles          Role[]
+  status         MembershipStatus @default(ACTIVE)
+  last_active_at DateTime?
+  created_at     DateTime         @default(now())
+  updated_at     DateTime         @updatedAt
 
   user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
   company    Company  @relation(fields: [company_id], references: [id], onDelete: Cascade)
@@ -1412,7 +1453,106 @@ model CompanyMembership {
   @@unique([user_id, company_id])
   @@index([user_id], name: "idx_membership_user")
   @@index([company_id], name: "idx_membership_company")
+  @@index([status], name: "idx_membership_status")
   @@map("company_memberships")
+}
+
+// ─── Enterprise: Invitations ──────────────────────────────
+
+model Invitation {
+  id          String           @id @default(cuid())
+  company_id  String
+  invited_by  String
+  email       String
+  role        Role
+  status      InvitationStatus @default(PENDING)
+  project_ids String[]         @default([])
+  site_ids    String[]         @default([])
+  expires_at  DateTime
+  accepted_at DateTime?
+  approved_at DateTime?
+  created_at  DateTime         @default(now())
+  updated_at  DateTime         @updatedAt
+
+  company Company @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  inviter User    @relation("InvitationSender", fields: [invited_by], references: [id])
+
+  @@unique([company_id, email])
+  @@index([email], name: "idx_invitation_email")
+  @@index([status], name: "idx_invitation_status")
+  @@index([company_id], name: "idx_invitation_company")
+  @@map("invitations")
+}
+
+// ─── Enterprise: Project & Site Assignments ───────────────
+
+model ProjectAssignment {
+  id          String   @id @default(cuid())
+  user_id     String
+  project_id  String
+  company_id  String
+  role        Role
+  assigned_by String
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  user     User    @relation("AssignedUser", fields: [user_id], references: [id], onDelete: Cascade)
+  project  Project @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  company  Company @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  assigner User    @relation("AssignmentGiver", fields: [assigned_by], references: [id])
+
+  @@unique([user_id, project_id, role])
+  @@index([project_id], name: "idx_proj_assign_project")
+  @@index([user_id], name: "idx_proj_assign_user")
+  @@index([company_id], name: "idx_proj_assign_company")
+  @@map("project_assignments")
+}
+
+model SiteAssignment {
+  id          String   @id @default(cuid())
+  user_id     String
+  site_id     String
+  company_id  String
+  role        Role
+  assigned_by String
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  user     User    @relation("SiteAssignedUser", fields: [user_id], references: [id], onDelete: Cascade)
+  site     Site    @relation(fields: [site_id], references: [id], onDelete: Cascade)
+  company  Company @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  assigner User    @relation("SiteAssignmentGiver", fields: [assigned_by], references: [id])
+
+  @@unique([user_id, site_id, role])
+  @@index([site_id], name: "idx_site_assign_site")
+  @@index([user_id], name: "idx_site_assign_user")
+  @@index([company_id], name: "idx_site_assign_company")
+  @@map("site_assignments")
+}
+
+// ─── Enterprise: Resignations ─────────────────────────────
+
+model Resignation {
+  id               String           @id @default(cuid())
+  user_id          String
+  company_id       String
+  reason           String
+  last_working_day DateTime?        @db.Date
+  feedback         String?
+  status           ResignationStatus @default(PENDING)
+  reviewed_by      String?
+  reviewed_at      DateTime?
+  created_at       DateTime         @default(now())
+  updated_at       DateTime         @updatedAt
+
+  user     User     @relation("ResigningUser", fields: [user_id], references: [id])
+  company  Company  @relation(fields: [company_id], references: [id])
+  reviewer User?    @relation("ResignationReviewer", fields: [reviewed_by], references: [id])
+
+  @@index([user_id], name: "idx_resignation_user")
+  @@index([company_id], name: "idx_resignation_company")
+  @@index([status], name: "idx_resignation_status")
+  @@map("resignations")
 }
 
 // ─── Attachments (Photo Evidence System) ───────────────

@@ -20,7 +20,14 @@ export async function POST(req: NextRequest) {
     maxAge: 7 * 24 * 60 * 60,
   });
 
-  const response = ok({ accessToken: result.accessToken, user: result.user }, "Signup successful");
+  const response = ok(
+    {
+      accessToken: result.accessToken,
+      user: result.user,
+      memberships: result.memberships,
+    },
+    "Signup successful"
+  );
   response.headers.set("Set-Cookie", refreshCookie);
   return response;
 }

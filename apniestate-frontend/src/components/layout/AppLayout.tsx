@@ -8,7 +8,7 @@ import Logo from '@/components/shared/Logo';
 import UniversalSearch from '@/components/shared/UniversalSearch';
 
 export default function AppLayout() {
-  const { isAuthenticated, isLoading, user } = useAuth();
+  const { isAuthenticated, isLoading, user, activeWorkspace } = useAuth();
   const isDesktop = useIsDesktop();
 
   if (isLoading) {
@@ -24,7 +24,7 @@ export default function AppLayout() {
     return <Navigate to="/login" replace />;
   }
 
-  if (user && !user.company_id) {
+  if (!activeWorkspace && user) {
     return <Navigate to="/select-workspace" replace />;
   }
 

@@ -105,7 +105,7 @@ export default function Sidebar() {
               >
                 {section.items.map(({ to, icon: Icon, label, badge }) => (
                   <NavLink
-                    key={to}
+                    key={`${to}-${label}`}
                     to={to}
                     end={to === '/dashboard'}
                     className={({ isActive }) =>

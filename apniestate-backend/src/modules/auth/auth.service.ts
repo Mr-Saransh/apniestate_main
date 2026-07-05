@@ -12,14 +12,13 @@ export async function loginUser(input: LoginInput) {
   const valid = await bcrypt.compare(input.password, user.password_hash);
   if (!valid) return null;
 
-  // Fetch all memberships for this user
+  // Fetch all ACTIVE memberships for this user
   const memberships = await prisma.companyMembership.findMany({
-    where: { user_id: user.id },
+    where: { user_id: user.id, status: "ACTIVE" },
     include: { company: true }
   });
 
-  // We issue a token. If the user doesn't have an active company_id in DB, we don't put one in the token.
-  // Actually, we'll put whatever is currently their active pointer.
+  // Issue token with whatever is currently the user's active pointer
   const accessToken = signAccessToken({ sub: user.id, email: user.email, role: user.role as Role, company_id: user.company_id });
   const refreshToken = signRefreshToken(user.id);
 
@@ -32,7 +31,31 @@ export async function loginUser(input: LoginInput) {
     },
   });
 
-  return { accessToken, refreshToken, user: { id: user.id, name: user.name, email: user.email, role: user.role as Role, company_id: user.company_id }, memberships };
+  return {
+    accessToken,
+    refreshToken,
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role as Role,
+      company_id: user.company_id,
+      onboarded: user.onboarded,
+      last_workspace_id: user.last_workspace_id,
+    },
+    memberships: memberships.map(m => ({
+      id: m.id,
+      user_id: m.user_id,
+      company_id: m.company_id,
+      roles: m.roles,
+      status: m.status,
+      last_active_at: m.last_active_at,
+      company: {
+        id: m.company.id,
+        name: m.company.name,
+      }
+    })),
+  };
 }
 
 export async function logoutUser(userId: string, tokenId?: string) {
@@ -55,13 +78,11 @@ export async function signupUser(input: import("./auth.schema").SignupInput) {
       email: input.email,
       password_hash: passwordHash,
       name,
+      onboarded: false,
     },
   });
 
-  // Check if they have memberships (they shouldn't since they just signed up)
-  const memberships = await prisma.companyMembership.findMany({ where: { user_id: user.id } });
-  
-  const accessToken = signAccessToken({ sub: user.id, email: user.email, role: user.role as Role, company_id: user.company_id });
+  const accessToken = signAccessToken({ sub: user.id, email: user.email, role: user.role as Role, company_id: null });
   const refreshToken = signRefreshToken(user.id);
 
   const tokenHash = await hashToken(refreshToken);
@@ -73,5 +94,18 @@ export async function signupUser(input: import("./auth.schema").SignupInput) {
     },
   });
 
-  return { accessToken, refreshToken, user: { id: user.id, name: user.name, email: user.email, role: user.role as Role, company_id: user.company_id }, memberships: [] };
+  return {
+    accessToken,
+    refreshToken,
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role as Role,
+      company_id: null,
+      onboarded: false,
+      last_workspace_id: null,
+    },
+    memberships: [],
+  };
 }

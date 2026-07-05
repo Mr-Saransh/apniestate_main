@@ -1,4 +1,4 @@
-export type Role = "ADMIN" | "BUILDER" | "SITE_SUPERVISOR" | "ACCOUNTANT" | "INVENTORY_MANAGER" | "PROJECT_MANAGER";
+export type Role = "ADMIN" | "BUILDER" | "SITE_SUPERVISOR" | "ACCOUNTANT" | "INVENTORY_MANAGER" | "PROJECT_MANAGER" | "WORKER" | "VENDOR";
 
 export interface JWTPayload {
   sub: string;      // user id

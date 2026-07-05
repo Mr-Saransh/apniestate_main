@@ -58,7 +58,19 @@ export const GET = withAuth(async (req: NextRequest, user) => {
       upcomingMilestones: [],
       materialShortages: [],
       labourTrend: [],
-      approvalsPending: { total: 0, expenses: 0, leaves: 0, materialRequests: 0, purchaseOrders: 0 }
+      approvalsPending: { total: 0, expenses: 0, leaves: 0, materialRequests: 0, purchaseOrders: 0 },
+      workflowAlerts: {
+        projectsWithoutPM: 0,
+        projectsWithoutSupervisor: 0,
+        pendingInvitations: 0,
+        pendingApprovals: 0,
+        pendingResignations: 0,
+        projectsWithoutBudget: 0,
+        sitesWithoutAttendanceToday: 0,
+        missingDprToday: 0,
+        unassignedProjects: 0,
+        inactiveMembers: 0
+      }
     });
   }
 
@@ -133,13 +145,13 @@ export const GET = withAuth(async (req: NextRequest, user) => {
   const decisionCards: any[] = [];
 
   // Low stock inventory alert
-  const lowStockItems = await prisma.inventoryItem.findMany({
+  const allInventoryItems = await prisma.inventoryItem.findMany({
     where: {
-      site: { company_id },
-      quantity: { lte: prisma.inventoryItem.fields.min_quantity }
+      site: { company_id }
     },
     include: { material: true, site: true }
   });
+  const lowStockItems = allInventoryItems.filter(item => item.quantity <= item.min_quantity);
 
   for (const item of lowStockItems) {
     alerts.push({
@@ -197,15 +209,60 @@ export const GET = withAuth(async (req: NextRequest, user) => {
   const projectIntelligence: any[] = [];
   let delayedProjects = 0;
 
-  for (const project of projects) {
-    const progress = await calculateProjectProgress(project.id);
-    const riskScore = await calculateProjectRiskScore(project.id);
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+  // Pre-fetch all related models in bulk queries
+  const allMilestonesForCompany = await prisma.milestone.findMany({
+    where: { project: { company_id } }
+  });
+
+  const allTasksForCompany = await prisma.task.findMany({
+    where: { company_id }
+  });
+
+  const allAttendancesForCompany = await prisma.workerAttendance.findMany({
+    where: { site: { company_id }, date: { gte: sevenDaysAgo } }
+  });
+
+  const allWorkersForCompany = await prisma.worker.findMany({
+    where: { company_id, is_active: true }
+  });
+
+  const allDprsForCompany = await prisma.dailyReport.findMany({
+    where: { company_id, created_at: { gte: sevenDaysAgo } }
+  });
+
+  // Re-map projects to include project reference for site health calculations
+  const projectsWithRefs = projects.map(p => ({
+    ...p,
+    sites: p.sites.map(s => ({
+      ...s,
+      project: p
+    }))
+  }));
+
+  const preFetchedSiteHealthSites = projectsWithRefs.flatMap(p => p.sites);
+
+  for (const project of projectsWithRefs) {
+    const progress = await calculateProjectProgress(project.id, allMilestonesForCompany, allTasksForCompany);
+    const riskScore = await calculateProjectRiskScore(project.id, {
+      project,
+      tasks: allTasksForCompany,
+      milestones: allMilestonesForCompany
+    });
     
     // Average health score of project sites
     let healthSum = 0;
     const projectSites = project.sites;
     for (const site of projectSites) {
-      healthSum += await calculateSiteHealthScore(site.id);
+      healthSum += await calculateSiteHealthScore(site.id, {
+        attendances: allAttendancesForCompany,
+        workers: allWorkersForCompany,
+        tasks: allTasksForCompany,
+        dprs: allDprsForCompany,
+        sites: preFetchedSiteHealthSites
+      });
     }
     const healthScore = projectSites.length > 0 ? Math.round(healthSum / projectSites.length) : 100;
 
@@ -508,6 +565,72 @@ export const GET = withAuth(async (req: NextRequest, user) => {
     where: { site: { company_id }, status: "UNDER_MAINTENANCE" }
   });
 
+  // 11. WORKFLOW ALERTS (Phase 5 Sprint 2 - Milestone 12)
+  const pendingInvitationsCount = await prisma.invitation.count({ where: { company_id, status: "PENDING" } });
+  const pendingApprovalsCount = await prisma.invitation.count({ where: { company_id, status: "ACCEPTED" } });
+  const pendingResignationsCount = await prisma.resignation.count({ where: { company_id, status: "PENDING" } });
+  const inactiveMembersCount = await prisma.companyMembership.count({ where: { company_id, status: "INACTIVE" } });
+  
+  let projectsWithoutPM = 0;
+  let unassignedProjects = 0;
+  let projectsWithoutBudgetCount = 0;
+  
+  for (const p of projects) {
+    if (!p.manager_id) projectsWithoutPM++;
+    
+    const projAssignments = await prisma.projectAssignment.count({ where: { project_id: p.id } });
+    if (projAssignments === 0) unassignedProjects++;
+    
+    const projBudgets = budgets.filter(b => b.project_id === p.id);
+    if (projBudgets.length === 0) projectsWithoutBudgetCount++;
+  }
+
+  let projectsWithoutSupervisor = 0;
+  let sitesWithoutAttendanceToday = 0;
+  let missingDprToday = 0;
+  
+  for (const s of sites) {
+    if (!s.supervisor_id) projectsWithoutSupervisor++;
+    
+    // Check attendance for today
+    const hasAttendance = todayAttendances.some(a => a.site_id === s.id);
+    if (!hasAttendance && s.status === "IN_PROGRESS") sitesWithoutAttendanceToday++;
+    
+    // Check DPR for today
+    const dprCount = await prisma.dailyReport.count({
+      where: {
+        site_id: s.id,
+        created_at: { gte: today }
+      }
+    });
+    if (dprCount === 0 && s.status === "IN_PROGRESS") missingDprToday++;
+  }
+
+  // Add Decision Cards for urgent workflow blocks
+  if (pendingApprovalsCount > 0) {
+    decisionCards.push({
+      id: "dec-workflow-approvals",
+      title: `${pendingApprovalsCount} invitations await approval`,
+      reason: "Members have accepted their invitations and are waiting for your final approval to join the workspace.",
+      suggestedAction: "Review and approve pending members.",
+      ctaText: "Review Approvals",
+      ctaLink: "/users/invitations",
+      severity: "warning"
+    });
+  }
+  
+  if (pendingResignationsCount > 0) {
+    decisionCards.push({
+      id: "dec-workflow-resignations",
+      title: `${pendingResignationsCount} resignation requests`,
+      reason: "Employees have submitted resignation requests that require your review to cleanly revoke access.",
+      suggestedAction: "Review and approve/reject resignations.",
+      ctaText: "Review Resignations",
+      ctaLink: "/users/resignations",
+      severity: "error"
+    });
+  }
+
   return ok({
     overview: {
       totalProjects,
@@ -540,6 +663,18 @@ export const GET = withAuth(async (req: NextRequest, user) => {
       leaves: pendingLeaves,
       materialRequests: pendingMRsCount,
       purchaseOrders: pendingPOsCount
+    },
+    workflowAlerts: {
+      projectsWithoutPM,
+      projectsWithoutSupervisor,
+      pendingInvitations: pendingInvitationsCount,
+      pendingApprovals: pendingApprovalsCount,
+      pendingResignations: pendingResignationsCount,
+      projectsWithoutBudget: projectsWithoutBudgetCount,
+      sitesWithoutAttendanceToday,
+      missingDprToday,
+      unassignedProjects,
+      inactiveMembers: inactiveMembersCount
     }
   });
 });

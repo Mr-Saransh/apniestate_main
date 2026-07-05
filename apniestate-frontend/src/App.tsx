@@ -7,6 +7,10 @@ import LoginPage from '@/pages/LoginPage';
 import LandingPage from '@/pages/LandingPage';
 import SignupPage from '@/pages/SignupPage';
 import WorkspaceSelectPage from '@/pages/WorkspaceSelectPage';
+import OnboardingPage from '@/pages/OnboardingPage';
+import MyInvitationsPage from '@/pages/MyInvitationsPage';
+import CompanyInvitationsPage from '@/pages/CompanyInvitationsPage';
+import CompanyResignationsPage from '@/pages/CompanyResignationsPage';
 import DashboardPage from '@/pages/DashboardPage';
 import ProjectsPage from '@/pages/ProjectsPage';
 import ProjectDetailPage from '@/pages/ProjectDetailPage';
@@ -56,6 +60,8 @@ export default function App() {
               <Route path="/login" element={<LoginPage />} />
               <Route path="/signup" element={<SignupPage />} />
               <Route path="/select-workspace" element={<WorkspaceSelectPage />} />
+              <Route path="/onboarding" element={<OnboardingPage />} />
+              <Route path="/my-invitations" element={<MyInvitationsPage />} />
 
               {/* Protected — wrapped by AppLayout which handles auth check */}
               <Route element={<AppLayout />}>
@@ -82,6 +88,8 @@ export default function App() {
                 </Route>
                 <Route element={<RouteGuard permission="users.read" />}>
                   <Route path="/users" element={<UsersPage />} />
+                  <Route path="/users/invitations" element={<CompanyInvitationsPage />} />
+                  <Route path="/users/resignations" element={<CompanyResignationsPage />} />
                 </Route>
                 <Route element={<RouteGuard permission="sites.read" />}>
                   <Route path="/sites" element={<SitesPage />} />

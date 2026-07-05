@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { Navigate, Link } from 'react-router-dom';
+import { Navigate, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { ApiError } from '@/api/client';
 import { AlertCircle, Eye, EyeOff, ShieldCheck, MapPin, TrendingUp, Users } from 'lucide-react';
@@ -8,6 +8,7 @@ import '@/styles/login.css';
 
 export default function SignupPage() {
   const { signup, isAuthenticated, isLoading } = useAuth();
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -22,10 +23,7 @@ export default function SignupPage() {
     );
   }
 
-  // Once authenticated (successful signup), redirect to onboarding
-  if (isAuthenticated) {
-    return <Navigate to="/select-workspace" replace />;
-  }
+  // We remove the generic isAuthenticated redirect to handle the onboarding explicitly in handleSubmit
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -34,6 +32,8 @@ export default function SignupPage() {
 
     try {
       await signup({ email, password });
+      // New signups never have active workspaces yet. Must go to onboarding.
+      navigate('/onboarding', { replace: true });
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message);

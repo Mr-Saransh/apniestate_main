@@ -4,21 +4,22 @@ import { prisma } from "@/lib/prisma";
 import { ok } from "@/lib/response";
 
 // GET /api/inventory/alerts — items below minimum stock level
-export const GET = withAuth(async () => {
-  const lowStockItems = await prisma.inventoryItem.findMany({
-    where: {
-      quantity: { lte: prisma.inventoryItem.fields.min_quantity as any },
-    },
-    include: {
-      material: { select: { name: true, unit: true } },
-      site: { select: { name: true } },
-    },
-    orderBy: { quantity: "asc" },
+export const GET = withAuth(async (req: NextRequest, user) => {
+  const dbUser = await prisma.user.findUnique({
+    where: { id: user.sub }
   });
 
-  // Workaround: Prisma doesn't support comparing columns directly in where
-  // So we fetch all and filter in memory
+  const company_id = dbUser?.company_id || undefined;
+
+  if (!company_id) {
+    return ok([]);
+  }
+
+  // Fetch all and filter in memory to workaround Prisma not supporting column comparisons in where
   const allItems = await prisma.inventoryItem.findMany({
+    where: {
+      site: { company_id }
+    },
     include: {
       material: { select: { name: true, unit: true } },
       site: { select: { name: true } },

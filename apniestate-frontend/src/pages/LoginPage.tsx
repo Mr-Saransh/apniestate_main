@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { Navigate, Link } from 'react-router-dom';
+import { Navigate, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { ApiError } from '@/api/client';
 import { AlertCircle, Eye, EyeOff, ShieldCheck, MapPin, TrendingUp, Users } from 'lucide-react';
@@ -7,7 +7,8 @@ import Logo from '@/components/shared/Logo';
 import '@/styles/login.css';
 
 export default function LoginPage() {
-  const { login, isAuthenticated, isLoading } = useAuth();
+  const { login, restoreWorkspace, isAuthenticated, isLoading } = useAuth();
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -23,9 +24,8 @@ export default function LoginPage() {
     );
   }
 
-  if (isAuthenticated) {
-    return <Navigate to="/select-workspace" replace />;
-  }
+  // Note: we removed the generic `if (isAuthenticated)` check here because we want
+  // to handle the post-login routing explicitly within `handleSubmit` now.
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -33,7 +33,24 @@ export default function LoginPage() {
     setSubmitting(true);
 
     try {
-      await login({ email, password });
+      const response = await login({ email, password });
+      
+      if (!response.memberships || response.memberships.length === 0) {
+        // No memberships -> Must create a company
+        navigate('/onboarding', { replace: true });
+        return;
+      }
+
+      // Try to intelligently restore the last workspace
+      const restored = await restoreWorkspace();
+      
+      if (restored) {
+        navigate('/dashboard', { replace: true });
+      } else {
+        // Needs manual selection or has multiple roles
+        navigate('/select-workspace', { replace: true });
+      }
+      
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message);
@@ -55,7 +72,6 @@ export default function LoginPage() {
               {/* Image area */}
               <div className="login-image-container">
                 <div className="login-image-overlay"></div>
-                {/* You can put an actual img here, using a placeholder gradient for now */}
                 <div className="login-placeholder-img"></div>
               </div>
               <div className="login-brand" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>

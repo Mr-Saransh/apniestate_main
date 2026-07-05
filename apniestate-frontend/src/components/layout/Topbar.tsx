@@ -2,6 +2,8 @@ import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { Search, Bell, LogOut, User, ChevronDown } from 'lucide-react';
 
+import WorkspaceSwitcher from '@/components/shared/WorkspaceSwitcher';
+
 export default function Topbar() {
   const { user, logout } = useAuth();
   const [showDropdown, setShowDropdown] = useState(false);
@@ -40,6 +42,8 @@ export default function Topbar() {
       </div>
 
       <div className="topbar-right">
+        <WorkspaceSwitcher />
+        
         <button className="topbar-icon-btn" aria-label="Notifications" id="notification-btn">
           <Bell size={20} />
           <span className="notification-dot" />
