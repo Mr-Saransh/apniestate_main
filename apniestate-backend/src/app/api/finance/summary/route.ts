@@ -4,12 +4,33 @@ import { prisma } from "@/lib/prisma";
 import { ok } from "@/lib/response";
 
 // GET /api/finance/summary — Overall finance summary with computed formulas
-export const GET = withAuth(async () => {
+export const GET = withAuth(async (req, user) => {
+  const company_id = user.company_id || undefined;
+  if (!company_id) {
+    return ok({
+      total_expenses: 0,
+      total_payments: 0,
+      pending_payments: 0,
+      total_invoiced: 0,
+      receivable: 0,
+      payable: 0,
+      total_budget: 0,
+      total_spent: 0,
+      budget_variance: 0,
+      revenue: 0,
+      profit: 0,
+      cash_flow: 0,
+      expense_count: 0,
+      invoice_count: 0,
+      payment_count: 0,
+    });
+  }
+
   const [expenses, payments, invoices, budgets] = await Promise.all([
-    prisma.expense.findMany(),
-    prisma.payment.findMany(),
-    prisma.invoice.findMany(),
-    prisma.budget.findMany(),
+    prisma.expense.findMany({ where: { company_id } }),
+    prisma.payment.findMany({ where: { company_id } }),
+    prisma.invoice.findMany({ where: { company_id } }),
+    prisma.budget.findMany({ where: { project: { company_id } } }),
   ]);
 
   const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);

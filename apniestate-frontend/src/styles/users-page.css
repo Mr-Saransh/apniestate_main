@@ -1,0 +1,102 @@
+.users-page {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table-responsive .table {
+  min-width: 600px; /* Ensures it scrolls instead of squishing on mobile */
+}
+
+/* Card-based layout for mobile users table */
+@media (max-width: 768px) {
+  .users-desktop-table {
+    display: none;
+  }
+  
+  .users-mobile-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  
+  .user-mobile-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .user-mobile-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  
+  .user-mobile-info {
+    flex: 1;
+  }
+  
+  .user-mobile-name {
+    font-weight: 600;
+    color: var(--color-text);
+    font-size: 16px;
+    margin-bottom: 2px;
+  }
+  
+  .user-mobile-email {
+    font-size: 13px;
+    color: var(--color-text-secondary);
+  }
+  
+  .user-mobile-details {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 14px;
+    color: var(--color-text-muted);
+  }
+  
+  .user-mobile-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+}
+
+@media (min-width: 769px) {
+  .users-mobile-list {
+    display: none;
+  }
+}
+
+.invitation-badge {
+  display: inline-flex;
+  padding: 4px 8px;
+  background: var(--color-bg);
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.invitation-pending {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.invitation-accepted {
+  background: #dcfce7;
+  color: #16a34a;
+}

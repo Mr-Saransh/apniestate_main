@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { usersApi } from '@/api/users';
+import { companiesApi } from '@/api/companies';
 import Modal from '@/components/shared/Modal';
 import {
   User,
@@ -15,7 +16,7 @@ import {
 } from 'lucide-react';
 
 export default function SettingsPage() {
-  const { user, updateUser, logout } = useAuth();
+  const { user, updateUser, logout, activeWorkspace } = useAuth();
 
   // Modal control
   const [showEditModal, setShowEditModal] = useState(false);
@@ -32,11 +33,18 @@ export default function SettingsPage() {
   const [formEmail, setFormEmail] = useState(user?.email || '');
   const [formPhone, setFormPhone] = useState(user?.phone || '');
 
-  // Mock states for other settings
-  const [companyName, setCompanyName] = useState('Apni Estate Builders Ltd.');
-  const [gstin, setGstin] = useState('07AAAAA0000A1Z0');
+  // Company states
+  const [companyName, setCompanyName] = useState(activeWorkspace?.company?.name || 'Company Name');
+  const [gstin, setGstin] = useState('Not provided');
+  
+  // Settings dummy states
   const [emailAlerts, setEmailAlerts] = useState(true);
   const [pushAlerts, setPushAlerts] = useState(true);
+
+  // Delete Workspace States
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const formatRole = (role: string) => {
     if (role === 'BUILDER' || role === 'ADMIN') return 'Builder (Owner)';
@@ -72,9 +80,21 @@ export default function SettingsPage() {
         setTimeout(() => setShowEditModal(false), 800);
       }
     } catch (err: any) {
-      setFormError(err.message || 'Failed to update profile details');
+      setFormError(err.message || 'Failed to update profile');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleDeleteCompany = async () => {
+    if (!activeWorkspace?.company?.id) return;
+    setIsDeleting(true);
+    try {
+      await companiesApi.deleteCompany(activeWorkspace.company.id);
+      window.location.href = '/companies'; // Force reload to company selection
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete workspace');
+      setIsDeleting(false);
     }
   };
 
@@ -240,12 +260,63 @@ export default function SettingsPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
           <div className="form-group">
             <label className="form-label" htmlFor="s-company">Registered Company Name</label>
-            <input id="s-company" type="text" className="form-input" value={companyName} onChange={(e) => setCompanyName(e.target.value)} />
+            <input id="s-company" type="text" className="form-input" value={companyName} readOnly />
           </div>
           <div className="form-group">
             <label className="form-label" htmlFor="s-gstin">GSTIN registration number</label>
-            <input id="s-gstin" type="text" className="form-input" value={gstin} onChange={(e) => setGstin(e.target.value)} />
+            <input id="s-gstin" type="text" className="form-input" value={gstin} readOnly placeholder="Not available" />
           </div>
+          
+          {user?.role === 'BUILDER' && (
+            <div style={{ marginTop: '24px', paddingTop: '24px', borderTop: '1px solid var(--color-border)' }}>
+              <h4 style={{ color: 'var(--color-danger)', marginBottom: '8px', fontWeight: 600 }}>Danger Zone</h4>
+              <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', marginBottom: '16px' }}>
+                Permanently delete this workspace. This will remove all associated projects, tasks, and members. This action cannot be undone.
+              </p>
+              
+              {isConfirmingDelete ? (
+                <div style={{ background: 'var(--color-danger-light)', padding: '16px', borderRadius: '8px', border: '1px solid var(--color-danger)' }}>
+                  <p style={{ fontSize: '13px', color: 'var(--color-danger)', marginBottom: '12px', fontWeight: 500 }}>
+                    Type <strong>{companyName}</strong> to confirm deletion:
+                  </p>
+                  <input 
+                    type="text" 
+                    className="form-input" 
+                    style={{ borderColor: 'var(--color-danger)', marginBottom: '12px' }}
+                    value={deleteConfirmationText}
+                    onChange={(e) => setDeleteConfirmationText(e.target.value)}
+                    placeholder={companyName}
+                  />
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button 
+                      className="btn" 
+                      style={{ background: 'white', color: 'var(--color-text)' }}
+                      onClick={() => setIsConfirmingDelete(false)}
+                      disabled={isDeleting}
+                    >
+                      Cancel
+                    </button>
+                    <button 
+                      className="btn btn-primary" 
+                      style={{ background: 'var(--color-danger)', borderColor: 'var(--color-danger)' }}
+                      disabled={deleteConfirmationText !== companyName || isDeleting}
+                      onClick={handleDeleteCompany}
+                    >
+                      {isDeleting ? 'Deleting...' : 'Permanently Delete'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button 
+                  className="btn" 
+                  style={{ color: 'var(--color-danger)', border: '1px solid var(--color-danger)', background: 'transparent' }}
+                  onClick={() => setIsConfirmingDelete(true)}
+                >
+                  Delete Workspace
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </Modal>
 

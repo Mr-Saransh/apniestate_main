@@ -6,7 +6,8 @@ import { reviewResignation } from "@/modules/resignations/resignations.service";
 export const PATCH = withAuth(async (req, user, context) => {
   if (!user.company_id || user.role !== "BUILDER") return badRequest("Unauthorized");
 
-  const { id } = context.params;
+  const params = await context.params;
+  const { id } = params;
   const body = await req.json();
   const { status } = body;
 

@@ -4,7 +4,8 @@ import { ok, badRequest } from "@/lib/response";
 import { acceptInvitation, rejectInvitation, approveInvitation, cancelInvitation, resendInvitation } from "@/modules/invitations/invitations.service";
 
 export const PATCH = withAuth(async (req, user, context) => {
-  const { id } = context.params;
+  const params = await context.params;
+  const { id } = params;
   const body = await req.json();
   const { action } = body;
 

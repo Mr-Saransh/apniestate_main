@@ -39,7 +39,7 @@ interface TopBarProps {
 }
 
 export function TopBar({ title: customTitle, icon: customIcon, leftAction }: TopBarProps) {
-  const { user, logout, switchWorkspace } = useAuth();
+  const { user, memberships, logout, switchWorkspace } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [showDropdown, setShowDropdown] = useState(false);
@@ -303,20 +303,20 @@ export function TopBar({ title: customTitle, icon: customIcon, leftAction }: Top
               }}
             >
               <div style={{ padding: '8px 16px', fontSize: '11px', fontWeight: 700, color: Colors.mutedText, textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid #E2E8F0', backgroundColor: '#F8FAFC' }}>
-                Switch Role
+                Switch Workspace
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                {roles.map((r) => {
-                  const Icon = r.icon;
-                  const isCurrent = user?.role === r.id;
+              <div style={{ display: 'flex', flexDirection: 'column', maxHeight: '200px', overflowY: 'auto' }}>
+                {memberships.map((m) => {
+                  const isCurrent = user?.company_id === m.company_id;
                   return (
                     <button
-                      key={r.id}
+                      key={m.company_id}
                       type="button"
                       onClick={async (e) => {
                         e.stopPropagation();
-                        if (user?.company_id) {
-                          await switchWorkspace(user.company_id, r.id);
+                        if (!isCurrent) {
+                          await switchWorkspace(m.company_id, m.roles[0]);
+                          navigate('/dashboard'); // Optionally navigate back to dashboard when switching workspace
                         }
                         setShowDropdown(false);
                       }}
@@ -336,8 +336,11 @@ export function TopBar({ title: customTitle, icon: customIcon, leftAction }: Top
                       }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Icon size={14} color={isCurrent ? Colors.primaryBlue : Colors.secondaryText} />
-                        <span>{r.label.split(' / ')[0]}</span>
+                        <Building2 size={14} color={isCurrent ? Colors.primaryBlue : Colors.secondaryText} />
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                          <span>{m.company.name}</span>
+                          <span style={{ fontSize: '10px', color: Colors.mutedText }}>Role: {m.roles[0].replace('_', ' ')}</span>
+                        </div>
                       </div>
                       {isCurrent && <Check size={14} color={Colors.primaryBlue} />}
                     </button>

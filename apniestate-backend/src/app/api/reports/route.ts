@@ -4,7 +4,12 @@ import { prisma } from "@/lib/prisma";
 import { ok } from "@/lib/response";
 
 // GET /api/reports?type=attendance|inventory|finance|projects|workforce|vendors
-export const GET = withAuth(async (req) => {
+export const GET = withAuth(async (req, user) => {
+  const company_id = user.company_id || undefined;
+  if (!company_id) {
+    return ok({ type: "projects", total: 0, active: 0, completed: 0, projects: [] });
+  }
+
   const url = new URL(req.url);
   const type = url.searchParams.get("type") || "projects";
   const fromDate = url.searchParams.get("from") ? new Date(url.searchParams.get("from")!) : undefined;
@@ -14,35 +19,35 @@ export const GET = withAuth(async (req) => {
 
   switch (type) {
     case "attendance":
-      report = await generateAttendanceReport(fromDate, toDate);
+      report = await generateAttendanceReport(company_id, fromDate, toDate);
       break;
     case "inventory":
-      report = await generateInventoryReport();
+      report = await generateInventoryReport(company_id);
       break;
     case "finance":
-      report = await generateFinanceReport(fromDate, toDate);
+      report = await generateFinanceReport(company_id, fromDate, toDate);
       break;
     case "projects":
-      report = await generateProjectsReport();
+      report = await generateProjectsReport(company_id);
       break;
     case "workforce":
-      report = await generateWorkforceReport();
+      report = await generateWorkforceReport(company_id);
       break;
     case "vendors":
-      report = await generateVendorReport();
+      report = await generateVendorReport(company_id);
       break;
     default:
-      report = await generateProjectsReport();
+      report = await generateProjectsReport(company_id);
   }
 
   return ok(report);
 });
 
-async function generateAttendanceReport(from?: Date, to?: Date) {
+async function generateAttendanceReport(company_id: string, from?: Date, to?: Date) {
   const dateFilter: any = {};
   if (from) dateFilter.gte = from;
   if (to) dateFilter.lte = to;
-  const where: any = {};
+  const where: any = { site: { company_id } };
   if (Object.keys(dateFilter).length) where.date = dateFilter;
 
   const attendances = await prisma.workerAttendance.findMany({
@@ -70,8 +75,9 @@ async function generateAttendanceReport(from?: Date, to?: Date) {
   };
 }
 
-async function generateInventoryReport() {
+async function generateInventoryReport(company_id: string) {
   const items = await prisma.inventoryItem.findMany({
+    where: { company_id },
     include: {
       material: { select: { name: true, unit: true } },
       site: { select: { name: true } },
@@ -87,7 +93,10 @@ async function generateInventoryReport() {
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
   
   const transactions = await prisma.inventoryTransaction.findMany({
-    where: { created_at: { gte: thirtyDaysAgo } },
+    where: {
+      item: { company_id },
+      created_at: { gte: thirtyDaysAgo }
+    },
   });
 
   const totalIn = transactions.filter(t => t.type === "IN").reduce((s, t) => s + t.quantity, 0);
@@ -109,19 +118,23 @@ async function generateInventoryReport() {
   };
 }
 
-async function generateFinanceReport(from?: Date, to?: Date) {
+async function generateFinanceReport(company_id: string, from?: Date, to?: Date) {
   const dateFilter: any = {};
   if (from) dateFilter.gte = from;
   if (to) dateFilter.lte = to;
 
-  const expenseWhere: any = {};
+  const expenseWhere: any = { company_id };
   if (Object.keys(dateFilter).length) expenseWhere.date = dateFilter;
 
+  const paymentWhere: any = { company_id };
+  if (Object.keys(dateFilter).length) paymentWhere.date = dateFilter;
+
+  const invoiceWhere: any = { company_id };
+  if (Object.keys(dateFilter).length) invoiceWhere.due_date = dateFilter;
+
   const expenses = await prisma.expense.findMany({ where: expenseWhere });
-  const payments = await prisma.payment.findMany({
-    where: Object.keys(dateFilter).length ? { date: dateFilter } : {},
-  });
-  const invoices = await prisma.invoice.findMany();
+  const payments = await prisma.payment.findMany({ where: paymentWhere });
+  const invoices = await prisma.invoice.findMany({ where: invoiceWhere });
 
   const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
   const totalPayments = payments.reduce((s, p) => s + p.amount, 0);
@@ -149,8 +162,9 @@ async function generateFinanceReport(from?: Date, to?: Date) {
   };
 }
 
-async function generateProjectsReport() {
+async function generateProjectsReport(company_id: string) {
   const projects = await prisma.project.findMany({
+    where: { company_id },
     include: {
       _count: { select: { sites: true, tasks: true, milestones: true } },
       tasks: { select: { status: true } },
@@ -200,8 +214,9 @@ async function generateProjectsReport() {
   };
 }
 
-async function generateWorkforceReport() {
+async function generateWorkforceReport(company_id: string) {
   const workers = await prisma.worker.findMany({
+    where: { company_id },
     select: { id: true, name: true, trade: true, status: true, daily_rate: true, site_id: true },
   });
 
@@ -232,8 +247,9 @@ async function generateWorkforceReport() {
   };
 }
 
-async function generateVendorReport() {
+async function generateVendorReport(company_id: string) {
   const vendors = await prisma.vendor.findMany({
+    where: { company_id },
     include: {
       _count: { select: { invoices: true, payments: true } },
       ratings: { select: { score: true } },

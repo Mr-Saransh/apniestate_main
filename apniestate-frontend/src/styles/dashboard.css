@@ -12,19 +12,19 @@
 */
 
 :root {
-  --cc-primary: #0A3D91;
-  --cc-accent: #F4B400;
-  --cc-success: #16A34A;
-  --cc-warning: #F59E0B;
-  --cc-error: #DC2626;
-  --cc-bg: #F8FAFC;
-  --cc-white: #FFFFFF;
-  --cc-text: #111827;
-  --cc-text-muted: #4B5563;
-  --cc-border: #E5E7EB;
+  --cc-primary: var(--color-primary, #1D4ED8);
+  --cc-accent: var(--color-cta, #F5A623);
+  --cc-success: var(--color-success, #10B981);
+  --cc-warning: var(--color-warning, #F5A623);
+  --cc-error: var(--color-danger, #EF4444);
+  --cc-bg: var(--color-bg, #F8FAFC);
+  --cc-white: var(--color-surface, #FFFFFF);
+  --cc-text: var(--color-text, #0F172A);
+  --cc-text-muted: var(--color-text-muted, #94A3B8);
+  --cc-border: var(--color-border, #E2E8F0);
   
-  --cc-radius: 16px;
-  --cc-shadow: 0 4px 12px rgba(0, 0, 0, 0.03), 0 1px 2px rgba(0, 0, 0, 0.06);
+  --cc-radius: var(--radius-xl, 16px);
+  --cc-shadow: var(--shadow-sm);
   --cc-gap-mobile: 24px;
   --cc-gap-desktop: 24px;
 }
@@ -50,11 +50,15 @@ body {
 .cc-card {
   background: var(--cc-white);
   border-radius: var(--cc-radius);
-  box-shadow: var(--cc-shadow);
-  padding: 16px;
-  border: 1px solid rgba(229, 231, 235, 0.5);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
   box-sizing: border-box;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.cc-card:hover {
+  box-shadow: var(--shadow-md);
 }
 
 /* Onboard Card for Empty States */
@@ -75,10 +79,11 @@ body {
   gap: 8px;
 }
 .cc-onboard-title {
-  font-size: 20px;
-  font-weight: 700;
+  font-size: 22px;
+  font-weight: 800;
   margin: 0;
   color: var(--cc-primary);
+  letter-spacing: -0.02em;
 }
 .cc-onboard-desc {
   font-size: 14px;
@@ -125,18 +130,20 @@ body {
 
 /* 2. SITE OVERVIEW HERO CARD */
 .cc-hero-v3 {
-  background: var(--cc-primary);
+  background: linear-gradient(135deg, var(--color-primary-dark), var(--color-primary));
   color: var(--cc-white);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  gap: 16px;
-  padding: 16px;
-  max-height: 220px;
+  gap: var(--space-4);
+  padding: var(--space-6);
+  max-height: 240px;
   overflow: hidden;
   box-sizing: border-box;
   position: relative;
   border: none;
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-lg);
 }
 .cc-hero-top {
   display: flex;
@@ -163,11 +170,12 @@ body {
   flex-direction: column;
 }
 .cc-hero-title {
-  font-size: 18px;
-  font-weight: 700;
+  font-size: 20px;
+  font-weight: 800;
   margin: 0;
   color: var(--cc-white);
   line-height: 1.2;
+  letter-spacing: -0.02em;
 }
 .cc-hero-meta {
   font-size: 12px;

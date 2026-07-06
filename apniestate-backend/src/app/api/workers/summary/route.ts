@@ -4,14 +4,25 @@ import { prisma } from "@/lib/prisma";
 import { ok } from "@/lib/response";
 
 export const GET = withAuth(async (_req, user) => {
+  const company_id = user.company_id || undefined;
+  if (!company_id) {
+    return ok({
+      totalWorkers: 0,
+      activeWorkers: 0,
+      tradeBreakdown: {}
+    });
+  }
+
   let site = null;
   if (user.role === "SITE_SUPERVISOR") {
     site = await prisma.site.findFirst({
-      where: { supervisor_id: user.sub }
+      where: { supervisor_id: user.sub, company_id }
     });
   }
   if (!site) {
-    site = await prisma.site.findFirst();
+    site = await prisma.site.findFirst({
+      where: { company_id }
+    });
   }
 
   if (!site) {

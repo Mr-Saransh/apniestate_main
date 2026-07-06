@@ -25,6 +25,11 @@
   overflow: hidden;
 }
 
+.btn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
 .btn:active {
   transform: scale(0.97);
 }
@@ -42,7 +47,7 @@
 
 .btn-primary:hover:not(:disabled) {
   background: var(--color-primary-hover);
-  box-shadow: 0 4px 12px rgba(27, 110, 243, 0.25);
+  box-shadow: 0 4px 14px rgba(29, 78, 216, 0.3);
 }
 
 .btn-cta {
@@ -137,7 +142,7 @@
 
 .card-interactive:hover {
   box-shadow: var(--shadow-card-hover);
-  transform: translateY(-1px);
+  transform: translateY(-2px);
 }
 
 .card-interactive:active {

@@ -222,7 +222,8 @@ export const GET = withAuth(async (req: NextRequest, user) => {
   });
 
   const allAttendancesForCompany = await prisma.workerAttendance.findMany({
-    where: { site: { company_id }, date: { gte: sevenDaysAgo } }
+    where: { site: { company_id }, date: { gte: sevenDaysAgo } },
+    include: { worker: true }
   });
 
   const allWorkersForCompany = await prisma.worker.findMany({
@@ -231,6 +232,10 @@ export const GET = withAuth(async (req: NextRequest, user) => {
 
   const allDprsForCompany = await prisma.dailyReport.findMany({
     where: { company_id, created_at: { gte: sevenDaysAgo } }
+  });
+
+  const allProjectAssignments = await prisma.projectAssignment.findMany({
+    where: { project: { company_id } }
   });
 
   // Re-map projects to include project reference for site health calculations
@@ -362,18 +367,6 @@ export const GET = withAuth(async (req: NextRequest, user) => {
     todayExpenses,
     expectedPayments: pendingInvoicesTotal._sum.total || 0
   };
-
-  if (pendingMilestones.filter(m => m.status === 'PENDING').length > 5) {
-     decisionCards.push({
-        id: `dec-finance-pending`,
-        title: `₹4.2L in pending vendor approvals`,
-        reason: `Multiple purchase orders and expense vouchers are waiting for approval.`,
-        suggestedAction: "Clear pending approvals to avoid supply chain blocks.",
-        ctaText: "Review Approvals",
-        ctaLink: `/approvals`,
-        severity: "warning"
-      });
-  }
 
   // 8. Workforce Metrics Today
   const totalWorkers = await prisma.worker.count({
@@ -520,12 +513,12 @@ export const GET = withAuth(async (req: NextRequest, user) => {
     const next = new Date(date);
     next.setDate(next.getDate() + 1);
 
-    const attendances = await prisma.workerAttendance.findMany({
-      where: {
-        site: { company_id },
-        date: date
-      },
-      include: { worker: true }
+    // Filter in-memory
+    const attendances = allAttendancesForCompany.filter(a => {
+      const aDate = new Date(a.date);
+      return aDate.getFullYear() === date.getFullYear() &&
+             aDate.getMonth() === date.getMonth() &&
+             aDate.getDate() === date.getDate();
     });
 
     const present = attendances.filter(a => a.status === "PRESENT").length;
@@ -559,6 +552,20 @@ export const GET = withAuth(async (req: NextRequest, user) => {
   const pendingMRsCount = await prisma.materialRequest.count({ where: { site: { company_id }, status: "PENDING" } });
   const pendingPOsCount = await prisma.purchaseOrder.count({ where: { project: { company_id }, status: "PENDING" } });
 
+  // Add Dynamic Decision Card for pending vendor approvals instead of hardcoded numbers
+  const pendingApprovalsTotal = pendingExpenses + pendingMRsCount + pendingPOsCount;
+  if (pendingApprovalsTotal > 0) {
+    decisionCards.push({
+      id: "dec-finance-pending",
+      title: `${pendingApprovalsTotal} pending vendor approvals`,
+      reason: `You have ${pendingExpenses} expenses, ${pendingMRsCount} material requests, and ${pendingPOsCount} purchase orders waiting for approval.`,
+      suggestedAction: "Clear pending approvals to avoid supply chain blocks.",
+      ctaText: "Review Approvals",
+      ctaLink: "/approvals",
+      severity: "warning"
+    });
+  }
+
   const monthlyLabourCost = await calculateMonthlyLabourCost(company_id);
   
   const underMaintenanceEquipment = await prisma.equipment.count({
@@ -578,8 +585,9 @@ export const GET = withAuth(async (req: NextRequest, user) => {
   for (const p of projects) {
     if (!p.manager_id) projectsWithoutPM++;
     
-    const projAssignments = await prisma.projectAssignment.count({ where: { project_id: p.id } });
-    if (projAssignments === 0) unassignedProjects++;
+    // Filter in-memory
+    const projAssignmentsCount = allProjectAssignments.filter(a => a.project_id === p.id).length;
+    if (projAssignmentsCount === 0) unassignedProjects++;
     
     const projBudgets = budgets.filter(b => b.project_id === p.id);
     if (projBudgets.length === 0) projectsWithoutBudgetCount++;
@@ -596,13 +604,14 @@ export const GET = withAuth(async (req: NextRequest, user) => {
     const hasAttendance = todayAttendances.some(a => a.site_id === s.id);
     if (!hasAttendance && s.status === "IN_PROGRESS") sitesWithoutAttendanceToday++;
     
-    // Check DPR for today
-    const dprCount = await prisma.dailyReport.count({
-      where: {
-        site_id: s.id,
-        created_at: { gte: today }
-      }
-    });
+    // Check DPR for today - Filter in-memory
+    const dprCount = allDprsForCompany.filter(d => {
+      const dDate = new Date(d.created_at);
+      return d.site_id === s.id &&
+             dDate.getFullYear() === today.getFullYear() &&
+             dDate.getMonth() === today.getMonth() &&
+             dDate.getDate() === today.getDate();
+    }).length;
     if (dprCount === 0 && s.status === "IN_PROGRESS") missingDprToday++;
   }
 

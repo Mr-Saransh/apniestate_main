@@ -6,7 +6,8 @@ import { prisma } from "@/lib/prisma";
 export const DELETE = withAuth(async (req, user, context) => {
   if (!user.company_id || user.role !== "BUILDER") return badRequest("Unauthorized");
 
-  const { id } = context.params;
+  const params = await context.params;
+  const { id } = params;
   const url = new URL(req.url);
   const type = url.searchParams.get("type"); // "project" or "site"
 

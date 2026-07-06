@@ -1,76 +1,77 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
 /* ============================================
-   APNI ESTATE — Design System Variables
-   Theme: Premium Blue + Royal Yellow
-   Mobile-first, Outdoor-optimized
+   APNI ESTATE — Premium Enterprise Design System
+   Theme: Brand Blue + Premium Yellow
    ============================================ */
 
 :root {
-  /* ── Primary Colors (Dark Blue) ── */
-  --color-primary: #0A3D91;
-  --color-primary-light: #0A3D91;
-  --color-primary-dark: #052660;
-  --color-primary-50: rgba(10, 61, 145, 0.05);
-  --color-primary-100: rgba(10, 61, 145, 0.10);
-  --color-primary-200: rgba(10, 61, 145, 0.18);
-  --color-primary-hover: #08337A;
+  /* ── Primary Colors (Brand Blue) ── */
+  --color-primary: #1D4ED8;
+  --color-primary-light: #2563EB;
+  --color-primary-dark: #1E3A8A;
+  --color-primary-50: #EFF6FF;
+  --color-primary-100: #DBEAFE;
+  --color-primary-200: #BFDBFE;
+  --color-primary-hover: #1E40AF;
 
-  /* ── CTA / Accent (Gold) ── */
-  --color-cta: #F4B400;
-  --color-cta-light: #F4B400;
-  --color-cta-dark: #C29000;
-  --color-cta-text: #111827;
-  --color-cta-50: rgba(244, 180, 0, 0.08);
-  --color-cta-hover: #DBA200;
+  /* ── CTA / Accent (Premium Yellow) ── */
+  --color-cta: #F5A623;
+  --color-cta-light: #FBBF24;
+  --color-cta-dark: #D97706;
+  --color-cta-text: #FFFFFF;
+  --color-cta-50: #FEF3C7;
+  --color-cta-hover: #F59E0B;
 
   /* ── Neutrals ── */
-  --color-bg: #FFFFFF;
-  --color-bg-warm: #F8FAFC;
-  --color-surface: #F8FAFC;
-  --color-surface-hover: #E2E8F0;
-  --color-surface-active: #CBD5E1;
+  --color-bg: #F8FAFC;
+  --color-bg-warm: #F1F5F9;
+  --color-surface: #FFFFFF;
+  --color-surface-hover: #F8FAFC;
+  --color-surface-active: #F1F5F9;
   --color-border: #E2E8F0;
-  --color-border-light: #E2E8F0;
-  --color-text: #111827;
-  --color-text-secondary: #374151;
-  --color-text-muted: #6B7280;
+  --color-border-light: #F1F5F9;
+  --color-text: #0F172A;
+  --color-text-secondary: #475569;
+  --color-text-muted: #94A3B8;
   --color-text-inverse: #FFFFFF;
 
   /* ── Status Colors ── */
-  --color-success: #16A34A;
-  --color-success-light: #16A34A;
-  --color-success-bg: rgba(22, 163, 74, 0.1);
-  --color-warning: #F59E0B;
-  --color-warning-light: #F59E0B;
-  --color-warning-bg: rgba(245, 158, 11, 0.1);
-  --color-danger: #DC2626;
-  --color-danger-light: #DC2626;
-  --color-danger-bg: rgba(220, 38, 38, 0.1);
-  --color-info: #0A3D91;
-  --color-info-light: #0A3D91;
-  --color-info-bg: rgba(10, 61, 145, 0.05);
+  --color-success: #10B981;
+  --color-success-light: #34D399;
+  --color-success-bg: #ECFDF5;
+  --color-warning: #F5A623;
+  --color-warning-light: #FBBF24;
+  --color-warning-bg: #FEF3C7;
+  --color-danger: #EF4444;
+  --color-danger-light: #F87171;
+  --color-danger-bg: #FEF2F2;
+  --color-info: #3B82F6;
+  --color-info-light: #60A5FA;
+  --color-info-bg: #EFF6FF;
 
-  /* ── Typography (Outdoor-optimized) ── */
-  --font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  /* ── Typography ── */
+  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 
-  /* Mobile-first sizes (larger for outdoor readability) */
-  --font-size-xs: 0.8125rem;   /* 13px */
+  /* Sizes */
+  --font-size-xs: 0.75rem;     /* 12px */
   --font-size-sm: 0.875rem;    /* 14px */
   --font-size-base: 1rem;      /* 16px */
   --font-size-md: 1.125rem;    /* 18px */
   --font-size-lg: 1.25rem;     /* 20px */
   --font-size-xl: 1.5rem;      /* 24px */
-  --font-size-2xl: 1.75rem;    /* 28px */
-  --font-size-3xl: 2rem;       /* 32px */
-  --font-size-4xl: 2.5rem;     /* 40px */
+  --font-size-2xl: 1.875rem;   /* 30px */
+  --font-size-3xl: 2.25rem;    /* 36px */
+  --font-size-4xl: 3rem;       /* 48px */
 
   --font-weight-regular: 400;
   --font-weight-medium: 500;
   --font-weight-semibold: 600;
   --font-weight-bold: 700;
 
-  --line-height-tight: 1.2;
+  --line-height-tight: 1.25;
   --line-height-normal: 1.5;
-  --line-height-relaxed: 1.7;
+  --line-height-relaxed: 1.75;
 
   /* ── Spacing ── */
   --space-1: 0.25rem;    /* 4px */
@@ -86,41 +87,45 @@
   --space-20: 5rem;      /* 80px */
 
   /* ── Touch & Interaction ── */
-  --touch-target-min: 48px;
-  --touch-target-lg: 56px;
+  --touch-target-min: 44px;
+  --touch-target-lg: 52px;
 
   /* ── Borders & Radius ── */
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 20px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
   --radius-2xl: 24px;
   --radius-full: 9999px;
 
-  /* ── Shadows ── */
-  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
-  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.10);
-  --shadow-xl: 0 16px 40px rgba(0, 0, 0, 0.12);
-  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(0, 0, 0, 0.02);
-  --shadow-card-hover: 0 4px 16px rgba(27, 110, 243, 0.10);
-  --shadow-bottom-nav: 0 -2px 12px rgba(0, 0, 0, 0.08);
-  --shadow-fab: 0 4px 16px rgba(245, 158, 11, 0.35);
+  /* ── Premium Enterprise Shadows ── */
+  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 4px 14px rgba(15, 23, 42, 0.05), 0 1px 4px rgba(15, 23, 42, 0.03);
+  --shadow-lg: 0 10px 25px rgba(15, 23, 42, 0.08), 0 4px 10px rgba(15, 23, 42, 0.04);
+  --shadow-xl: 0 20px 40px rgba(15, 23, 42, 0.12), 0 8px 16px rgba(15, 23, 42, 0.06);
+  --shadow-card: 0 1px 3px rgba(15, 23, 42, 0.05), 0 0 0 1px rgba(15, 23, 42, 0.03);
+  --shadow-card-hover: 0 8px 24px rgba(15, 23, 42, 0.08), 0 0 0 1px rgba(15, 23, 42, 0.04);
+  --shadow-bottom-nav: 0 -4px 16px rgba(15, 23, 42, 0.06);
+  --shadow-fab: 0 8px 24px rgba(245, 166, 35, 0.3);
+  
+  /* Focus Rings */
+  --focus-ring: 0 0 0 3px rgba(29, 78, 216, 0.15);
+  --focus-ring-danger: 0 0 0 3px rgba(239, 68, 68, 0.15);
 
   /* ── Transitions ── */
-  --transition-fast: 150ms ease;
-  --transition-base: 250ms ease;
-  --transition-slow: 350ms ease;
-  --transition-spring: 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-spring: 300ms cubic-bezier(0.175, 0.885, 0.32, 1.275);
 
   /* ── Layout ── */
-  --sidebar-width: 240px;
+  --sidebar-width: 260px;
   --sidebar-collapsed-width: 72px;
   --topbar-height: 64px;
-  --bottom-nav-height: 72px;
+  --bottom-nav-height: calc(72px + var(--safe-area-bottom));
   --mobile-header-height: 64px;
-  --page-max-width: 1200px;
+  --page-max-width: 1400px;
   --safe-area-bottom: env(safe-area-inset-bottom, 0px);
   --safe-area-top: env(safe-area-inset-top, 0px);
 
@@ -131,13 +136,4 @@
   --z-overlay: 500;
   --z-modal: 1000;
   --z-toast: 2000;
-
-  /* ── Premium Tactile 3D Shadows & Colors ── */
-  --shadow-3d-sm: 0 2px 0 0 rgba(15, 23, 42, 0.05), 0 4px 6px -1px rgba(15, 23, 42, 0.06), inset 0 1px 0 0 rgba(255, 255, 255, 0.8);
-  --shadow-3d-md: 0 3px 0 0 rgba(27, 110, 243, 0.12), 0 6px 12px -2px rgba(15, 23, 42, 0.05), inset 0 1px 0 0 rgba(255, 255, 255, 0.9);
-  --shadow-3d-lg: 0 6px 0 0 rgba(15, 23, 42, 0.04), 0 12px 20px -4px rgba(15, 23, 42, 0.07), inset 0 1px 0 0 rgba(255, 255, 255, 0.9), inset 0 -1px 0 0 rgba(0, 0, 0, 0.03);
-  --shadow-3d-active: 0 1px 0 0 rgba(15, 23, 42, 0.04), 0 2px 4px -1px rgba(15, 23, 42, 0.03), inset 0 1px 0 0 rgba(255, 255, 255, 0.6);
-  --color-border-3d: rgba(255, 255, 255, 0.6);
-  --glass-bg: rgba(255, 255, 255, 0.75);
-  --glass-border: rgba(255, 255, 255, 0.4);
 }

@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { withAuth } from "@/middleware/auth.middleware";
 import { ok, badRequest } from "@/lib/response";
+import { signAccessToken } from "@/lib/jwt";
 
 export const POST = withAuth(async (req: NextRequest, user) => {
   const body = await req.json();
@@ -28,7 +29,7 @@ export const POST = withAuth(async (req: NextRequest, user) => {
   });
 
   // Automatically switch them to the new workspace and mark onboarded
-  await prisma.user.update({
+  const updated = await prisma.user.update({
     where: { id: user.sub },
     data: { 
       company_id: company.id, 
@@ -38,5 +39,25 @@ export const POST = withAuth(async (req: NextRequest, user) => {
     }
   });
 
-  return ok({ company, membership }, "Company created successfully");
+  // Re-sign JWT with new company_id and BUILDER role
+  const accessToken = signAccessToken({
+    sub: updated.id,
+    email: updated.email,
+    role: updated.role as any,
+    company_id: updated.company_id,
+  });
+
+  return ok({
+    user: {
+      id: updated.id,
+      name: updated.name,
+      email: updated.email,
+      role: updated.role,
+      company_id: updated.company_id,
+      onboarded: updated.onboarded
+    },
+    accessToken,
+    company,
+    membership 
+  }, "Company created successfully");
 });

@@ -24,6 +24,8 @@ export const companiesApi = {
   selectCompany: (companyId: string) =>
     apiClient.post<CompanySelectResponse>('/companies/select', { company_id: companyId }),
 
+  deleteCompany: (id: string) => apiClient.delete(`/companies/delete?id=${id}`),
+
   createCompany: (name: string) =>
     apiClient.post<CompanySelectResponse>('/companies/create', { name }),
 };

@@ -10,13 +10,14 @@ export async function createInvitation(data: {
   project_ids?: string[];
   site_ids?: string[];
 }) {
+  const emailLower = data.email.toLowerCase();
   const existing = await prisma.invitation.findFirst({
-    where: { company_id: data.company_id, email: data.email, status: { in: ["PENDING", "ACCEPTED"] } }
+    where: { company_id: data.company_id, email: emailLower, status: { in: ["PENDING", "ACCEPTED"] } }
   });
   if (existing) throw new Error("An active invitation already exists for this email in this company");
 
   // Check if they are already a member
-  const user = await prisma.user.findUnique({ where: { email: data.email } });
+  const user = await prisma.user.findUnique({ where: { email: emailLower } });
   if (user) {
     const membership = await prisma.companyMembership.findUnique({
       where: { user_id_company_id: { user_id: user.id, company_id: data.company_id } }
@@ -29,6 +30,7 @@ export async function createInvitation(data: {
   const invitation = await prisma.invitation.create({
     data: {
       ...data,
+      email: emailLower,
       expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days default
     }
   });
@@ -57,7 +59,7 @@ export async function getCompanyInvitations(companyId: string) {
 
 export async function getMyInvitations(email: string) {
   return prisma.invitation.findMany({
-    where: { email },
+    where: { email: email.toLowerCase() },
     include: {
       company: { select: { name: true } },
       inviter: { select: { name: true, email: true } }
@@ -69,7 +71,7 @@ export async function getMyInvitations(email: string) {
 export async function acceptInvitation(invitationId: string, userId: string, userEmail: string) {
   const invitation = await prisma.invitation.findUnique({ where: { id: invitationId } });
   if (!invitation) throw new Error("Invitation not found");
-  if (invitation.email !== userEmail) throw new Error("Unauthorized to accept this invitation");
+  if (invitation.email.toLowerCase() !== userEmail.toLowerCase()) throw new Error("Unauthorized to accept this invitation");
   if (invitation.status !== "PENDING") throw new Error(`Cannot accept invitation with status: ${invitation.status}`);
   if (invitation.expires_at < new Date()) {
     await prisma.invitation.update({ where: { id: invitationId }, data: { status: "EXPIRED" } });
@@ -141,7 +143,7 @@ export async function acceptInvitation(invitationId: string, userId: string, use
 export async function rejectInvitation(invitationId: string, userEmail: string) {
   const invitation = await prisma.invitation.findUnique({ where: { id: invitationId } });
   if (!invitation) throw new Error("Invitation not found");
-  if (invitation.email !== userEmail) throw new Error("Unauthorized");
+  if (invitation.email.toLowerCase() !== userEmail.toLowerCase()) throw new Error("Unauthorized");
   if (invitation.status !== "PENDING") throw new Error("Cannot reject");
 
   await prisma.invitation.update({
