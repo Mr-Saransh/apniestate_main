@@ -173,37 +173,78 @@ export default function ProjectsPage() {
           }
         />
       ) : (
-        <div className="card" style={{ overflow: 'hidden' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
           {filtered.map((project, idx) => (
             <div
               key={project.id}
-              className="list-card"
+              className="card card-interactive animate-card-reveal"
               onClick={() => navigate(`/projects/${project.id}`)}
               id={`project-${idx}`}
+              style={{
+                padding: 'var(--space-4)',
+                border: '1px solid var(--color-border)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px'
+              }}
             >
-              <div
-                className="list-card-icon"
-                style={{
-                  background: getProjectColor(project.status).bg,
-                  color: getProjectColor(project.status).color,
-                }}
-              >
-                <FolderKanban size={20} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div
+                    style={{
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '10px',
+                      background: getProjectColor(project.status).bg,
+                      color: getProjectColor(project.status).color,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0
+                    }}
+                  >
+                    <FolderKanban size={20} />
+                  </div>
+                  <div>
+                    <h4 style={{ fontSize: '15px', fontWeight: 700, margin: 0, color: 'var(--color-text)' }}>{project.name}</h4>
+                    <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+                      <MapPin size={12} /> {project._count?.sites || 0} Sites
+                    </span>
+                  </div>
+                </div>
+                <StatusBadge status={project.status} />
               </div>
-              <div className="list-card-content">
-                <div className="list-card-title">{project.name}</div>
-                <div className="list-card-subtitle">
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                    <MapPin size={12} /> {project._count?.sites || 0} sites
-                  </span>
-                  <span style={{ margin: '0 6px', opacity: 0.4 }}>·</span>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                    <Calendar size={12} /> {formatDate(project.start_date)}
-                  </span>
+
+              {/* Description */}
+              {project.description && (
+                <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', margin: 0, lineClamp: 2, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: 1.4 }}>
+                  {project.description}
+                </p>
+              )}
+
+              {/* Budget vs Spent */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', fontSize: '13px', borderTop: '1px dashed var(--color-border-light)', paddingTop: '10px', marginTop: '2px' }}>
+                <div>
+                  <span style={{ color: 'var(--color-text-muted)', fontSize: '11px', textTransform: 'uppercase', display: 'block', marginBottom: '2px' }}>Budget Limit</span>
+                  <strong style={{ color: 'var(--color-text)', fontSize: '14px' }}>₹{(project.budget || 0).toLocaleString()}</strong>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <span style={{ color: 'var(--color-text-muted)', fontSize: '11px', textTransform: 'uppercase', display: 'block', marginBottom: '2px' }}>Spent So Far</span>
+                  <strong style={{ color: (project.actual_cost || 0) > (project.budget || 0) ? 'var(--color-danger)' : 'var(--color-success)', fontSize: '14px' }}>
+                    ₹{(project.actual_cost || 0).toLocaleString()}
+                  </strong>
                 </div>
               </div>
-              <div className="list-card-meta">
-                <StatusBadge status={project.status} />
+
+              {/* Progress bar */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid var(--color-border-light)', paddingTop: '10px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 600 }}>
+                  <span style={{ color: 'var(--color-text-secondary)' }}>Project Progress:</span>
+                  <span style={{ color: 'var(--color-primary)' }}>{project.progress_percentage || 0}% Complete</span>
+                </div>
+                <div style={{ width: '100%', height: '8px', background: 'var(--color-border-light)', borderRadius: '4px', overflow: 'hidden' }}>
+                  <div style={{ width: `${project.progress_percentage || 0}%`, height: '100%', background: 'linear-gradient(90deg, var(--color-primary), var(--color-primary-light))', borderRadius: '4px' }} />
+                </div>
               </div>
             </div>
           ))}

@@ -13,17 +13,17 @@
   position: sticky;
   top: 70px;
   z-index: 40;
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--color-border);
   padding: 12px 0;
-  margin-left: -24px;
-  margin-right: -24px;
-  padding-left: 24px;
-  padding-right: 24px;
+  margin-left: -20px;
+  margin-right: -20px;
+  padding-left: 20px;
+  padding-right: 20px;
   display: flex;
-  gap: 12px;
+  gap: 10px;
   overflow-x: auto;
   scrollbar-width: none; /* Firefox */
 }
@@ -34,8 +34,8 @@
 
 .section-nav-item {
   white-space: nowrap;
-  padding: 8px 16px;
-  border-radius: 20px;
+  padding: 9px 18px;
+  border-radius: var(--radius-full);
   font-size: 13px;
   font-weight: 600;
   color: var(--color-text-muted);
@@ -43,6 +43,9 @@
   transition: all 0.2s ease;
   background: transparent;
   border: 1px solid transparent;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
 }
 
 .section-nav-item:hover {
@@ -59,13 +62,14 @@
 /* Premium Widget Container */
 .premium-widget {
   background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 20px;
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  border-radius: var(--radius-native, 20px);
   padding: 24px;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
   display: flex;
   flex-direction: column;
   gap: 16px;
+  box-shadow: var(--shadow-native-card);
 }
 
 .premium-widget:hover {
@@ -92,19 +96,25 @@
 /* Decision Cards */
 .decision-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: 1fr;
   gap: 16px;
+}
+
+@media (min-width: 768px) {
+  .decision-grid {
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  }
 }
 
 .decision-card {
   background: #ffffff;
-  border: 1px solid var(--color-border);
-  border-radius: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  border-radius: var(--radius-native, 20px);
   padding: 20px;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.02);
+  box-shadow: var(--shadow-native-card, 0 4px 12px rgba(0,0,0,0.02));
   transition: all 0.2s ease;
   position: relative;
   overflow: hidden;

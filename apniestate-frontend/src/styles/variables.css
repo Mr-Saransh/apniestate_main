@@ -24,7 +24,7 @@
   --color-cta-hover: #F59E0B;
 
   /* ── Neutrals ── */
-  --color-bg: #F8FAFC;
+  --color-bg: #F0F2F8;
   --color-bg-warm: #F1F5F9;
   --color-surface: #FFFFFF;
   --color-surface-hover: #F8FAFC;
@@ -108,6 +108,24 @@
   --shadow-card-hover: 0 8px 24px rgba(15, 23, 42, 0.08), 0 0 0 1px rgba(15, 23, 42, 0.04);
   --shadow-bottom-nav: 0 -4px 16px rgba(15, 23, 42, 0.06);
   --shadow-fab: 0 8px 24px rgba(245, 166, 35, 0.3);
+
+  /* ── Premium Mobile-Native Tokens ── */
+  --color-accent-gold: #FFC300;
+  --color-accent-gold-light: rgba(255, 195, 0, 0.12);
+  --color-accent-gold-glow: rgba(255, 195, 0, 0.25);
+
+  --radius-native: 20px;
+  --radius-native-lg: 24px;
+
+  --shadow-native-card: 0 2px 8px rgba(15, 23, 42, 0.04), 0 0 0 1px rgba(15, 23, 42, 0.02);
+  --shadow-native-elevated: 0 8px 32px rgba(15, 23, 42, 0.08), 0 2px 8px rgba(15, 23, 42, 0.04);
+  --shadow-native-header: 0 2px 12px rgba(15, 23, 42, 0.06);
+  --shadow-fab-native: 0 6px 20px rgba(29, 78, 216, 0.35), 0 2px 6px rgba(29, 78, 216, 0.2);
+
+  --transition-native: 320ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --transition-bounce: 400ms cubic-bezier(0.68, -0.15, 0.27, 1.35);
+
+  --space-mobile-inset: 20px;
   
   /* Focus Rings */
   --focus-ring: 0 0 0 3px rgba(29, 78, 216, 0.15);

@@ -36,7 +36,8 @@ import {
   PieChart,
   UserPlus,
   ArrowRight,
-  Briefcase
+  Briefcase,
+  User
 } from 'lucide-react';
 
 export interface NavigationItem {

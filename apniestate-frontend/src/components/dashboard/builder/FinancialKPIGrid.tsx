@@ -101,9 +101,7 @@ export const FinancialKPIGrid: React.FC<FinancialKPIGridProps> = ({ data }) => {
       prefix: '₹',
       icon: CreditCard,
       color: '#EF4444',
-      bg: 'rgba(239, 68, 68, 0.06)',
-      change: overview.spendChange,
-      sparkline: sparklines.dailySpend
+      bg: 'rgba(239, 68, 68, 0.06)'
     },
     {
       title: 'Pending Payments',
@@ -111,19 +109,15 @@ export const FinancialKPIGrid: React.FC<FinancialKPIGridProps> = ({ data }) => {
       prefix: '₹',
       icon: HandCoins,
       color: '#F59E0B',
-      bg: 'rgba(245, 158, 11, 0.06)',
-      change: undefined,
-      sparkline: undefined
+      bg: 'rgba(245, 158, 11, 0.06)'
     },
     {
       title: 'Budget Utilized',
       value: overview.budgetUtilization || 0,
       suffix: '%',
       icon: PiggyBank,
-      color: overview.budgetUtilization > 85 ? '#EF4444' : '#3B82F6',
-      bg: overview.budgetUtilization > 85 ? 'rgba(239, 68, 68, 0.06)' : 'rgba(59, 130, 246, 0.06)',
-      change: undefined,
-      sparkline: sparklines.budgetUtil
+      color: '#3B82F6',
+      bg: 'rgba(59, 130, 246, 0.06)'
     },
     {
       title: 'Available Cash',
@@ -131,9 +125,7 @@ export const FinancialKPIGrid: React.FC<FinancialKPIGridProps> = ({ data }) => {
       prefix: '₹',
       icon: Wallet,
       color: '#10B981',
-      bg: 'rgba(16, 185, 129, 0.06)',
-      change: undefined,
-      sparkline: sparklines.cashBalance
+      bg: 'rgba(16, 185, 129, 0.06)'
     },
     {
       title: "Today's Labour Cost",
@@ -141,9 +133,7 @@ export const FinancialKPIGrid: React.FC<FinancialKPIGridProps> = ({ data }) => {
       prefix: '₹',
       icon: Users,
       color: '#8B5CF6',
-      bg: 'rgba(139, 92, 246, 0.06)',
-      change: overview.labourCostChange,
-      sparkline: sparklines.labourCost
+      bg: 'rgba(139, 92, 246, 0.06)'
     },
     {
       title: 'Monthly Labour Cost',
@@ -151,142 +141,68 @@ export const FinancialKPIGrid: React.FC<FinancialKPIGridProps> = ({ data }) => {
       prefix: '₹',
       icon: Users,
       color: '#6366F1',
-      bg: 'rgba(99, 102, 241, 0.06)',
-      change: undefined,
-      sparkline: undefined
-    },
-    {
-      title: 'Pending Invoices',
-      value: overview.pendingInvoiceCount || data.approvalsPending?.total || 0,
-      suffix: '',
-      icon: FileText,
-      color: '#EC4899',
-      bg: 'rgba(236, 72, 153, 0.06)',
-      change: undefined,
-      sparkline: undefined
-    },
-    {
-      title: 'POs Awaiting Approval',
-      value: data.approvalsPending?.purchaseOrders || 0,
-      suffix: '',
-      icon: ShoppingCart,
-      color: '#14B8A6',
-      bg: 'rgba(20, 184, 166, 0.06)',
-      change: undefined,
-      sparkline: undefined
-    },
-    {
-      title: 'Outstanding Vendor Payments',
-      value: overview.outstandingPayments || 0,
-      prefix: '₹',
-      icon: Building2,
-      color: '#F97316',
-      bg: 'rgba(249, 115, 22, 0.06)',
-      change: undefined,
-      sparkline: undefined
-    },
-    {
-      title: 'Cashbook Balance',
-      value: financial.creditSum - financial.debitSum || 0,
-      prefix: '₹',
-      icon: BadgeIndianRupee,
-      color: '#0EA5E9',
-      bg: 'rgba(14, 165, 233, 0.06)',
-      change: undefined,
-      sparkline: sparklines.cashBalance
-    },
-    {
-      title: 'Receivables',
-      value: overview.receivables || financial.creditSum * 0.12 || 0,
-      prefix: '₹',
-      icon: TrendingUp,
-      color: '#22C55E',
-      bg: 'rgba(34, 197, 94, 0.06)',
-      change: undefined,
-      sparkline: undefined
-    },
-    {
-      title: 'Payables',
-      value: overview.payables || financial.debitSum * 0.08 || 0,
-      prefix: '₹',
-      icon: Receipt,
-      color: '#E11D48',
-      bg: 'rgba(225, 29, 72, 0.06)',
-      change: undefined,
-      sparkline: undefined
+      bg: 'rgba(99, 102, 241, 0.06)'
     }
   ];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-      <h3 style={{
-        fontSize: '15px',
-        fontWeight: 700,
-        color: 'var(--color-text)',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px'
-      }}>
-        <BadgeIndianRupee size={18} color="#3B82F6" />
-        Executive Financial Snapshot
-      </h3>
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: 'var(--space-3)',
-        width: '100%'
-      }}>
+    <section style={{
+      backgroundColor: '#FFFFFF',
+      border: '1px solid #E2E8F0',
+      borderRadius: '20px',
+      padding: '20px',
+      boxShadow: '0 4px 12px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.02)',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '14px'
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <BadgeIndianRupee size={18} color="#2648E7" />
+        <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#0F172A', margin: 0 }}>
+          Executive Financial Snapshot
+        </h2>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
         {kpis.map((kpi, idx) => {
           const Icon = kpi.icon;
           return (
-            <motion.div
+            <div
               key={kpi.title}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: idx * 0.025 }}
-              whileHover={{ y: -3, boxShadow: '0 8px 20px rgba(0,0,0,0.04)' }}
               style={{
-                background: 'var(--color-surface)',
-                border: '1px solid var(--color-border)',
-                borderRadius: '14px',
-                padding: '16px',
                 display: 'flex',
-                flexDirection: 'column',
-                gap: '8px',
-                cursor: 'default',
-                transition: 'all 0.2s ease'
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '12px 0',
+                borderTop: idx > 0 ? '1px solid #F1F5F9' : 'none'
               }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 550, lineHeight: 1.3 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <span style={{ fontSize: '12px', color: '#64748B', fontWeight: 550, letterSpacing: '-0.01em' }}>
                   {kpi.title}
                 </span>
-                <div style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '8px',
-                  background: kpi.bg,
+                <span style={{ fontSize: '20px', fontWeight: 800, color: '#0F172A', letterSpacing: '-0.02em', lineHeight: 1.1 }}>
+                  <AnimatedNumber value={kpi.value} prefix={kpi.prefix} suffix={kpi.suffix} />
+                </span>
+              </div>
+              <div
+                style={{
+                  width: '38px',
+                  height: '38px',
+                  borderRadius: '10px',
+                  backgroundColor: kpi.bg,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   flexShrink: 0
-                }}>
-                  <Icon size={16} color={kpi.color} />
-                </div>
+                }}
+              >
+                <Icon size={18} color={kpi.color} />
               </div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
-                <span style={{ fontSize: '20px', fontWeight: 800, color: 'var(--color-text)', letterSpacing: '-0.02em' }}>
-                  <AnimatedNumber value={kpi.value} prefix={kpi.prefix} suffix={kpi.suffix} />
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <TrendBadge change={kpi.change} />
-                <MiniSparkline data={kpi.sparkline || []} color={kpi.color} />
-              </div>
-            </motion.div>
+            </div>
           );
         })}
       </div>
-    </div>
+    </section>
   );
 };

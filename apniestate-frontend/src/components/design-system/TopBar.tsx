@@ -27,7 +27,8 @@ import {
   Shield,
   Calculator,
   Briefcase,
-  Check
+  Check,
+  Menu
 } from 'lucide-react';
 import { Colors } from './Colors';
 import { Shadows } from './Shadows';
@@ -158,30 +159,30 @@ export function TopBar({ title: customTitle, icon: customIcon, leftAction }: Top
       className="unified-topbar"
       style={{
         height: '64px',
-        backgroundColor: Colors.background,
-        borderBottom: '1px solid #E2E8F0',
+        backgroundColor: '#2648E7',
+        borderBottom: 'none',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '0 20px',
+        padding: '0 16px',
         position: 'fixed',
         top: 0,
         left: 0,
         right: 0,
         zIndex: 900,
-        boxShadow: Shadows.sm,
+        boxShadow: '0 2px 8px rgba(15, 23, 42, 0.05)',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
         {leftAction ? (
           leftAction
-        ) : (
+        ) : icon ? (
           <div
             style={{
               width: '36px',
               height: '36px',
-              backgroundColor: 'rgba(10, 61, 145, 0.08)',
-              color: Colors.primaryBlue,
+              backgroundColor: 'rgba(255, 255, 255, 0.12)',
+              color: '#FFFFFF',
               borderRadius: '10px',
               display: 'flex',
               alignItems: 'center',
@@ -190,40 +191,22 @@ export function TopBar({ title: customTitle, icon: customIcon, leftAction }: Top
           >
             {icon}
           </div>
-        )}
+        ) : null}
         <h1
           style={{
             fontSize: '18px',
             fontWeight: 700,
-            color: Colors.primaryText,
+            color: '#FFFFFF',
             margin: 0,
             letterSpacing: '-0.02em',
           }}
         >
-          {title}
+          {title || 'Apni Estate'}
         </h1>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-        <button
-          type="button"
-          aria-label="Search"
-          onClick={() => window.dispatchEvent(new CustomEvent('open-search'))}
-          style={{
-            background: 'none',
-            border: 'none',
-            color: Colors.secondaryText,
-            cursor: 'pointer',
-            padding: '8px',
-            borderRadius: '50%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Search size={20} />
-        </button>
-
+      <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+        {/* Notifications Icon */}
         <button
           type="button"
           aria-label="Notifications"
@@ -231,170 +214,165 @@ export function TopBar({ title: customTitle, icon: customIcon, leftAction }: Top
           style={{
             background: 'none',
             border: 'none',
-            color: Colors.secondaryText,
+            color: '#FFFFFF',
             cursor: 'pointer',
-            padding: '8px',
-            borderRadius: '50%',
+            padding: '6px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             position: 'relative',
           }}
+          className="tap-highlight"
         >
-          <Bell size={20} />
+          <Bell size={22} />
           <span
             style={{
               position: 'absolute',
-              top: '6px',
-              right: '6px',
+              top: '4px',
+              right: '4px',
               width: '8px',
               height: '8px',
-              backgroundColor: Colors.errorRed,
+              backgroundColor: '#FFC300',
               borderRadius: '50%',
-              border: `2px solid ${Colors.background}`,
+              border: '1.5px solid #1D4ED8',
             }}
           />
         </button>
 
+        {/* Gold Initials Avatar Circle */}
         <div
           ref={dropdownRef}
           onClick={() => setShowDropdown(!showDropdown)}
           style={{
+            width: '32px',
+            height: '32px',
+            borderRadius: '50%',
+            backgroundColor: '#FFC300',
+            color: '#1E3A8A',
             display: 'flex',
             alignItems: 'center',
-            gap: '8px',
+            justifyContent: 'center',
+            fontWeight: 800,
+            fontSize: '12px',
             cursor: 'pointer',
-            position: 'relative',
+            boxShadow: '0 1px 4px rgba(0,0,0,0.1)'
           }}
         >
+          {user ? getInitials(user.name) : 'AR'}
+        </div>
+
+        {showDropdown && (
           <div
+            className="topbar-dropdown"
             style={{
-              width: '32px',
-              height: '32px',
-              borderRadius: '50%',
-              backgroundColor: Colors.primaryBlue,
-              color: '#FFFFFF',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: 700,
-              fontSize: '13px',
+              position: 'absolute',
+              top: '100%',
+              right: '16px',
+              marginTop: '8px',
+              backgroundColor: '#FFFFFF',
+              border: '1px solid #E2E8F0',
+              borderRadius: '12px',
+              boxShadow: Shadows.lg,
+              minWidth: '240px',
+              zIndex: 1000,
+              padding: '6px',
+              overflow: 'hidden',
             }}
           >
-            {user ? getInitials(user.name) : '?'}
-          </div>
-          <ChevronDown size={14} style={{ color: Colors.mutedText }} />
-
-          {showDropdown && (
-            <div
-              className="topbar-dropdown"
+            <div style={{ padding: '8px 12px', fontSize: '11px', fontWeight: 700, color: Colors.mutedText, textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid #E2E8F0', backgroundColor: '#F8FAFC' }}>
+              Switch Workspace
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', maxHeight: '180px', overflowY: 'auto' }}>
+              {memberships.map((m) => {
+                const isCurrent = user?.company_id === m.company_id;
+                return (
+                  <button
+                    key={m.company_id}
+                    type="button"
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      if (!isCurrent) {
+                        await switchWorkspace(m.company_id, m.roles[0]);
+                        navigate('/dashboard');
+                      }
+                      setShowDropdown(false);
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      width: '100%',
+                      padding: '10px 12px',
+                      fontSize: '13px',
+                      fontWeight: isCurrent ? 600 : 500,
+                      color: isCurrent ? '#1D4ED8' : Colors.primaryText,
+                      background: isCurrent ? 'rgba(29, 78, 216, 0.04)' : 'transparent',
+                      border: 'none',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Building2 size={14} color={isCurrent ? '#1D4ED8' : Colors.secondaryText} />
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                        <span>{m.company.name}</span>
+                        <span style={{ fontSize: '10px', color: Colors.mutedText }}>Role: {m.roles[0].replace('_', ' ')}</span>
+                      </div>
+                    </div>
+                    {isCurrent && <Check size={14} color="#1D4ED8" />}
+                  </button>
+                );
+              })}
+            </div>
+            <div style={{ height: '1px', backgroundColor: '#E2E8F0' }} />
+            
+            <button
+              type="button"
+              onClick={() => { navigate('/settings'); setShowDropdown(false); }}
               style={{
-                position: 'absolute',
-                top: '100%',
-                right: 0,
-                marginTop: '8px',
-                backgroundColor: '#FFFFFF',
-                border: '1px solid #E2E8F0',
-                borderRadius: '12px',
-                boxShadow: Shadows.lg,
-                minWidth: '220px',
-                zIndex: 1000,
-                overflow: 'hidden',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                padding: '10px 12px',
+                color: Colors.primaryText,
+                fontSize: '13px',
+                border: 'none',
+                backgroundColor: 'transparent',
+                width: '100%',
+                textAlign: 'left',
+                cursor: 'pointer',
+                fontWeight: 500,
+                borderRadius: '8px'
               }}
             >
-              <div style={{ padding: '8px 16px', fontSize: '11px', fontWeight: 700, color: Colors.mutedText, textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid #E2E8F0', backgroundColor: '#F8FAFC' }}>
-                Switch Workspace
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', maxHeight: '200px', overflowY: 'auto' }}>
-                {memberships.map((m) => {
-                  const isCurrent = user?.company_id === m.company_id;
-                  return (
-                    <button
-                      key={m.company_id}
-                      type="button"
-                      onClick={async (e) => {
-                        e.stopPropagation();
-                        if (!isCurrent) {
-                          await switchWorkspace(m.company_id, m.roles[0]);
-                          navigate('/dashboard'); // Optionally navigate back to dashboard when switching workspace
-                        }
-                        setShowDropdown(false);
-                      }}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        width: '100%',
-                        padding: '10px 16px',
-                        fontSize: '13px',
-                        fontWeight: isCurrent ? 600 : 500,
-                        color: isCurrent ? Colors.primaryBlue : Colors.primaryText,
-                        background: isCurrent ? 'rgba(10, 61, 145, 0.04)' : 'transparent',
-                        border: 'none',
-                        textAlign: 'left',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Building2 size={14} color={isCurrent ? Colors.primaryBlue : Colors.secondaryText} />
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                          <span>{m.company.name}</span>
-                          <span style={{ fontSize: '10px', color: Colors.mutedText }}>Role: {m.roles[0].replace('_', ' ')}</span>
-                        </div>
-                      </div>
-                      {isCurrent && <Check size={14} color={Colors.primaryBlue} />}
-                    </button>
-                  );
-                })}
-              </div>
-              <div style={{ height: '1px', backgroundColor: '#E2E8F0' }} />
-              
-              <button
-                type="button"
-                onClick={() => navigate('/settings')}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  padding: '12px 16px',
-                  color: Colors.primaryText,
-                  fontSize: '13px',
-                  border: 'none',
-                  backgroundColor: 'transparent',
-                  width: '100%',
-                  textAlign: 'left',
-                  cursor: 'pointer',
-                  fontWeight: 500,
-                }}
-              >
-                <User size={16} />
-                <span>Settings</span>
-              </button>
-              <div style={{ height: '1px', backgroundColor: '#E2E8F0' }} />
-              <button
-                type="button"
-                onClick={logout}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  padding: '12px 16px',
-                  color: Colors.errorRed,
-                  fontSize: '13px',
-                  border: 'none',
-                  backgroundColor: 'transparent',
-                  width: '100%',
-                  textAlign: 'left',
-                  cursor: 'pointer',
-                  fontWeight: 500,
-                }}
-              >
-                <LogOut size={16} />
-                <span>Logout</span>
-              </button>
-            </div>
-          )}
-        </div>
+              <User size={16} />
+              <span>Profile Settings</span>
+            </button>
+            <div style={{ height: '1px', backgroundColor: '#E2E8F0' }} />
+            <button
+              type="button"
+              onClick={logout}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                padding: '10px 12px',
+                color: Colors.errorRed,
+                fontSize: '13px',
+                border: 'none',
+                backgroundColor: 'transparent',
+                width: '100%',
+                textAlign: 'left',
+                cursor: 'pointer',
+                fontWeight: 500,
+                borderRadius: '8px'
+              }}
+            >
+              <LogOut size={16} />
+              <span>Logout</span>
+            </button>
+          </div>
+        )}
       </div>
     </header>
   );

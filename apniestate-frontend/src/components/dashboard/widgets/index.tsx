@@ -1,4 +1,5 @@
 import { useState, useTransition } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
   Plus, 
@@ -35,59 +36,82 @@ function getRiskBadgeColor(score: string) {
   }
 }
 
-// 1. KPI WIDGET
 interface KpiItem {
   title: string;
-  value: number;
+  value: number | string;
   prefix?: string;
   suffix?: string;
   icon: any;
   color: string;
   bg: string;
+  path?: string;
+  trend?: string;
+  trendColor?: string;
 }
 export function KPIWidget({ items, loading }: { items?: KpiItem[]; loading?: boolean }) {
+  const navigate = useNavigate();
+
   if (loading || !items) return <KpiGridSkeleton />;
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 'var(--space-4)', width: '100%' }}>
+    <div className="kpi-grid">
       {items.map((kpi, idx) => {
         const Icon = kpi.icon;
         return (
           <motion.div
             key={kpi.title}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: idx * 0.03 }}
-            whileHover={{ y: -4, boxShadow: '0 12px 24px rgba(0,0,0,0.04)' }}
+            onClick={() => kpi.path && navigate(kpi.path)}
+            className="kpi-card animate-card-reveal"
             style={{
-              background: 'var(--color-surface)',
-              border: '1px solid var(--color-border)',
-              borderRadius: '16px',
-              padding: '20px',
+              animationDelay: `${idx * 40}ms`,
+              padding: '16px',
               display: 'flex',
-              alignItems: 'center',
+              flexDirection: 'column',
               justifyContent: 'space-between',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.01)',
+              gap: '12px',
+              borderRadius: '20px',
+              border: '1px solid #E2E8F0',
+              backgroundColor: '#FFFFFF',
+              boxShadow: '0 4px 12px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.02)',
+              minHeight: '124px',
               cursor: 'pointer'
             }}
           >
-            <div>
-              <span style={{ fontSize: '12px', color: 'var(--color-text-muted)', fontWeight: 550 }}>{kpi.title}</span>
-              <h3 style={{ fontSize: '24px', fontWeight: 800, color: 'var(--color-text)', margin: '6px 0 0 0', letterSpacing: '-0.02em' }}>
-                <AnimatedNumber value={kpi.value} prefix={kpi.prefix} suffix={kpi.suffix} />
-              </h3>
+            {/* Top row: Icon and Trend */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+              <div 
+                style={{
+                  width: '38px',
+                  height: '38px',
+                  borderRadius: '50%',
+                  backgroundColor: 'rgba(29, 78, 216, 0.06)',
+                  color: '#1D4ED8',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Icon size={18} />
+              </div>
+              {kpi.trend && (
+                <span style={{ fontSize: '12px', fontWeight: 700, color: kpi.trendColor || '#10B981', display: 'flex', alignItems: 'center', gap: '2px' }}>
+                  {kpi.trend}
+                </span>
+              )}
             </div>
-            <div style={{
-              width: '46px',
-              height: '46px',
-              borderRadius: '12px',
-              background: kpi.bg,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: kpi.color
-            }}>
-              <Icon size={22} />
+
+            {/* Bottom section: Big value and Label */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: 'auto' }}>
+              <h3 style={{ fontSize: '24px', fontWeight: 800, color: '#0F172A', margin: 0, letterSpacing: '-0.02em', lineHeight: 1.1 }}>
+                {typeof kpi.value === 'string' ? (
+                  kpi.value
+                ) : (
+                  <AnimatedNumber value={kpi.value} prefix={kpi.prefix} suffix={kpi.suffix} />
+                )}
+              </h3>
+              <span style={{ fontSize: '12px', color: '#64748B', fontWeight: 550 }}>
+                {kpi.title}
+              </span>
             </div>
           </motion.div>
         );
@@ -108,37 +132,32 @@ export function CriticalAlertsWidget({ alerts, loading }: { alerts?: AlertItem[]
   if (!alerts || alerts.length === 0) return null;
 
   return (
-    <section style={{ background: 'rgba(239, 68, 68, 0.02)', border: '1px solid rgba(239, 68, 68, 0.12)', borderRadius: '20px', padding: '24px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-        <AlertTriangle color="#EF4444" size={20} />
-        <h2 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--color-text)' }}>Critical Site Alerts</h2>
+    <section style={{ backgroundColor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '20px', padding: '20px', boxShadow: '0 4px 12px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.02)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+        <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#0F172A', margin: 0 }}>Active Alerts</h2>
+        <span style={{ fontSize: '13px', color: '#1D4ED8', fontWeight: 600 }}>{alerts.length} new</span>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        {alerts.map((alert, i) => (
-          <div
-            key={i}
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              background: 'var(--color-surface)',
-              padding: '14px 18px',
-              borderRadius: '14px',
-              border: '1px solid var(--color-border)'
-            }}
-          >
-            <div>
-              <span style={{ fontWeight: 600, fontSize: '14px', color: 'var(--color-text)' }}>{alert.title}</span>
-              <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', marginTop: '2px' }}>{alert.description}</p>
-            </div>
-            <a
-              href={alert.link}
-              style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: 'var(--color-primary)', fontWeight: 600, textDecoration: 'none' }}
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
+        {alerts.map((alert, i) => {
+          const dotColor = alert.severity === 'error' ? '#EF4444' : alert.severity === 'warning' ? '#FFC300' : '#10B981';
+          return (
+            <div
+              key={i}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '12px 0',
+                borderTop: '1px solid #F1F5F9'
+              }}
             >
-              Resolve <ChevronRight size={14} />
-            </a>
-          </div>
-        ))}
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: dotColor, flexShrink: 0 }} />
+              <span style={{ fontSize: '13px', color: '#334155', lineHeight: 1.4, fontWeight: 500 }}>
+                {alert.title} — {alert.description}
+              </span>
+            </div>
+          );
+        })}
       </div>
     </section>
   );

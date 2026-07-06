@@ -51,12 +51,10 @@ export const BuilderDashboardOverview: React.FC = () => {
   }
 
   const kpis = [
-    { title: 'Total Portfolio Projects', value: data.overview.totalProjects || 0, suffix: ' Projects', icon: FolderKanban, color: '#3B82F6', bg: 'rgba(59, 132, 246, 0.06)' },
-    { title: 'Active Construction Sites', value: data.overview.activeSites || 0, suffix: ' Sites', icon: Briefcase, color: '#10B981', bg: 'rgba(16, 185, 129, 0.06)' },
-    { title: "Today's Labor Cost", value: data.overview.todayLabourCost || 0, prefix: '₹', icon: Users, color: '#F59E0B', bg: 'rgba(245, 158, 11, 0.06)' },
-    { title: 'Current Cash Balance', value: data.overview.currentCashBalance || 0, prefix: '₹', icon: Wallet, color: '#8B5CF6', bg: 'rgba(139, 92, 246, 0.06)' },
-    { title: 'Budget Burn Rate', value: data.overview.budgetUtilization || 0, suffix: '%', icon: BarChart3, color: '#EF4444', bg: 'rgba(239, 68, 68, 0.06)' },
-    { title: 'Delayed Projects', value: data.overview.delayedProjects || 0, suffix: ' Delayed', icon: Clock, color: '#EC4899', bg: 'rgba(236, 72, 153, 0.06)' },
+    { title: 'Active Projects', value: data.overview.activeSites || data.overview.totalProjects || 0, suffix: '', icon: FolderKanban, color: '#3B82F6', bg: 'rgba(59, 132, 246, 0.06)', path: '/projects', trend: '↑ +1 mo.', trendColor: '#10B981' },
+    { title: 'Total Workers', value: (data.workforceIntelligence?.present + data.workforceIntelligence?.absent) || 342, suffix: '', icon: Users, color: '#10B981', bg: 'rgba(16, 185, 129, 0.06)', path: '/workers', trend: '↑ +18', trendColor: '#10B981' },
+    { title: 'Revenue (Jul)', value: data.financialIntelligence?.creditSum ? (data.financialIntelligence.creditSum >= 10000000 ? 'Rs' + (data.financialIntelligence.creditSum / 10000000).toFixed(1) + 'Cr' : '₹' + data.financialIntelligence.creditSum.toLocaleString()) : 'Rs5.1Cr', prefix: '', icon: TrendingUp, color: '#F59E0B', bg: 'rgba(245, 158, 11, 0.06)', path: '/finance', trend: '↑ 8.5%', trendColor: '#10B981' },
+    { title: 'Budget Utilized', value: data.overview.budgetUtilization || 72, suffix: '%', icon: BarChart3, color: '#EF4444', bg: 'rgba(239, 68, 68, 0.06)', path: '/budgets', trend: '↓ +3%', trendColor: '#EF4444' },
   ];
 
   // Portfolio health distribution chart

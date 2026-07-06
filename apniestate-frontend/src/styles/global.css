@@ -5,6 +5,7 @@
 
 @import './variables.css';
 @import './floating-actions.css';
+@import './mobile-native.css';
 
 /* ── Reset ── */
 *,
@@ -199,6 +200,53 @@ input, textarea, select {
   100% { opacity: 1; transform: scale(1); }
 }
 
+/* ── Mobile-Native Animations ── */
+@keyframes nativeSlideUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes cardReveal {
+  from { opacity: 0; transform: translateY(16px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes gentlePulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+}
+
+@keyframes bellRing {
+  0% { transform: rotate(0); }
+  15% { transform: rotate(14deg); }
+  30% { transform: rotate(-14deg); }
+  45% { transform: rotate(8deg); }
+  60% { transform: rotate(-8deg); }
+  75% { transform: rotate(3deg); }
+  100% { transform: rotate(0); }
+}
+
+@keyframes fabEntrance {
+  0% { opacity: 0; transform: scale(0) rotate(-90deg); }
+  60% { transform: scale(1.1) rotate(0deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0deg); }
+}
+
+@keyframes skeletonShimmer {
+  0% { background-position: -300% 0; }
+  100% { background-position: 300% 0; }
+}
+
+@keyframes dotPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.4); opacity: 0.7; }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
 .animate-fade-in {
   animation: fadeIn var(--transition-base);
 }
@@ -218,6 +266,22 @@ input, textarea, select {
 .animate-pop-in {
   animation: popIn var(--transition-spring);
 }
+
+.animate-card-reveal {
+  animation: cardReveal 400ms var(--transition-native, cubic-bezier(0.25, 0.46, 0.45, 0.94)) both;
+}
+
+.animate-native-slide {
+  animation: nativeSlideUp 350ms cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+}
+
+/* Stagger delays for card grids */
+.stagger-1 { animation-delay: 50ms; }
+.stagger-2 { animation-delay: 100ms; }
+.stagger-3 { animation-delay: 150ms; }
+.stagger-4 { animation-delay: 200ms; }
+.stagger-5 { animation-delay: 250ms; }
+.stagger-6 { animation-delay: 300ms; }
 
 /* ── Utility Classes ── */
 .sr-only {
@@ -251,4 +315,44 @@ input, textarea, select {
 
 .text-secondary {
   color: var(--color-text-secondary);
+}
+
+/* ── Skeleton Loading Utilities ── */
+.skeleton-block {
+  background: linear-gradient(90deg, #E2E8F0 25%, #F1F5F9 50%, #E2E8F0 75%);
+  background-size: 300% 100%;
+  animation: skeletonShimmer 1.8s ease-in-out infinite;
+  border-radius: var(--radius-md);
+}
+
+.skeleton-text {
+  background: linear-gradient(90deg, #E2E8F0 25%, #F1F5F9 50%, #E2E8F0 75%);
+  background-size: 300% 100%;
+  animation: skeletonShimmer 1.8s ease-in-out infinite;
+  border-radius: 6px;
+  height: 14px;
+}
+
+.skeleton-circle {
+  background: linear-gradient(90deg, #E2E8F0 25%, #F1F5F9 50%, #E2E8F0 75%);
+  background-size: 300% 100%;
+  animation: skeletonShimmer 1.8s ease-in-out infinite;
+  border-radius: 50%;
+}
+
+/* ── Micro-interaction Utilities ── */
+.press-effect {
+  transition: transform var(--transition-fast);
+}
+
+.press-effect:active {
+  transform: scale(0.97);
+}
+
+.tap-highlight {
+  transition: background-color var(--transition-fast);
+}
+
+.tap-highlight:active {
+  background-color: rgba(0, 0, 0, 0.04);
 }

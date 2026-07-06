@@ -146,7 +146,8 @@
 }
 
 .card-interactive:active {
-  transform: scale(0.99);
+  transform: scale(0.98);
+  transition-duration: 80ms;
 }
 
 .card-header {
@@ -165,6 +166,23 @@
 .card-footer {
   padding: var(--space-4) var(--space-5);
   border-top: 1px solid var(--color-border-light);
+}
+
+/* Mobile card refinements */
+@media (max-width: 767px) {
+  .card {
+    border-radius: var(--radius-native, 20px);
+    box-shadow: var(--shadow-native-card, var(--shadow-card));
+    border: 1px solid rgba(0, 0, 0, 0.03);
+  }
+
+  .card-header {
+    padding: var(--space-5);
+  }
+
+  .card-body {
+    padding: var(--space-5);
+  }
 }
 
 @media (min-width: 768px) {
@@ -195,13 +213,14 @@
 }
 
 .action-card:active {
-  transform: scale(0.98);
+  transform: scale(0.97);
+  transition-duration: 80ms;
 }
 
 .action-card-icon {
   width: 52px;
   height: 52px;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -229,6 +248,20 @@
 .action-card-chevron {
   color: var(--color-text-muted);
   flex-shrink: 0;
+  transition: transform var(--transition-fast);
+}
+
+.action-card:hover .action-card-chevron {
+  transform: translateX(2px);
+}
+
+@media (max-width: 767px) {
+  .action-card {
+    border-radius: var(--radius-native, 20px);
+    box-shadow: var(--shadow-native-card);
+    padding: var(--space-5) var(--space-5);
+    min-height: 76px;
+  }
 }
 
 /* ── List Card (Mobile list items) ── */
@@ -264,12 +297,13 @@
 
 .list-card:active {
   background: var(--color-surface-active);
+  transition-duration: 80ms;
 }
 
 .list-card-icon {
   width: 44px;
   height: 44px;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -285,12 +319,13 @@
   font-size: var(--font-size-base);
   font-weight: var(--font-weight-medium);
   color: var(--color-text);
-  margin-bottom: 2px;
+  margin-bottom: 3px;
 }
 
 .list-card-subtitle {
   font-size: var(--font-size-sm);
   color: var(--color-text-secondary);
+  line-height: 1.4;
 }
 
 .list-card-meta {
@@ -307,7 +342,33 @@
 .list-card-date {
   font-size: var(--font-size-xs);
   color: var(--color-text-muted);
-  margin-top: 2px;
+  margin-top: 3px;
+}
+
+@media (max-width: 767px) {
+  .list-card {
+    padding: var(--space-4) var(--space-5);
+    min-height: 76px;
+    gap: var(--space-4);
+  }
+
+  .list-card:first-child {
+    border-radius: var(--radius-native, 20px) var(--radius-native, 20px) 0 0;
+  }
+
+  .list-card:last-child {
+    border-radius: 0 0 var(--radius-native, 20px) var(--radius-native, 20px);
+  }
+
+  .list-card:only-child {
+    border-radius: var(--radius-native, 20px);
+  }
+
+  .list-card-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius-lg);
+  }
 }
 
 /* ── Stat Card (Redesigned) ── */
@@ -336,7 +397,7 @@
 .stat-card-icon {
   width: 44px;
   height: 44px;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -365,6 +426,27 @@
   font-size: var(--font-size-sm);
   color: var(--color-text-secondary);
   font-weight: var(--font-weight-medium);
+}
+
+@media (max-width: 767px) {
+  .stat-card {
+    border-radius: var(--radius-native, 20px);
+    box-shadow: var(--shadow-native-card);
+    padding: var(--space-5);
+    gap: var(--space-3);
+    border: 1px solid rgba(0, 0, 0, 0.03);
+  }
+
+  .stat-card-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius-lg);
+  }
+
+  .stat-card-value {
+    font-size: var(--font-size-xl);
+    letter-spacing: -0.02em;
+  }
 }
 
 /* ── Inputs ── */
@@ -418,6 +500,38 @@
   background-repeat: no-repeat;
   background-position: right 1rem center;
   padding-right: 3rem;
+}
+
+/* Mobile-native form enhancements */
+@media (max-width: 767px) {
+  .form-group {
+    gap: var(--space-2);
+    margin-bottom: var(--space-1);
+  }
+
+  .form-input {
+    min-height: 52px;
+    padding: 14px 16px;
+    border-radius: var(--radius-lg);
+    border-width: 1.5px;
+    font-size: 16px;
+  }
+
+  .form-input:focus {
+    box-shadow: 0 0 0 4px var(--color-primary-100);
+  }
+
+  .form-select {
+    min-height: 52px;
+    padding: 14px 16px;
+    padding-right: 3rem;
+    border-radius: var(--radius-lg);
+  }
+
+  textarea.form-input {
+    min-height: 100px;
+    resize: vertical;
+  }
 }
 
 /* ── Badges ── */
@@ -523,8 +637,9 @@
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -535,13 +650,15 @@
 
 .modal {
   background: var(--color-surface);
-  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  border-radius: var(--radius-native-lg, 24px) var(--radius-native-lg, 24px) 0 0;
   box-shadow: var(--shadow-xl);
   width: 100%;
   max-height: 90vh;
   max-height: 90dvh;
   overflow-y: auto;
-  animation: slideInUp 250ms ease-out;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  animation: slideInUp 280ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
 @media (min-width: 768px) {
@@ -557,8 +674,8 @@
 }
 
 .modal-handle {
-  width: 36px;
-  height: 4px;
+  width: 42px;
+  height: 5px;
   background: var(--color-border);
   border-radius: var(--radius-full);
   margin: var(--space-3) auto var(--space-2);
@@ -583,10 +700,28 @@
 
 .modal-footer {
   padding: var(--space-4) var(--space-5);
+  padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom, 0px));
   border-top: 1px solid var(--color-border-light);
   display: flex;
   justify-content: flex-end;
   gap: var(--space-3);
+}
+
+/* Mobile modal footer: full-width stacked buttons */
+@media (max-width: 767px) {
+  .modal-footer {
+    flex-direction: column-reverse;
+    gap: var(--space-2);
+  }
+
+  .modal-footer .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .modal-body {
+    padding: var(--space-5) var(--space-mobile-inset, var(--space-5));
+  }
 }
 
 @media (min-width: 768px) {
