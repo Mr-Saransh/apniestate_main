@@ -66,7 +66,7 @@ export default function InvoicesPage() {
     setFormNumber(invoice.number);
     setFormVendorId(invoice.vendor_id);
     setFormAmount(invoice.amount);
-    setFormTaxAmount(invoice.tax_amount);
+    setFormTaxAmount(invoice.tax_amount || 0);
     setFormDueDate(invoice.due_date ? new Date(invoice.due_date).toISOString().split('T')[0] : '');
     setFormStatus(invoice.status);
     setFormNotes(invoice.notes || '');
@@ -139,7 +139,7 @@ export default function InvoicesPage() {
     inv.vendor?.name.toLowerCase().includes(search.toLowerCase())
   );
 
-  const pendingInvoices = invoices.filter(inv => inv.status === 'PENDING' || inv.status === 'DRAFT');
+  const pendingInvoices = invoices.filter(inv => (inv.status as string) === 'PENDING' || inv.status === 'DRAFT');
   const pendingCount = pendingInvoices.length;
   const pendingAmount = pendingInvoices.reduce((sum, inv) => sum + inv.total, 0);
 
@@ -200,7 +200,7 @@ export default function InvoicesPage() {
         ) : (
           filteredInvoices.map((inv, i) => {
             const dueDate = inv.due_date ? new Date(inv.due_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A';
-            const displayStatus = inv.status === 'PENDING' ? 'Pending Approval' : inv.status;
+            const displayStatus = (inv.status as string) === 'PENDING' ? 'Pending Approval' : inv.status;
             
             return (
               <div key={inv.id || i} className={`px-4 py-3 ${i < filteredInvoices.length - 1 ? "border-b border-border" : ""}`}>
@@ -219,7 +219,7 @@ export default function InvoicesPage() {
                 <div className="flex items-center gap-2 flex-wrap">
                   <Chip color={statusColor[inv.status] || "gray"}>{displayStatus}</Chip>
                   <span className="text-[10px] text-muted-foreground">Due: {dueDate}</span>
-                  {(inv.status === "PENDING" || inv.status === "DRAFT") && (
+                  {((inv.status as string) === "PENDING" || inv.status === "DRAFT") && (
                     <button 
                       onClick={() => approveInvoice(inv.id)}
                       className="ml-auto text-[10px] bg-primary text-white px-2.5 py-1 rounded font-semibold hover:bg-primary/90 transition-colors"

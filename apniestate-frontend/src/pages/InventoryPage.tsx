@@ -86,7 +86,7 @@ export default function InventoryPage() {
     setSaving(true);
     setFormError('');
     try {
-      await inventoryApi.createTransaction({
+      await inventoryApi.recordTransaction({
         site_id: selectedSiteId,
         material_id: selectedMaterialId,
         type: txnType,
@@ -105,21 +105,21 @@ export default function InventoryPage() {
     }
   };
 
-  const filtered = inventory.filter(item => 
+  const filtered = inventory.filter((item: any) => 
     !searchQuery || 
     item.material?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     item.site?.name?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const lowStockCount = inventory.filter(i => {
+  const lowStockCount = inventory.filter((i: any) => {
     const minThreshold = i.material?.min_threshold || 100;
     return i.quantity < minThreshold;
   }).length;
   
-  const lowStockNames = inventory.filter(i => {
+  const lowStockNames = inventory.filter((i: any) => {
     const minThreshold = i.material?.min_threshold || 100;
     return i.quantity < minThreshold;
-  }).map(i => `${i.material?.name} at ${i.site?.name}`).join(', ');
+  }).map((i: any) => `${i.material?.name} at ${i.site?.name}`).join(', ');
 
   if (loading && inventory.length === 0) {
     return (
@@ -159,7 +159,7 @@ export default function InventoryPage() {
         {filtered.length === 0 ? (
           <div className="p-8 text-center text-muted-foreground text-sm">No inventory items found</div>
         ) : (
-          filtered.map((item, i) => {
+          filtered.map((item: any, i) => {
             const minThreshold = item.material?.min_threshold || 100;
             const isCritical = item.quantity <= minThreshold * 0.25;
             const isLow = item.quantity < minThreshold && !isCritical;

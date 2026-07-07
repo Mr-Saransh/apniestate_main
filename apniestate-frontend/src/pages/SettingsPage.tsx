@@ -114,12 +114,12 @@ export default function SettingsPage() {
       </Card>
 
       {companySections.map((s, si) => (
-        <Card key={si} title={
+        <Card key={si} title={(
           <div className="flex items-center gap-2">
             {s.icon}
             <span>{s.title}</span>
           </div>
-        } noPad>
+        ) as any} noPad>
           {s.fields.map(([l, v], fi) => (
             <div key={fi} className={`flex items-center justify-between px-4 py-3 ${fi < s.fields.length - 1 ? "border-b border-border" : ""}`}>
               <span className="text-xs text-muted-foreground">{l}</span>
@@ -133,9 +133,9 @@ export default function SettingsPage() {
         Save Company Settings
       </button>
 
-      {(user?.role === 'BUILDER' || user?.role === 'COMPANY_ADMIN') && (
+      {(user?.role === 'BUILDER' || (user?.role as string) === 'COMPANY_ADMIN') && (
         <div className="pt-8">
-          <Card title={<span className="text-red-500">Danger Zone</span>} noPad>
+          <Card title={<span className="text-red-500">Danger Zone</span> as any} noPad>
             <div className="px-4 py-4 flex items-center justify-between">
               <div>
                 <p className="text-xs font-semibold text-foreground">Delete Workspace</p>

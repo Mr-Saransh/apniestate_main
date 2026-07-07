@@ -95,7 +95,7 @@ export default function PayrollPage() {
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.05)" />
             <XAxis dataKey="m" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
             <YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
-            <Tooltip contentStyle={{ fontSize: 10, borderRadius: 8 }} formatter={(v: number) => [`₨${v}Cr`, "Payroll"]} />
+            <Tooltip contentStyle={{ fontSize: 10, borderRadius: 8 }} formatter={(v: any) => [`₨${v}Cr`, "Payroll"]} />
             <Bar dataKey="amt" fill="var(--color-primary)" radius={[3, 3, 0, 0]} name="Payroll" />
           </BarChart>
         </ResponsiveContainer>
