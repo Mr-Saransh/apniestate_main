@@ -1,161 +1,155 @@
-import { useState, useEffect } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import React from 'react';
+import { NavLink } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
-import Logo from '@/components/shared/Logo';
-import { LogOut, ChevronDown, Building2, ArrowLeftRight } from 'lucide-react';
-import { getSidebarConfig } from '@/config/navigation.config';
-import { apiClient } from '@/api/client';
+import {
+  LayoutDashboard, ClipboardList, Users, HardHat, FileText,
+  Package, Warehouse, ShoppingCart, Flag, CalendarDays,
+  BookOpen, TrendingUp, ShoppingBag, Receipt, CreditCard,
+  Truck, DollarSign, BarChart2, FolderOpen, UserCog, Settings,
+  Download, FileDown, Bell, Calendar, UserCircle, X, Building2, LogOut, FileCheck, Landmark, PieChart
+} from "lucide-react";
 
-export default function Sidebar() {
-  const { user, logout, hasPermission } = useAuth();
-  const navigate = useNavigate();
-  const [companyName, setCompanyName] = useState('');
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
+type NavItem = { id: string; label: string; icon: React.ElementType; badge?: number };
+type NavGroup = { label: string; items: NavItem[] };
 
-  useEffect(() => {
-    // Fetch company name
-    apiClient.get<any>('/companies/me')
-      .then(res => {
-        if (res.success && res.data) {
-          setCompanyName(res.data.name || '');
-        }
-      })
-      .catch(() => {});
+const navGroups: NavGroup[] = [
+  { label: "Overview", items: [{ id: "/dashboard", label: "Overview", icon: LayoutDashboard }] },
+  {
+    label: "Entities", items: [
+      { id: "/projects", label: "Projects", icon: Building2 },
+      { id: "/sites", label: "Sites", icon: HardHat },
+      { id: "/milestones", label: "Milestones", icon: Flag },
+      { id: "/vendors", label: "Vendors", icon: Truck },
+      { id: "/contractors", label: "Contractors", icon: Users },
+    ],
+  },
+  {
+    label: "Field Operations", items: [
+      { id: "/daily-logs", label: "Daily Logs", icon: ClipboardList },
+      { id: "/attendance", label: "Attendance", icon: Users },
+      { id: "/workers", label: "Workers", icon: HardHat },
+      { id: "/dpr", label: "Daily Progress Report", icon: FileText },
+    ],
+  },
+  {
+    label: "Materials", items: [
+      { id: "/materials", label: "Materials Master", icon: Package },
+      { id: "/inventory", label: "Inventory", icon: Warehouse },
+      { id: "/material-requests", label: "Material Requests", icon: ShoppingCart, badge: 8 },
+    ],
+  },
+  {
+    label: "Planning", items: [
+      { id: "/milestones", label: "Milestones", icon: Flag },
+      { id: "/timeline", label: "Timeline", icon: CalendarDays },
+    ],
+  },
+  {
+    label: "Finance", items: [
+      { id: "/finance", label: "Finance Dashboard", icon: Landmark },
+      { id: "/cashbook", label: "Cashbook", icon: BookOpen },
+      { id: "/budgets", label: "Budgets", icon: PieChart },
+      { id: "/purchase-orders", label: "Purchase Orders", icon: ShoppingCart },
+      { id: "/expenses", label: "Expenses", icon: Receipt },
+      { id: "/invoices", label: "Invoices", icon: FileText },
+      { id: "/payments", label: "Vendor Payments", icon: CreditCard },
+    ],
+  },
+  {
+    label: "Operations", items: [
+      { id: "/equipment", label: "Equipment Usage", icon: Truck },
+      { id: "/payroll", label: "Payroll", icon: DollarSign },
+    ],
+  },
+  {
+    label: "Intelligence", items: [
+      { id: "/reports", label: "Reports & Analytics", icon: BarChart2 },
+      { id: "/documents", label: "Documents", icon: FolderOpen },
+    ],
+  },
+  {
+    label: "Admin", items: [
+      { id: "/users", label: "Users", icon: UserCog },
+      { id: "/profile", label: "Profile", icon: UserCircle },
+      { id: "/settings", label: "Company Settings", icon: Settings },
+    ],
+  },
+  {
+    label: "Tools", items: [
+      { id: "/export-attendance", label: "Export Attendance", icon: Download },
+      { id: "/export-dpr", label: "Export DPR", icon: FileDown },
+      { id: "/notifications", label: "Notifications", icon: Bell, badge: 5 },
+      { id: "/calendar", label: "Calendar", icon: Calendar },
+    ],
+  }
+];
 
-    // Fetch unread notification count
-    apiClient.get<any>('/notifications?unread=true&limit=1')
-      .then(res => {
-        if (res.success && res.data) {
-          const count = Array.isArray(res.data) ? res.data.length : (res.data.unreadCount || 0);
-          setUnreadCount(count);
-        }
-      })
-      .catch(() => {});
-  }, []);
-
-  const getInitials = (name: string) =>
-    name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-
-  const formatRole = (role: string) =>
-    role.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-
-  const checkAccess = (permission?: string) => {
-    if (!permission) return true;
-    return hasPermission(permission);
-  };
-
-  const toggleSection = (label: string) => {
-    setCollapsedSections(prev => ({
-      ...prev,
-      [label]: !prev[label]
-    }));
-  };
-
-  const navSections = getSidebarConfig(user?.role || 'SITE_SUPERVISOR');
-
-  const filteredNavSections = navSections.map(section => ({
-    ...section,
-    items: section.items.filter(item => checkAccess(item.permission))
-  })).filter(section => section.items.length > 0);
+export default function Sidebar({ onClose }: { onClose?: () => void }) {
+  const { user, logout } = useAuth();
+  const initials = user?.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : 'AR';
 
   return (
-    <aside className="sidebar" id="desktop-sidebar">
-      {/* Brand */}
-      <div className="sidebar-brand" style={{ display: 'flex', justifyContent: 'center', padding: 'var(--space-4) 0' }}>
-        <Logo size="lg" />
-      </div>
-
-      {/* Company Badge */}
-      {companyName && (
-        <div className="sidebar-company-badge">
-          <Building2 size={14} />
-          <span className="sidebar-company-name">{companyName}</span>
+    <div className="flex flex-col h-full bg-[#2648E7] text-white overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-4 border-b border-white/10 flex-shrink-0">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-[#FCC300] flex items-center justify-center flex-shrink-0">
+            <Building2 className="w-4 h-4 text-[#0D1117]" />
+          </div>
+          <div>
+            <p className="text-sm font-bold leading-tight">Apni Estate</p>
+            <p className="text-[9px] opacity-50 font-medium tracking-wide uppercase m-0">Construction ERP</p>
+          </div>
         </div>
-      )}
-
-      {/* Navigation */}
-      <nav className="sidebar-nav">
-        {filteredNavSections.map((section) => {
-          const isCollapsed = collapsedSections[section.label] || false;
-          return (
-            <div key={section.label} className="sidebar-section">
-              <div 
-                className="sidebar-section-label"
-                onClick={() => toggleSection(section.label)}
-                style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
-              >
-                <span>{section.label}</span>
-                <ChevronDown 
-                  size={12} 
-                  style={{ 
-                    transition: 'transform 0.2s ease',
-                    transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)',
-                    opacity: 0.5
-                  }} 
-                />
-              </div>
-              <div 
-                className="sidebar-section-items"
-                style={{
-                  maxHeight: isCollapsed ? '0px' : '800px',
-                  overflow: 'hidden',
-                  transition: 'max-height 0.3s ease'
-                }}
-              >
-                {section.items.map(({ to, icon: Icon, label, badge }) => (
-                  <NavLink
-                    key={`${to}-${label}`}
-                    to={to}
-                    end={to === '/dashboard'}
-                    className={({ isActive }) =>
-                      `sidebar-link ${isActive ? 'active' : ''}`
-                    }
-                  >
-                    <span className="sidebar-link-icon">
-                      <Icon size={20} />
+        {onClose && (
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10 ml-2 flex-shrink-0">
+            <X className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+      <div className="flex-1 overflow-y-auto py-2 custom-scrollbar">
+        {navGroups.map(group => (
+          <div key={group.label} className="mb-0.5">
+            <p className="px-4 pt-3 pb-1 text-[9px] font-bold uppercase tracking-widest opacity-40 m-0">{group.label}</p>
+            {group.items.map(item => (
+              <div key={item.id} className="px-2">
+                <NavLink
+                  to={item.id}
+                  onClick={() => onClose && onClose()}
+                  className={({ isActive }) =>
+                    `group flex items-center justify-between px-4 py-2.5 mx-2 my-0.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                      isActive ? "bg-white/10 text-white font-semibold shadow-inner" : "text-white/70 hover:bg-white/5 hover:text-white"
+                    }`
+                  }
+                >
+                  <div className="flex items-center gap-3">
+                    <item.icon className="w-[18px] h-[18px] opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-transform duration-200" />
+                    <span className="group-hover:translate-x-0.5 transition-transform duration-200">{item.label}</span>
+                  </div>
+                  {item.badge && (
+                    <span className="bg-[#FCC300] text-[#0D1117] text-[10px] font-bold px-1.5 py-0.5 rounded-md group-hover:scale-105 transition-transform duration-200">
+                      {item.badge}
                     </span>
-                    <span className="sidebar-link-text">{label}</span>
-                    {badge && unreadCount > 0 && (
-                      <span className="sidebar-badge">{unreadCount > 9 ? '9+' : unreadCount}</span>
-                    )}
-                  </NavLink>
-                ))}
+                  )}
+                </NavLink>
               </div>
-            </div>
-          );
-        })}
-      </nav>
-
-      {/* User */}
-      <div className="sidebar-footer">
-        <div 
-          className="sidebar-switch-company" 
-          onClick={() => {
-            // Clear company_id to trigger company selection
-            const userData = user ? { ...user, company_id: null } : null;
-            if (userData) {
-              navigate('/select-workspace');
-            }
-          }}
-          title="Switch Company"
-        >
-          <ArrowLeftRight size={14} />
-          <span>Switch Company</span>
-        </div>
-        <div className="sidebar-user" onClick={logout} title="Logout">
-          <div className="sidebar-user-avatar">
-            {user ? getInitials(user.name) : '?'}
+            ))}
           </div>
-          <div className="sidebar-user-info">
-            <div className="sidebar-user-name">{user?.name || 'User'}</div>
-            <div className="sidebar-user-role">
-              {user ? formatRole(user.role) : ''}
-            </div>
+        ))}
+      </div>
+      <div className="px-3 py-3 border-t border-white/10 flex-shrink-0">
+        <div className="flex items-center gap-2.5 px-2 py-2">
+          <div className="w-8 h-8 rounded-full bg-[#FCC300] flex items-center justify-center text-[#0D1117] text-[11px] font-bold flex-shrink-0">
+            {initials}
           </div>
-          <LogOut size={16} style={{ opacity: 0.5, flexShrink: 0 }} className="sidebar-link-text" />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold m-0">{user?.name || 'Asim Raza'}</p>
+            <p className="text-[9px] opacity-50 m-0">{user?.role ? user.role.replace(/_/g, ' ') : 'Super Admin'}</p>
+          </div>
+          <button onClick={logout} className="p-1 rounded bg-transparent border-none outline-none">
+            <LogOut className="w-3.5 h-3.5 opacity-40 flex-shrink-0 cursor-pointer hover:opacity-100 transition-opacity" />
+          </button>
         </div>
       </div>
-    </aside>
+    </div>
   );
 }

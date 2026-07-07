@@ -1,27 +1,20 @@
-import { useState, useEffect, type FormEvent } from 'react';
+import React, { useState, useEffect, type FormEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Package, Search, AlertTriangle, Plus, ArrowLeft, Layers, Calendar, BarChart3 } from 'lucide-react';
-import EmptyState from '@/components/shared/EmptyState';
-import LoadingSpinner from '@/components/shared/LoadingSpinner';
-import Modal from '@/components/shared/Modal';
-import StatCard from '@/components/shared/StatCard';
+import { Package, Plus, X, AlertTriangle } from 'lucide-react';
 import { inventoryApi, type InventoryItem } from '@/api/inventory';
 import { apiClient } from '@/api/client';
-
-const categoryFilters = ['All', 'Material', 'Plumbing', 'Electrical', 'Finishing', 'Other'];
+import { PH, Card, Chip, SrchBar } from '@/components/shared/FigmaComponents';
 
 export default function InventoryPage() {
   const location = useLocation();
   const navigate = useNavigate();
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeFilter, setActiveFilter] = useState('All');
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Modal and Form controls
   const [showModal, setShowModal] = useState(false);
-  const [modalMode, setModalMode] = useState<'transaction' | 'material'>('transaction');
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
 
@@ -36,18 +29,10 @@ export default function InventoryPage() {
   const [quantity, setQuantity] = useState('');
   const [notes, setNotes] = useState('');
 
-  // Material form states
-  const [newMatName, setNewMatName] = useState('');
-  const [newMatUnit, setNewMatUnit] = useState('pcs');
-  const [newMatCategory, setNewMatCategory] = useState('Material');
-  const [newMatDesc, setNewMatDesc] = useState('');
-
   const loadInventory = async () => {
     try {
       const res = await inventoryApi.getAll();
-      if (res.data) {
-        setInventory(res.data);
-      }
+      if (res.data) setInventory(res.data);
     } catch (err) {
       console.error('Failed to load inventory data:', err);
     }
@@ -79,7 +64,6 @@ export default function InventoryPage() {
     const params = new URLSearchParams(location.search);
     if (params.get('create') === 'true') {
       setShowModal(true);
-      setModalMode('transaction');
     }
   }, [location.search]);
 
@@ -90,450 +74,183 @@ export default function InventoryPage() {
     setQuantity('');
     setNotes('');
     setFormError('');
-    setModalMode('transaction');
-    setNewMatName('');
-    setNewMatUnit('pcs');
-    setNewMatCategory('Material');
-    setNewMatDesc('');
   };
 
   const handleTxnSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!selectedSiteId || !selectedMaterialId || !quantity) {
-      setFormError('Please fill out all required fields.');
+      setFormError('Please fill in all required fields.');
       return;
     }
-
-    const qtyNum = parseFloat(quantity);
-    if (isNaN(qtyNum) || qtyNum <= 0) {
-      setFormError('Quantity must be a positive number.');
-      return;
-    }
-
+    
     setSaving(true);
     setFormError('');
-
     try {
-      await inventoryApi.recordTransaction({
+      await inventoryApi.createTransaction({
         site_id: selectedSiteId,
         material_id: selectedMaterialId,
         type: txnType,
-        quantity: qtyNum,
+        quantity: Number(quantity),
         notes: notes || null
       });
-
-      // Reload data
-      await loadInventory();
       
-      // Reset form & close modal
-      resetForm();
       setShowModal(false);
+      resetForm();
+      loadInventory();
       navigate('/inventory', { replace: true });
     } catch (err: any) {
-      console.error('Failed to record stock transaction:', err);
-      setFormError(err.response?.data?.message || 'Failed to save transaction. Please try again.');
+      setFormError(err.message || 'Transaction failed');
     } finally {
       setSaving(false);
     }
   };
 
-  const handleMaterialSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!newMatName || !newMatUnit) {
-      setFormError('Material Name and Unit are required.');
-      return;
-    }
+  const filtered = inventory.filter(item => 
+    !searchQuery || 
+    item.material?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    item.site?.name?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
-    setSaving(true);
-    setFormError('');
-
-    try {
-      const res = await apiClient.post<any>('/materials', {
-        name: newMatName,
-        unit: newMatUnit,
-        category: newMatCategory,
-        description: newMatDesc || null
-      });
-
-      // Reload dropdowns
-      await loadDropdowns();
-
-      // Select newly created material
-      if (res.data && res.data.id) {
-        setSelectedMaterialId(res.data.id);
-      }
-
-      // Reset material form & go back to transaction form
-      setNewMatName('');
-      setNewMatUnit('pcs');
-      setNewMatCategory('Material');
-      setNewMatDesc('');
-      setModalMode('transaction');
-    } catch (err: any) {
-      console.error('Failed to create new material:', err);
-      setFormError(err.response?.data?.message || 'Failed to create material. Please try again.');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const filtered = inventory.filter(item => {
-    const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesFilter = activeFilter === 'All' || item.category === activeFilter;
-    return matchesSearch && matchesFilter;
-  });
-
-  // Calculate statistics
-  const lowStockCount = inventory.filter(i => i.is_low_stock).length;
+  const lowStockCount = inventory.filter(i => {
+    const minThreshold = i.material?.min_threshold || 100;
+    return i.quantity < minThreshold;
+  }).length;
   
-  const itemsWithUsage = inventory.filter(i => i.avg_daily_usage && i.avg_daily_usage > 0);
-  const minDays = itemsWithUsage.length > 0 ? Math.min(...itemsWithUsage.map(i => i.days_remaining ?? 999)) : 999;
-  const daysText = minDays === 999 ? 'N/A' : `${minDays} days`;
+  const lowStockNames = inventory.filter(i => {
+    const minThreshold = i.material?.min_threshold || 100;
+    return i.quantity < minThreshold;
+  }).map(i => `${i.material?.name} at ${i.site?.name}`).join(', ');
 
-  if (loading) return <LoadingSpinner size="lg" />;
+  if (loading && inventory.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="w-8 h-8 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+      </div>
+    );
+  }
 
   return (
-    <div className="animate-fade-in">
-      {/* Header */}
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">Physical Inventory</h1>
-          <p className="page-subtitle">
-            Track stocks, manage transactions, and view depletion warnings across sites.
-          </p>
-        </div>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="stats-grid" style={{ marginBottom: 'var(--space-6)' }}>
-        <StatCard
-          icon={<Layers size={20} />}
-          label="Material Categories"
-          value={new Set(inventory.map(i => i.name)).size}
-          color="#3B82F6"
-          bgColor="rgba(59, 130, 246, 0.1)"
-        />
-        <StatCard
-          icon={<AlertTriangle size={20} />}
-          label="Low Stock Items"
-          value={lowStockCount}
-          color={lowStockCount > 0 ? '#EF4444' : '#10B981'}
-          bgColor={lowStockCount > 0 ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)'}
-        />
-        <StatCard
-          icon={<Calendar size={20} />}
-          label="Earliest Depletion"
-          value={daysText}
-          color={minDays < 15 ? '#EF4444' : '#10B981'}
-          bgColor={minDays < 15 ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)'}
-        />
-        <StatCard
-          icon={<BarChart3 size={20} />}
-          label="Critical Stock Alerts"
-          value={inventory.filter(i => i.is_low_stock && i.quantity <= (i.minQuantity * 0.5)).length}
-          color="#F59E0B"
-          bgColor="rgba(245, 158, 11, 0.1)"
-        />
-      </div>
-
-      {/* Search and Filters */}
-      <div style={{ marginBottom: 'var(--space-4)', display: 'flex', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
-        <div className="search-input-wrapper" style={{ flex: 1, minWidth: '250px' }}>
-          <Search size={18} className="search-icon" />
-          <input
-            type="text"
-            className="form-input"
-            placeholder="Search material stocks..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            id="search-inventory"
-          />
-        </div>
-      </div>
-
-      {/* Filter Chips */}
-      <div className="filter-bar" style={{ marginBottom: 'var(--space-5)' }}>
-        {categoryFilters.map((filter) => (
-          <button
-            key={filter}
-            className={`filter-chip ${activeFilter === filter ? 'active' : ''}`}
-            onClick={() => setActiveFilter(filter)}
-          >
-            {filter}
-          </button>
-        ))}
-      </div>
-
-      {/* Inventory List */}
-      {filtered.length === 0 ? (
-        <EmptyState
-          icon={<Package size={36} />}
-          title="No inventory records found"
-          description="Adjust your search or add a transaction to record stock items."
-        />
-      ) : (
-        <div className="card" style={{ overflow: 'hidden' }}>
-          <div className="card-body" style={{ padding: 0 }}>
-            {filtered.map((item) => {
-              const isLow = item.is_low_stock;
-              const daysLeft = item.days_remaining;
-              return (
-                <div key={item.id} className="list-card hover-row" id={`inventory-${item.id}`}>
-                  <div
-                    className="list-card-icon"
-                    style={{
-                      background: isLow ? 'var(--color-danger-bg)' : 'var(--color-primary-50)',
-                      color: isLow ? 'var(--color-danger)' : 'var(--color-primary)',
-                    }}
-                  >
-                    {isLow ? <AlertTriangle size={20} /> : <Package size={20} />}
-                  </div>
-                  <div className="list-card-content">
-                    <div className="list-card-title">{item.name}</div>
-                    <div className="list-card-subtitle">
-                      {item.site?.name || 'Unknown Site'} · {item.category}
-                    </div>
-                    {item.avg_daily_usage && item.avg_daily_usage > 0 ? (
-                      <div className="text-muted" style={{ fontSize: '12px', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                        <span>Daily usage: {item.avg_daily_usage.toFixed(1)} {item.unit}/day · Forecast: {daysLeft === 999 ? '999+' : daysLeft} days left</span>
-                        {item.is_estimated && (
-                          <span style={{
-                            fontSize: '10px',
-                            fontWeight: 600,
-                            color: '#F59E0B',
-                            background: 'rgba(245, 158, 11, 0.1)',
-                            padding: '2px 6px',
-                            borderRadius: '4px',
-                            whiteSpace: 'nowrap'
-                          }}
-                          title="Based on industry averages. Will auto-switch to actual usage once enough project data is available."
-                          >
-                            ⚡ Estimated
-                          </span>
-                        )}
-                      </div>
-                    ) : null}
-                  </div>
-                  <div className="list-card-meta" style={{ textAlign: 'right' }}>
-                    <div className="list-card-value" style={{
-                      color: isLow ? 'var(--color-danger)' : 'var(--color-text)',
-                      fontWeight: 'bold'
-                    }}>
-                      {item.quantity} {item.unit}
-                    </div>
-                    {isLow && (
-                      <div style={{ color: 'var(--color-danger)', fontSize: '11px', fontWeight: '500', marginTop: '2px' }}>
-                        Low Stock Alert
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <PH title="Inventory" sub="Current stock across all site warehouses" />
+      
+      {lowStockCount > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-start gap-2 shadow-sm">
+          <AlertTriangle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="text-xs font-semibold text-red-700">{lowStockCount} materials below minimum threshold</p>
+            <p className="text-[10px] text-red-500 mt-0.5">{lowStockNames}</p>
           </div>
         </div>
       )}
 
+      <div className="flex flex-col sm:flex-row gap-2">
+        <div className="flex-1" onChange={(e: any) => setSearchQuery(e.target.value)}>
+          <SrchBar placeholder="Search inventory..." />
+        </div>
+        <button 
+          onClick={() => setShowModal(true)}
+          className="px-3 py-2 bg-primary text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 flex-shrink-0 hover:bg-primary/90 transition-colors"
+        >
+          <Plus className="w-3 h-3" /> Transaction
+        </button>
+      </div>
 
-      {/* Modal Popup */}
-      <Modal
-        isOpen={showModal}
-        onClose={() => { setShowModal(false); resetForm(); navigate('/inventory', { replace: true }); }}
-        title={modalMode === 'transaction' ? 'Record Stock Transaction' : 'Create New Material Type'}
-        footer={
-          modalMode === 'transaction' ? (
-            <>
-              <button 
-                type="button"
-                className="btn btn-secondary btn-3d btn-3d-secondary" 
-                onClick={() => { setShowModal(false); resetForm(); navigate('/inventory', { replace: true }); }}
-              >
-                Cancel
-              </button>
-              <button 
-                type="submit"
-                className="btn btn-primary btn-3d btn-3d-primary"
-                onClick={handleTxnSubmit as any}
-                disabled={saving || !selectedSiteId || !selectedMaterialId || !quantity}
-                id="submit-record-transaction"
-              >
-                {saving ? 'Saving...' : 'Save Transaction'}
-              </button>
-            </>
-          ) : (
-            <>
-              <button 
-                type="button"
-                className="btn btn-secondary btn-3d btn-3d-secondary" 
-                onClick={() => { setModalMode('transaction'); setFormError(''); }}
-                style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
-              >
-                <ArrowLeft size={16} /> Back
-              </button>
-              <button 
-                type="submit"
-                className="btn btn-primary btn-3d btn-3d-primary"
-                onClick={handleMaterialSubmit as any}
-                disabled={saving || !newMatName || !newMatUnit}
-                id="submit-create-material"
-              >
-                {saving ? 'Creating...' : 'Create Material'}
-              </button>
-            </>
-          )
-        }
-      >
-        {modalMode === 'transaction' ? (
-          <form onSubmit={handleTxnSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-            {formError && <div className="login-error"><span>{formError}</span></div>}
+      <Card noPad>
+        {filtered.length === 0 ? (
+          <div className="p-8 text-center text-muted-foreground text-sm">No inventory items found</div>
+        ) : (
+          filtered.map((item, i) => {
+            const minThreshold = item.material?.min_threshold || 100;
+            const isCritical = item.quantity <= minThreshold * 0.25;
+            const isLow = item.quantity < minThreshold && !isCritical;
+            const status = isCritical ? "Critical" : isLow ? "Low" : "OK";
+            const color = isCritical ? "red" : isLow ? "yellow" : "green";
 
-            <div className="form-group">
-              <label className="form-label" htmlFor="txn-site">Site Location *</label>
-              <select
-                id="txn-site"
-                className="form-input form-select"
-                value={selectedSiteId}
-                onChange={(e) => setSelectedSiteId(e.target.value)}
-                required
-              >
-                <option value="">Select Site Location...</option>
-                {sites.map(s => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
-              </select>
+            return (
+              <div key={item.id || i} className={`flex items-center gap-3 px-4 py-3 ${i < filtered.length - 1 ? "border-b border-border" : ""}`}>
+                <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center flex-shrink-0">
+                  <Package className="w-4 h-4 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-foreground truncate">{item.material?.name || 'Unknown'}</p>
+                  <p className="text-[10px] text-muted-foreground truncate">{item.site?.name || 'Unknown Site'}</p>
+                </div>
+                <div className="text-right mr-2 flex-shrink-0">
+                  <p className="text-xs font-bold text-foreground">{item.quantity.toLocaleString()}</p>
+                  <p className="text-[10px] text-muted-foreground">{item.material?.unit || 'units'}</p>
+                </div>
+                <Chip color={color}>{status}</Chip>
+              </div>
+            );
+          })
+        )}
+      </Card>
+
+      {/* Transaction Modal */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-card w-full max-w-md rounded-2xl shadow-xl flex flex-col max-h-[90vh]">
+            <div className="flex justify-between items-center p-4 border-b border-border">
+              <h2 className="text-sm font-bold">New Inventory Transaction</h2>
+              <button onClick={() => setShowModal(false)} className="text-muted-foreground hover:text-foreground">
+                <X className="w-5 h-5" />
+              </button>
             </div>
-
-            <div className="form-group">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-1)' }}>
-                <label className="form-label" htmlFor="txn-material" style={{ marginBottom: 0 }}>Material *</label>
-                <button 
-                  type="button" 
-                  className="btn btn-secondary btn-sm" 
-                  onClick={() => { setModalMode('material'); setFormError(''); }}
-                  style={{ padding: '2px 8px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px', minHeight: 'unset', height: 'auto' }}
-                >
-                  <Plus size={12} /> New Material Type
+            
+            <form onSubmit={handleTxnSubmit} className="p-4 overflow-y-auto space-y-4">
+              {formError && <div className="p-3 bg-red-50 text-red-600 rounded-lg text-xs">{formError}</div>}
+              
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <label className="flex items-center gap-2 p-2 rounded border border-border cursor-pointer hover:bg-muted/50 transition-colors">
+                    <input type="radio" name="txntype" checked={txnType === 'IN'} onChange={() => setTxnType('IN')} className="text-primary" />
+                    <span className="text-xs font-bold text-emerald-600">Stock IN</span>
+                  </label>
+                  <label className="flex items-center gap-2 p-2 rounded border border-border cursor-pointer hover:bg-muted/50 transition-colors">
+                    <input type="radio" name="txntype" checked={txnType === 'OUT'} onChange={() => setTxnType('OUT')} className="text-primary" />
+                    <span className="text-xs font-bold text-red-600">Stock OUT</span>
+                  </label>
+                </div>
+                
+                <div>
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Site *</label>
+                  <select required className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary" value={selectedSiteId} onChange={e => setSelectedSiteId(e.target.value)}>
+                    <option value="">Select a Site</option>
+                    {sites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Material *</label>
+                  <select required className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary" value={selectedMaterialId} onChange={e => setSelectedMaterialId(e.target.value)}>
+                    <option value="">Select a Material</option>
+                    {materials.map(m => <option key={m.id} value={m.id}>{m.name} ({m.unit})</option>)}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Quantity *</label>
+                  <input type="number" required min="1" step="0.01" className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary" value={quantity} onChange={e => setQuantity(e.target.value)} placeholder="0" />
+                </div>
+                
+                <div>
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Notes (Optional)</label>
+                  <textarea className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary" rows={2} value={notes} onChange={e => setNotes(e.target.value)} placeholder={txnType === 'OUT' ? "Where was it used?" : "Supplier / Bill details"} />
+                </div>
+              </div>
+              
+              <div className="border-t border-border flex gap-2 -mx-4 -mb-4 pt-4 px-4 bg-muted/30 rounded-b-2xl pb-4 mt-4">
+                <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-2 rounded-lg border border-border bg-card text-sm font-medium hover:bg-muted transition-colors">
+                  Cancel
+                </button>
+                <button type="submit" disabled={saving} className="flex-1 py-2 rounded-lg bg-primary text-white text-sm font-medium flex justify-center items-center hover:bg-primary/90 transition-colors disabled:opacity-50">
+                  {saving ? 'Processing...' : 'Confirm'}
                 </button>
               </div>
-              <select
-                id="txn-material"
-                className="form-input form-select"
-                value={selectedMaterialId}
-                onChange={(e) => setSelectedMaterialId(e.target.value)}
-                required
-              >
-                <option value="">Select Material...</option>
-                {materials.map(m => (
-                  <option key={m.id} value={m.id}>{m.name} ({m.unit})</option>
-                ))}
-              </select>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
-              <div className="form-group">
-                <label className="form-label" htmlFor="txn-type">Movement Type *</label>
-                <select
-                  id="txn-type"
-                  className="form-input form-select"
-                  value={txnType}
-                  onChange={(e) => setTxnType(e.target.value as any)}
-                  required
-                >
-                  <option value="IN">Stock In (+)</option>
-                  <option value="OUT">Stock Out (-)</option>
-                  <option value="ADJUST">Adjustment (+/-)</option>
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label" htmlFor="txn-quantity">Quantity *</label>
-                <input
-                  id="txn-quantity"
-                  type="number"
-                  step="any"
-                  min="0.01"
-                  placeholder="Enter quantity"
-                  className="form-input premium-input"
-                  value={quantity}
-                  onChange={(e) => setQuantity(e.target.value)}
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label className="form-label" htmlFor="txn-notes">Notes / Remarks</label>
-              <textarea
-                id="txn-notes"
-                className="form-input premium-input"
-                placeholder="e.g. Received from vendor XYZ, issued to foundation work..."
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                rows={2}
-              />
-            </div>
-          </form>
-        ) : (
-          <form onSubmit={handleMaterialSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-            {formError && <div className="login-error"><span>{formError}</span></div>}
-
-            <div className="form-group">
-              <label className="form-label" htmlFor="mat-name">Material Name *</label>
-              <input
-                id="mat-name"
-                type="text"
-                className="form-input premium-input"
-                placeholder="e.g. Concrete mix, Sand, Steel Rebar..."
-                value={newMatName}
-                onChange={(e) => setNewMatName(e.target.value)}
-                required
-              />
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
-              <div className="form-group">
-                <label className="form-label" htmlFor="mat-unit">Measurement Unit *</label>
-                <input
-                  id="mat-unit"
-                  type="text"
-                  className="form-input premium-input"
-                  placeholder="e.g. bags, cft, kg, pcs, liters"
-                  value={newMatUnit}
-                  onChange={(e) => setNewMatUnit(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label" htmlFor="mat-category">Category *</label>
-                <select
-                  id="mat-category"
-                  className="form-input form-select"
-                  value={newMatCategory}
-                  onChange={(e) => setNewMatCategory(e.target.value)}
-                  required
-                >
-                  <option value="Material">Material</option>
-                  <option value="Plumbing">Plumbing</option>
-                  <option value="Electrical">Electrical</option>
-                  <option value="Finishing">Finishing</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label className="form-label" htmlFor="mat-desc">Description</label>
-              <textarea
-                id="mat-desc"
-                className="form-input premium-input"
-                placeholder="Specifications or brand information..."
-                value={newMatDesc}
-                onChange={(e) => setNewMatDesc(e.target.value)}
-                rows={2}
-              />
-            </div>
-          </form>
-        )}
-      </Modal>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

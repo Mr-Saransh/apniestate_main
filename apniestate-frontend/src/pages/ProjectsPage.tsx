@@ -1,11 +1,9 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { projectsApi, type Project, type CreateProjectData } from '@/api/projects';
-import StatusBadge from '@/components/shared/StatusBadge';
-import Modal from '@/components/shared/Modal';
+import { PH, Card, Chip, SrchBar } from '@/components/shared/FigmaComponents';
+import { Plus, FolderKanban, Search, MapPin, Calendar, X } from 'lucide-react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
-import EmptyState from '@/components/shared/EmptyState';
-import { Plus, FolderKanban, Search, MapPin, Calendar } from 'lucide-react';
 
 const statusFilters = ['All', 'Active', 'Planning', 'On Hold', 'Completed'];
 
@@ -102,285 +100,158 @@ export default function ProjectsPage() {
   if (loading) return <LoadingSpinner size="lg" />;
 
   return (
-    <div className="animate-fade-in">
-      {/* Header */}
-      <div className="page-header">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', flexWrap: 'wrap', gap: '16px' }}>
-          <div>
-            <h1 className="page-title">Projects</h1>
-            <p className="page-subtitle">
-              {projects.length} {projects.length === 1 ? 'project' : 'projects'} total
-            </p>
-          </div>
-          <button className="btn btn-primary" onClick={() => { resetForm(); setShowCreateModal(true); }} id="btn-add-project">
-            <Plus size={18} /> Add Project
-          </button>
+    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
+      <div className="flex justify-between items-start">
+        <PH title="Projects" sub={`${projects.length} ${projects.length === 1 ? 'project' : 'projects'} total`} />
+        <button 
+          onClick={() => { resetForm(); setShowCreateModal(true); }}
+          className="px-3 py-2 bg-primary text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 shadow-sm hover:bg-primary/90 transition-colors"
+        >
+          <Plus size={14} /> New Project
+        </button>
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-2">
+        <div className="flex-1" onChange={(e: any) => setSearchQuery(e.target.value)}>
+          <SrchBar placeholder="Search projects..." />
         </div>
       </div>
 
-      {/* Search */}
-      {projects.length > 0 && (
-        <div style={{ marginBottom: 'var(--space-4)' }}>
-          <div className="search-input-wrapper">
-            <Search size={18} className="search-icon" />
-            <input
-              type="text"
-              className="form-input"
-              placeholder="Search projects..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              id="search-projects"
-            />
-          </div>
-        </div>
-      )}
+      <div className="flex flex-wrap gap-2">
+        {statusFilters.map((filter) => (
+          <button
+            key={filter}
+            onClick={() => setActiveFilter(filter)}
+            className={`px-3 py-1.5 rounded-full text-[10px] font-bold tracking-wider uppercase transition-colors ${activeFilter === filter ? 'bg-primary text-white shadow-sm' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}
+          >
+            {filter}
+          </button>
+        ))}
+      </div>
 
-      {/* Filter Chips */}
-      {projects.length > 0 && (
-        <div className="filter-bar" style={{ marginBottom: 'var(--space-5)' }}>
-          {statusFilters.map((filter) => (
-            <button
-              key={filter}
-              className={`filter-chip ${activeFilter === filter ? 'active' : ''}`}
-              onClick={() => setActiveFilter(filter)}
-            >
-              {filter}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Projects List */}
-      {filtered.length === 0 ? (
-        <EmptyState
-          icon={<FolderKanban size={36} />}
-          title={searchQuery || activeFilter !== 'All' ? 'No projects found' : 'No projects yet'}
-          description={
-            searchQuery || activeFilter !== 'All'
-              ? 'Try adjusting your search or filter'
-              : 'Create your first project to get started'
-          }
-          action={
-            !searchQuery && activeFilter === 'All' ? (
-              <button
-                className="btn btn-cta"
-                onClick={() => setShowCreateModal(true)}
-              >
-                <Plus size={18} />
-                Create Project
-              </button>
-            ) : undefined
-          }
-        />
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-          {filtered.map((project, idx) => (
-            <div
-              key={project.id}
-              className="card card-interactive animate-card-reveal"
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {filtered.length === 0 ? (
+          <div className="p-8 text-center text-muted-foreground text-sm w-full col-span-full">No projects found</div>
+        ) : (
+          filtered.map((project) => (
+            <div 
+              key={project.id} 
               onClick={() => navigate(`/projects/${project.id}`)}
-              id={`project-${idx}`}
-              style={{
-                padding: 'var(--space-4)',
-                border: '1px solid var(--color-border)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '12px'
-              }}
+              className="bg-card border border-border rounded-xl p-4 shadow-sm cursor-pointer hover:shadow-md hover:border-primary/30 transition-all flex flex-col gap-3 group"
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <div
-                    style={{
-                      width: '40px',
-                      height: '40px',
-                      borderRadius: '10px',
-                      background: getProjectColor(project.status).bg,
-                      color: getProjectColor(project.status).color,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0
-                    }}
-                  >
-                    <FolderKanban size={20} />
-                  </div>
-                  <div>
-                    <h4 style={{ fontSize: '15px', fontWeight: 700, margin: 0, color: 'var(--color-text)' }}>{project.name}</h4>
-                    <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
-                      <MapPin size={12} /> {project._count?.sites || 0} Sites
-                    </span>
-                  </div>
-                </div>
-                <StatusBadge status={project.status} />
-              </div>
-
-              {/* Description */}
-              {project.description && (
-                <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', margin: 0, lineClamp: 2, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: 1.4 }}>
-                  {project.description}
-                </p>
-              )}
-
-              {/* Budget vs Spent */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', fontSize: '13px', borderTop: '1px dashed var(--color-border-light)', paddingTop: '10px', marginTop: '2px' }}>
+              <div className="flex justify-between items-start gap-2">
                 <div>
-                  <span style={{ color: 'var(--color-text-muted)', fontSize: '11px', textTransform: 'uppercase', display: 'block', marginBottom: '2px' }}>Budget Limit</span>
-                  <strong style={{ color: 'var(--color-text)', fontSize: '14px' }}>₹{(project.budget || 0).toLocaleString()}</strong>
+                  <h3 className="font-bold text-sm text-foreground leading-snug group-hover:text-primary transition-colors">{project.name}</h3>
+                  <p className="text-[10px] text-muted-foreground mt-0.5 flex items-center gap-1">
+                    <MapPin size={10} /> {project._count?.sites || 0} Sites • {project.city || 'N/A'}
+                  </p>
                 </div>
-                <div style={{ textAlign: 'right' }}>
-                  <span style={{ color: 'var(--color-text-muted)', fontSize: '11px', textTransform: 'uppercase', display: 'block', marginBottom: '2px' }}>Spent So Far</span>
-                  <strong style={{ color: (project.actual_cost || 0) > (project.budget || 0) ? 'var(--color-danger)' : 'var(--color-success)', fontSize: '14px' }}>
-                    ₹{(project.actual_cost || 0).toLocaleString()}
-                  </strong>
-                </div>
+                <Chip color={project.status === 'ACTIVE' ? 'green' : project.status === 'COMPLETED' ? 'gray' : project.status === 'ON_HOLD' ? 'red' : 'yellow'}>
+                  {project.status}
+                </Chip>
               </div>
 
-              {/* Progress bar */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid var(--color-border-light)', paddingTop: '10px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 600 }}>
-                  <span style={{ color: 'var(--color-text-secondary)' }}>Project Progress:</span>
-                  <span style={{ color: 'var(--color-primary)' }}>{project.progress_percentage || 0}% Complete</span>
-                </div>
-                <div style={{ width: '100%', height: '8px', background: 'var(--color-border-light)', borderRadius: '4px', overflow: 'hidden' }}>
-                  <div style={{ width: `${project.progress_percentage || 0}%`, height: '100%', background: 'linear-gradient(90deg, var(--color-primary), var(--color-primary-light))', borderRadius: '4px' }} />
-                </div>
+              <div className="flex justify-between items-end border-t border-border pt-3 mt-auto">
+                 <div>
+                   <p className="text-[10px] font-bold text-muted-foreground uppercase">Budget</p>
+                   <p className="text-xs font-black text-foreground">₨{(project.budget || 0).toLocaleString()}</p>
+                 </div>
+                 <div className="text-right">
+                   <p className="text-[10px] font-bold text-muted-foreground uppercase">Spent</p>
+                   <p className={`text-xs font-black ${(project.actual_cost || 0) > (project.budget || 0) ? 'text-red-500' : 'text-foreground'}`}>
+                     ₨{(project.actual_cost || 0).toLocaleString()}
+                   </p>
+                 </div>
+              </div>
+              
+              <div className="flex flex-col gap-1.5 mt-1">
+                 <div className="flex justify-between text-[10px] font-bold">
+                   <span className="text-muted-foreground">Progress</span>
+                   <span className="text-primary">{project.progress_percentage || 0}%</span>
+                 </div>
+                 <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+                   <div className="h-full bg-primary" style={{ width: `${project.progress_percentage || 0}%` }} />
+                 </div>
               </div>
             </div>
-          ))}
-        </div>
-      )}
+          ))
+        )}
+      </div>
 
 
       {/* Create Modal */}
-      <Modal
-        isOpen={showCreateModal}
-        onClose={() => {
-          setShowCreateModal(false);
-          resetForm();
-        }}
-        title="New Project"
-        footer={
-          <>
-            <button className="btn btn-secondary" onClick={() => { setShowCreateModal(false); resetForm(); }}>
-              Cancel
-            </button>
-            <button
-              className="btn btn-cta"
-              onClick={handleCreate as any}
-              disabled={creating || !formName || !formStartDate}
-              id="submit-create-project"
-            >
-              {creating ? 'Creating...' : 'Create Project'}
-            </button>
-          </>
-        }
-      >
-        <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
-          {formError && (
-            <div className="login-error">
-              <span>{formError}</span>
+      {/* Create Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
+          <div className="bg-card w-full max-w-lg rounded-xl border border-border shadow-xl max-h-[90vh] overflow-y-auto custom-scrollbar">
+            <div className="flex justify-between items-center p-4 border-b border-border">
+              <h2 className="font-bold text-foreground">New Project</h2>
+              <button onClick={() => { setShowCreateModal(false); resetForm(); }} className="p-1 hover:bg-muted rounded-md transition-colors"><X size={18} className="text-muted-foreground" /></button>
             </div>
-          )}
-          <div className="form-group">
-            <label className="form-label" htmlFor="project-name">Project Name *</label>
-            <input
-              id="project-name"
-              type="text"
-              className="form-input"
-              placeholder="e.g., Green Valley Residency"
-              value={formName}
-              onChange={(e) => setFormName(e.target.value)}
-              required
-            />
+            
+            <form onSubmit={handleCreate} className="p-4">
+              {formError && <div className="p-3 bg-red-50 text-red-600 rounded-lg text-xs">{formError}</div>}
+              
+              <div className="space-y-3">
+                <div>
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Project Name *</label>
+                  <input type="text" required className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary" value={formName} onChange={e => setFormName(e.target.value)} />
+                </div>
+                
+                <div>
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Description</label>
+                  <input type="text" className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary" value={formDesc} onChange={e => setFormDesc(e.target.value)} />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Start Date *</label>
+                    <input type="date" required className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary" value={formStartDate} onChange={e => setFormStartDate(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">End Date</label>
+                    <input type="date" className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary" value={formEndDate} onChange={e => setFormEndDate(e.target.value)} />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Budget (₨)</label>
+                    <input type="number" className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary" value={formBudget} onChange={e => setFormBudget(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Status</label>
+                    <select className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary" value={formStatus} onChange={e => setFormStatus(e.target.value as any)}>
+                      <option value="PLANNING">Planning</option>
+                      <option value="ACTIVE">Active</option>
+                      <option value="ON_HOLD">On Hold</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Address</label>
+                    <input type="text" className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary" value={formAddress} onChange={e => setFormAddress(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">City</label>
+                    <input type="text" className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary" value={formCity} onChange={e => setFormCity(e.target.value)} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 flex justify-end gap-3 pt-4 border-t border-border">
+                <button type="button" onClick={() => { setShowCreateModal(false); resetForm(); }} className="px-4 py-2 text-sm font-semibold text-muted-foreground hover:bg-muted rounded-lg transition-colors">Cancel</button>
+                <button type="submit" disabled={creating} className="px-4 py-2 text-sm font-semibold bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2">
+                  {creating && <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                  Create Project
+                </button>
+              </div>
+            </form>
           </div>
-          <div className="form-group">
-            <label className="form-label" htmlFor="project-desc">Description</label>
-            <textarea
-              id="project-desc"
-              className="form-input"
-              placeholder="Brief project description"
-              value={formDesc}
-              onChange={(e) => setFormDesc(e.target.value)}
-              rows={3}
-              style={{ resize: 'vertical', minHeight: '80px' }}
-            />
-          </div>
-          <div className="grid-2">
-            <div className="form-group">
-              <label className="form-label" htmlFor="project-start">Start Date *</label>
-              <input
-                id="project-start"
-                type="date"
-                className="form-input"
-                value={formStartDate}
-                onChange={(e) => setFormStartDate(e.target.value)}
-                required
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label" htmlFor="project-end">End Date</label>
-              <input
-                id="project-end"
-                type="date"
-                className="form-input"
-                value={formEndDate}
-                onChange={(e) => setFormEndDate(e.target.value)}
-              />
-            </div>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
-            <div className="form-group">
-              <label className="form-label" htmlFor="project-budget">Project Budget (₹)</label>
-              <input
-                id="project-budget"
-                type="number"
-                className="form-input"
-                placeholder="e.g. 5000000"
-                value={formBudget}
-                onChange={(e) => setFormBudget(e.target.value)}
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label" htmlFor="project-status">Status</label>
-              <select
-                id="project-status"
-                className="form-input form-select"
-                value={formStatus}
-                onChange={(e) => setFormStatus(e.target.value as Project['status'])}
-              >
-                <option value="PLANNING">Planning</option>
-                <option value="ACTIVE">Active</option>
-                <option value="ON_HOLD">On Hold</option>
-              </select>
-            </div>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 'var(--space-4)' }}>
-            <div className="form-group">
-              <label className="form-label" htmlFor="project-address">Site Address</label>
-              <input
-                id="project-address"
-                type="text"
-                className="form-input"
-                placeholder="e.g., 123 Construction St"
-                value={formAddress}
-                onChange={(e) => setFormAddress(e.target.value)}
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label" htmlFor="project-city">City</label>
-              <input
-                id="project-city"
-                type="text"
-                className="form-input"
-                placeholder="e.g., Noida"
-                value={formCity}
-                onChange={(e) => setFormCity(e.target.value)}
-              />
-            </div>
-          </div>
-        </form>
-      </Modal>
+        </div>
+      )}
     </div>
   );
 }

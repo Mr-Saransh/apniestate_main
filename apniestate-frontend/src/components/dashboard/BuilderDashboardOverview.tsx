@@ -1,44 +1,9 @@
 import React from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useDashboardQuery } from '@/hooks/useDashboardQuery';
-import {
-  FolderKanban,
-  Briefcase,
-  Users,
-  Wallet,
-  BarChart3,
-  Clock,
-  ClipboardList,
-  AlertTriangle,
-  TrendingUp,
-  Boxes,
-  Activity,
-  ArrowUpRight,
-  TrendingDown,
-  ThumbsUp,
-  FileCheck
-} from 'lucide-react';
-import {
-  KPIWidget,
-  CriticalAlertsWidget,
-  ProjectHealthWidget,
-  CalendarWidget,
-  AttendanceWidget,
-  RecentActivityWidget,
-  TimelineWidget,
-  MiniChartCard,
-  ProgressRingCard,
-  EmptyStateWidget
-} from './widgets';
-import {
-  AreaChartWidget,
-  BarChartWidget,
-  DonutChartWidget,
-  LineChartWidget
-} from '@/components/charts/ChartComponents';
-import { KpiGridSkeleton } from './DashboardSkeletons';
-import { FinancialKPIGrid } from './builder/FinancialKPIGrid';
-import { ConstructionInsights } from './builder/ConstructionInsights';
+import { Building2, HardHat, TrendingUp, Activity, ArrowUp, ArrowDown } from 'lucide-react';
+import { KPI, Card } from '@/components/shared/FigmaComponents';
+import { ResponsiveContainer, AreaChart, Area, CartesianGrid, XAxis, YAxis, Tooltip } from 'recharts';
 
 export const BuilderDashboardOverview: React.FC = () => {
   const { user } = useAuth();
@@ -47,159 +12,140 @@ export const BuilderDashboardOverview: React.FC = () => {
   });
 
   if (isLoading || !data) {
-    return <KpiGridSkeleton />;
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="w-8 h-8 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+      </div>
+    );
   }
 
-  const kpis = [
-    { title: 'Active Projects', value: data.overview.activeSites || data.overview.totalProjects || 0, suffix: '', icon: FolderKanban, color: '#3B82F6', bg: 'rgba(59, 132, 246, 0.06)', path: '/projects', trend: '↑ +1 mo.', trendColor: '#10B981' },
-    { title: 'Total Workers', value: (data.workforceIntelligence?.present + data.workforceIntelligence?.absent) || 342, suffix: '', icon: Users, color: '#10B981', bg: 'rgba(16, 185, 129, 0.06)', path: '/workers', trend: '↑ +18', trendColor: '#10B981' },
-    { title: 'Revenue (Jul)', value: data.financialIntelligence?.creditSum ? (data.financialIntelligence.creditSum >= 10000000 ? 'Rs' + (data.financialIntelligence.creditSum / 10000000).toFixed(1) + 'Cr' : '₹' + data.financialIntelligence.creditSum.toLocaleString()) : 'Rs5.1Cr', prefix: '', icon: TrendingUp, color: '#F59E0B', bg: 'rgba(245, 158, 11, 0.06)', path: '/finance', trend: '↑ 8.5%', trendColor: '#10B981' },
-    { title: 'Budget Utilized', value: data.overview.budgetUtilization || 72, suffix: '%', icon: BarChart3, color: '#EF4444', bg: 'rgba(239, 68, 68, 0.06)', path: '/budgets', trend: '↓ +3%', trendColor: '#EF4444' },
-  ];
+  const activeProjects = data.overview.activeSites || data.overview.totalProjects || 0;
+  const totalWorkers = (data.workforceIntelligence?.present + data.workforceIntelligence?.absent) || 0;
+  const revenueStr = data.financialIntelligence?.creditSum 
+    ? (data.financialIntelligence.creditSum >= 10000000 ? 'Rs' + (data.financialIntelligence.creditSum / 10000000).toFixed(1) + 'Cr' : '₹' + data.financialIntelligence.creditSum.toLocaleString()) 
+    : 'Rs0';
+  const budgetUtilized = data.overview.budgetUtilization || 0;
 
-  // Portfolio health distribution chart
-  const activeCount = data.projectIntelligence?.filter((p: any) => p.status === 'ACTIVE').length || 0;
-  const planningCount = data.projectIntelligence?.filter((p: any) => p.status === 'PLANNING').length || 0;
-  const completedCount = data.projectIntelligence?.filter((p: any) => p.status === 'COMPLETED').length || 0;
-  const holdCount = data.projectIntelligence?.filter((p: any) => p.status === 'ON_HOLD').length || 0;
+  const revData = data.revenueTrend || [];
 
-  const healthData = [
-    { name: 'Active', value: activeCount },
-    { name: 'Planning', value: planningCount },
-    { name: 'Completed', value: completedCount },
-    { name: 'On Hold', value: holdCount }
-  ];
+  const projects = data.projectIntelligence?.map((p: any) => ({
+    name: p.name,
+    pct: p.progress_percentage || 0,
+    color: p.status === 'COMPLETED' ? '#22c55e' : (p.status === 'ACTIVE' ? '#2648E7' : '#FCC300'),
+    status: p.status
+  })) || [];
+
+  const alerts = data.alerts || [];
+
+  const name = user?.name ? user.name.split(' ')[0] : 'Asim';
+  const hr = new Date().getHours();
+  const greeting = hr < 12 ? `Good morning, ${name} ☀️` : (hr < 17 ? `Good afternoon, ${name} ☀️` : `Good evening, ${name} 🌙`);
+
+  const formattedDate = new Date().toLocaleDateString('en-GB', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric'
+  });
+
+  const initials = user?.name ? user.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) : 'AR';
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
-      {/* KPI Stats Block */}
-      <KPIWidget items={kpis} />
-
-      {/* Executive Financial Snapshot — Milestone 3 */}
-      <FinancialKPIGrid data={data} />
-
-      {/* Construction Insights — Rule-based recommendations */}
-      <ConstructionInsights data={data} />
-
-      {/* Critical Alerts Block */}
-      <CriticalAlertsWidget alerts={data.alerts} />
-
-      {/* Interactive Charts Section */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 'var(--space-5)' }}>
-        {/* Revenue & Expenses Trend Area Chart */}
-        <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '20px', padding: '24px' }}>
-          <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <TrendingUp size={18} color="#3B82F6" />
-            Revenue & Expense Monthly Trend
-          </h3>
-          <AreaChartWidget data={data.revenueTrend} xKey="month" dataKeys={['revenue', 'expenses']} colors={['#10B981', '#EF4444']} />
+    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-base font-bold text-foreground">{greeting}</h1>
+          <p className="text-[11px] text-muted-foreground">{formattedDate}</p>
         </div>
-
-        {/* Budget Burn Rate Bar Chart */}
-        <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '20px', padding: '24px' }}>
-          <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <BarChart3 size={18} color="#F59E0B" />
-            Project Budget Burn Breakdown
-          </h3>
-          <BarChartWidget data={data.budgetBurn} xKey="projectName" dataKeys={['allocated', 'spent']} colors={['#3B82F6', '#EF4444']} />
+        <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center text-white text-xs font-bold shadow-sm">
+          {initials}
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 'var(--space-5)' }}>
-        {/* Portfolio Health Donut Chart */}
-        <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '20px', padding: '24px' }}>
-          <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Activity size={18} color="#8B5CF6" />
-            Portfolio Project Distribution
-          </h3>
-          <DonutChartWidget data={healthData} colors={['#10B981', '#3B82F6', '#8B5CF6', '#F59E0B']} />
-        </div>
-
-        {/* Upcoming Milestones */}
-        <TimelineWidget events={data.upcomingMilestones} title="Upcoming Project Milestones" />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <KPI label="Active Projects" value={activeProjects.toString()} icon={Building2} trend={{ up: true, v: "+1 mo." }} />
+        <KPI label="Total Workers" value={totalWorkers.toString()} icon={HardHat} trend={{ up: true, v: "+18" }} />
+        <KPI label="Revenue (Jul)" value={revenueStr} icon={TrendingUp} trend={{ up: true, v: "8.5%" }} />
+        <KPI label="Budget Utilized" value={`${budgetUtilized}%`} icon={Activity} trend={{ up: false, v: "+3%" }} />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 'var(--space-5)' }}>
-        <ProjectHealthWidget projects={data.projectIntelligence} />
-
-        {/* Approval Center */}
-        <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '20px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <ClipboardList size={18} color="#EF4444" />
-            Pending Approval Action Center
-          </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
-            <ProgressRingCard title="Expense Vouchers" percentage={data.approvalsPending.expenses > 0 ? 35 : 100} color="#F59E0B" subtitle={`${data.approvalsPending.expenses} pending`} />
-            <ProgressRingCard title="Leave Requests" percentage={data.approvalsPending.leaves > 0 ? 50 : 100} color="#3B82F6" subtitle={`${data.approvalsPending.leaves} pending`} />
-          </div>
-          <a
-            href="/settings"
-            style={{
-              padding: '12px',
-              borderRadius: '12px',
-              background: 'rgba(59, 130, 246, 0.08)',
-              color: '#3B82F6',
-              fontWeight: 700,
-              fontSize: '13px',
-              textAlign: 'center',
-              textDecoration: 'none',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px'
-            }}
-          >
-            Review Approval Ledger <ArrowUpRight size={16} />
-          </a>
-        </div>
-      </div>
-
-      {/* Labor trends and material shortages */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 'var(--space-5)' }}>
-        {/* Labour Trend line chart */}
-        <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '20px', padding: '24px' }}>
-          <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Users size={18} color="#10B981" />
-            Labour Trend (Last 7 Days)
-          </h3>
-          <LineChartWidget data={data.labourTrend} xKey="date" dataKeys={['workers']} colors={['#10B981']} />
-        </div>
-
-        {/* Material Shortages */}
-        <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '20px', padding: '24px' }}>
-          <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Boxes size={18} color="#EF4444" />
-            Critical Material Shortages
-          </h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {data.materialShortages.length === 0 ? (
-              <EmptyStateWidget title="No Shortages" message="All active sites have adequate material stock levels." />
-            ) : (
-              data.materialShortages.map((item: any, idx: number) => (
-                <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', border: '1px solid var(--color-border)', borderRadius: '12px' }}>
-                  <div>
-                    <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text)' }}>{item.name}</span>
-                    <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>Site: {item.siteName}</div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="space-y-4 lg:col-span-1">
+          <Card title="Active Alerts" right={<span className="text-[11px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">{alerts.length} new</span>} noPad>
+            <div className="max-h-[220px] overflow-y-auto custom-scrollbar">
+              {alerts.length === 0 ? (
+                <div className="p-6 text-center text-sm text-muted-foreground">No active alerts</div>
+              ) : (
+                alerts.map((a: any, i: number) => (
+                  <div key={i} className={`flex items-start gap-3 px-4 py-3 ${i < alerts.length - 1 ? "border-b border-border" : ""} hover:bg-muted/30 transition-colors`}>
+                    <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${a.severity === "error" || a.type === "CRITICAL" ? "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]" : a.severity === "success" ? "bg-emerald-500" : "bg-[#FCC300]"}`} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-foreground leading-snug">{a.title}</p>
+                      {a.description && <p className="text-[10px] text-muted-foreground mt-0.5 truncate">{a.description}</p>}
+                    </div>
                   </div>
-                  <span style={{ fontSize: '12px', fontWeight: 700, color: '#EF4444' }}>
-                    {item.quantity} / {item.minQuantity} {item.unit}
-                  </span>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      </div>
+                ))
+              )}
+            </div>
+          </Card>
 
-      {/* Calendar & Activities footer */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 'var(--space-5)' }}>
-        <CalendarWidget events={data.calendarEvents} />
-        <RecentActivityWidget activities={data.financialIntelligence?.recentExpenses.map((e: any) => ({
-          id: e.id,
-          details: `${e.category} voucher for ₹${e.amount.toLocaleString()} was ${e.status.toLowerCase()}`,
-          timestamp: e.date,
-          userName: 'Finance'
-        }))} />
+          <Card title="Project Progress" noPad>
+            <div className="max-h-[250px] overflow-y-auto custom-scrollbar">
+              {projects.length === 0 ? (
+                <div className="p-6 text-center text-sm text-muted-foreground">No active projects</div>
+              ) : (
+                projects.map((p: any, i: number) => (
+                  <div key={i} className={`px-4 py-3 ${i < projects.length - 1 ? "border-b border-border" : ""} hover:bg-muted/30 transition-colors`}>
+                    <div className="flex justify-between items-center text-xs mb-2">
+                      <span className="font-semibold text-foreground truncate pr-2">{p.name}</span>
+                      <div className="flex items-center gap-2 flex-shrink-0 bg-background border border-border px-1.5 py-0.5 rounded text-[10px]">
+                        <span className="text-muted-foreground">{p.status}</span>
+                        <span className="font-bold" style={{ color: p.color }}>{p.pct}%</span>
+                      </div>
+                    </div>
+                    <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                      <div className="h-full rounded-full transition-all duration-1000 ease-out relative" style={{ width: `${p.pct}%`, backgroundColor: p.color }}>
+                        <div className="absolute inset-0 bg-white/20" />
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </Card>
+        </div>
+
+        <div className="lg:col-span-2 space-y-4">
+          <Card title="Revenue vs Expenses (Monthly)">
+            <ResponsiveContainer width="100%" height={250}>
+              <AreaChart data={revData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="rg" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#2648E7" stopOpacity={0.2} />
+                    <stop offset="95%" stopColor="#2648E7" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="eg" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#FCC300" stopOpacity={0.2} />
+                    <stop offset="95%" stopColor="#FCC300" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.05)" vertical={false} />
+                <XAxis dataKey="month" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} dy={10} />
+                <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} dx={-10} tickFormatter={(v) => `Rs${v >= 100000 ? (v/100000).toFixed(0)+'L' : v}`} />
+                <Tooltip 
+                  contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid hsl(var(--border))', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }} 
+                  formatter={(value: any) => [`Rs ${value.toLocaleString()}`, '']}
+                />
+                <Area type="monotone" dataKey="revenue" stroke="#2648E7" strokeWidth={2.5} fill="url(#rg)" name="Revenue" activeDot={{ r: 6, fill: '#2648E7', stroke: '#fff', strokeWidth: 2 }} />
+                <Area type="monotone" dataKey="expenses" stroke="#FCC300" strokeWidth={2.5} fill="url(#eg)" name="Expenses" activeDot={{ r: 6, fill: '#FCC300', stroke: '#fff', strokeWidth: 2 }} />
+              </AreaChart>
+            </ResponsiveContainer>
+            <div className="flex gap-4 justify-center mt-4">
+              <div className="flex items-center gap-1.5"><div className="w-3 h-1 bg-[#2648E7] rounded-full" /><span className="text-xs text-muted-foreground font-medium">Revenue</span></div>
+              <div className="flex items-center gap-1.5"><div className="w-3 h-1 bg-[#FCC300] rounded-full" /><span className="text-xs text-muted-foreground font-medium">Expenses</span></div>
+            </div>
+          </Card>
+        </div>
       </div>
     </div>
   );

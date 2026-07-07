@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { Navigate, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { ApiError } from '@/api/client';
-import { AlertCircle, Eye, EyeOff, ShieldCheck, MapPin, TrendingUp, Users } from 'lucide-react';
+import { AlertCircle, Eye, EyeOff, ShieldCheck, MapPin, TrendingUp, Users, Building2, HardHat, Briefcase, Calculator, Loader2 } from 'lucide-react';
 import Logo from '@/components/shared/Logo';
 import '@/styles/login.css';
 
@@ -15,6 +15,29 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [showDemoModal, setShowDemoModal] = useState(false);
+  const [loggingInRole, setLoggingInRole] = useState<string | null>(null);
+
+  const handleDemoLogin = async (demoEmail: string, roleName: string) => {
+    setLoggingInRole(roleName);
+    try {
+      const response = await login({ email: demoEmail, password: 'admin123' });
+      if (!response.memberships || response.memberships.length === 0) {
+        navigate('/onboarding', { replace: true });
+        return;
+      }
+      const restored = await restoreWorkspace();
+      if (restored) {
+        navigate('/dashboard', { replace: true });
+      } else {
+        navigate('/select-workspace', { replace: true });
+      }
+    } catch (err) {
+      console.error('Demo login failed', err);
+    } finally {
+      setLoggingInRole(null);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -154,8 +177,19 @@ export default function LoginPage() {
                 </button>
               </form>
 
-              <div className="login-footer-links">
-                <p>Don't have an account? <Link to="/">Sign up</Link></p>
+              <div className="login-footer-links" style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '16px' }}>
+                <p style={{ margin: 0 }}>Don't have an account? <Link to="/">Sign up</Link></p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', opacity: 0.5 }}>
+                  <div style={{ flex: 1, height: '1px', background: 'currentColor' }} />
+                  <span style={{ fontSize: '12px', textTransform: 'uppercase' }}>or</span>
+                  <div style={{ flex: 1, height: '1px', background: 'currentColor' }} />
+                </div>
+                <button 
+                  onClick={() => setShowDemoModal(true)}
+                  style={{ background: 'transparent', border: '1px solid var(--lp-border)', padding: '10px', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, color: 'var(--lp-primary)', transition: 'all 0.2s ease' }}
+                >
+                  View Demo Accounts
+                </button>
               </div>
             </div>
           </div>
@@ -193,6 +227,60 @@ export default function LoginPage() {
           </div>
         </div>
       </div>
+      
+      {/* Demo Accounts Modal */}
+      {showDemoModal && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div style={{ backgroundColor: '#fff', borderRadius: '16px', padding: '32px', width: '100%', maxWidth: '420px', boxShadow: '0 20px 40px rgba(0,0,0,0.2)', position: 'relative' }}>
+            <button 
+              onClick={() => setShowDemoModal(false)}
+              style={{ position: 'absolute', top: '16px', right: '16px', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '20px', color: '#64748B' }}
+            >
+              ×
+            </button>
+            <h3 style={{ fontSize: '20px', fontWeight: 800, color: '#0F172A', marginBottom: '8px' }}>Select Demo Account</h3>
+            <p style={{ fontSize: '14px', color: '#64748B', marginBottom: '24px' }}>Jump straight into the app with a pre-configured role.</p>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <button 
+                onClick={() => handleDemoLogin('admin@gmail.com', 'Builder')}
+                disabled={loggingInRole !== null}
+                style={{ width: '100%', padding: '16px', borderRadius: '12px', backgroundColor: '#2648E7', color: 'white', fontWeight: 'bold', fontSize: '14px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+              >
+                {loggingInRole === 'Builder' ? <Loader2 className="animate-spin w-5 h-5" /> : <Building2 className="w-5 h-5" />}
+                Builder (Admin)
+              </button>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                <button 
+                  onClick={() => handleDemoLogin('sup1@apniestate.com', 'Supervisor')}
+                  disabled={loggingInRole !== null}
+                  style={{ padding: '12px 8px', borderRadius: '12px', backgroundColor: '#EFF6FF', color: '#2648E7', fontWeight: 600, fontSize: '12px', border: '1px solid #DBEAFE', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}
+                >
+                  {loggingInRole === 'Supervisor' ? <Loader2 className="animate-spin w-4 h-4" /> : <HardHat className="w-4 h-4" />}
+                  Supervisor
+                </button>
+                <button 
+                  onClick={() => handleDemoLogin('pm1@apniestate.com', 'Manager')}
+                  disabled={loggingInRole !== null}
+                  style={{ padding: '12px 8px', borderRadius: '12px', backgroundColor: '#EFF6FF', color: '#2648E7', fontWeight: 600, fontSize: '12px', border: '1px solid #DBEAFE', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}
+                >
+                  {loggingInRole === 'Manager' ? <Loader2 className="animate-spin w-4 h-4" /> : <Briefcase className="w-4 h-4" />}
+                  Manager
+                </button>
+                <button 
+                  onClick={() => handleDemoLogin('accounts@apniestate.com', 'Accountant')}
+                  disabled={loggingInRole !== null}
+                  style={{ padding: '12px 8px', borderRadius: '12px', backgroundColor: '#EFF6FF', color: '#2648E7', fontWeight: 600, fontSize: '12px', border: '1px solid #DBEAFE', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}
+                >
+                  {loggingInRole === 'Accountant' ? <Loader2 className="animate-spin w-4 h-4" /> : <Calculator className="w-4 h-4" />}
+                  Accountant
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

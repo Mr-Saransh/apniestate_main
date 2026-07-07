@@ -1,11 +1,9 @@
-import { useState, useEffect, type FormEvent } from 'react';
-import { ClipboardList, Plus, Search, Calendar, MapPin, CloudSun, AlertCircle, FileText, Trash2, Eye, User, Users, Download } from 'lucide-react';
+import React, { useState, useEffect, type FormEvent } from 'react';
+import { Plus, Building2, CheckCircle, Eye, Download, X } from 'lucide-react';
 import { dprApi, type DPR } from '@/api/dpr';
-import { generateDprPdf } from '@/components/shared/PdfGenerator';
 import { apiClient } from '@/api/client';
-import LoadingSpinner from '@/components/shared/LoadingSpinner';
-import EmptyState from '@/components/shared/EmptyState';
-import Modal from '@/components/shared/Modal';
+import { PH, Card, Chip, SrchBar } from '@/components/shared/FigmaComponents';
+import { generateDprPdf } from '@/components/shared/PdfGenerator';
 
 interface Project {
   id: string;
@@ -23,11 +21,7 @@ export default function DprPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [sites, setSites] = useState<Site[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // Filters
-  const [projectFilter, setProjectFilter] = useState('');
-  const [siteFilter, setSiteFilter] = useState('');
-  const [dateFilter, setDateFilter] = useState('');
+  const [search, setSearch] = useState('');
 
   // Modals
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -57,12 +51,7 @@ export default function DprPage() {
       if (projectsRes.data) setProjects(projectsRes.data);
       if (sitesRes.data) setSites(sitesRes.data);
 
-      const filters: any = {};
-      if (projectFilter) filters.project_id = projectFilter;
-      if (siteFilter) filters.site_id = siteFilter;
-      if (dateFilter) filters.date = dateFilter;
-
-      const dprsRes = await dprApi.getAll(filters);
+      const dprsRes = await dprApi.getAll({});
       if (dprsRes.data) setDprs(dprsRes.data);
 
     } catch (err) {
@@ -74,7 +63,7 @@ export default function DprPage() {
 
   useEffect(() => {
     loadData();
-  }, [projectFilter, siteFilter, dateFilter]);
+  }, []);
 
   const handleCreate = async (e: FormEvent) => {
     e.preventDefault();
@@ -131,270 +120,174 @@ export default function DprPage() {
     doc.save(`DPR_${selectedDpr.site?.name || 'Site'}_${selectedDpr.report_date.split('T')[0]}.pdf`);
   };
 
-  if (loading) return <LoadingSpinner size="lg" />;
+  const filteredDprs = dprs.filter(d => 
+    d.site?.name.toLowerCase().includes(search.toLowerCase()) || 
+    d.work_completed?.toLowerCase().includes(search.toLowerCase())
+  );
 
   const filteredSites = sites.filter(s => !formProjectId || s.project_id === formProjectId);
 
+  if (loading && dprs.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="w-8 h-8 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+      </div>
+    );
+  }
+
   return (
-    <div className="animate-fade-in texture-grain" style={{ paddingBottom: 'var(--space-12)' }}>
-      {/* Header */}
-      <div className="page-header">
-        <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
-          <div>
-            <h1 className="page-title">Daily Progress Reports (DPR)</h1>
-            <p className="page-subtitle">Track site works completion logs and supervisor briefs</p>
-          </div>
-          <button className="btn btn-primary" onClick={() => { resetForm(); setShowCreateModal(true); }}>
-            <Plus size={18} /> Submit DPR
-          </button>
+    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <PH title="Daily Progress Reports" sub="End-of-day site summaries with photos" />
+      
+      <div className="flex flex-col sm:flex-row gap-2">
+        <div className="flex-1" onChange={(e: any) => setSearch(e.target.value)}>
+          <SrchBar placeholder="Search reports..." />
         </div>
-      </div>
-
-      {/* Filters Bar */}
-      <div className="card" style={{ marginBottom: 'var(--space-6)' }}>
-        <div className="card-body" style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-4)', alignItems: 'center' }}>
-          <div className="form-group" style={{ flex: '1 1 200px', marginBottom: 0 }}>
-            <select
-              className="form-input form-select"
-              value={projectFilter}
-              onChange={e => { setProjectFilter(e.target.value); setSiteFilter(''); }}
-            >
-              <option value="">All Projects</option>
-              {projects.map(p => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="form-group" style={{ flex: '1 1 200px', marginBottom: 0 }}>
-            <select
-              className="form-input form-select"
-              value={siteFilter}
-              onChange={e => setSiteFilter(e.target.value)}
-              disabled={!projectFilter}
-            >
-              <option value="">All Sites</option>
-              {sites.filter(s => s.project_id === projectFilter).map(s => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="form-group" style={{ flex: '1 1 200px', marginBottom: 0 }}>
-            <input
-              type="date"
-              className="form-input"
-              value={dateFilter}
-              onChange={e => setDateFilter(e.target.value)}
-            />
-          </div>
-          { (projectFilter || siteFilter || dateFilter) && (
-            <button className="btn btn-ghost btn-sm" onClick={() => { setProjectFilter(''); setSiteFilter(''); setDateFilter(''); }}>
-              Reset Filters
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* DPR Cards List */}
-      {dprs.length === 0 ? (
-        <EmptyState
-          icon={<ClipboardList size={38} />}
-          title="No DPRs submitted yet"
-          description="Supervisor progress summaries will appear here once logged."
-          action={
-            <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>
-              <Plus size={16} /> Log Daily Progress
-            </button>
-          }
-        />
-      ) : (
-        <div className="card" style={{ overflow: 'hidden' }}>
-          {dprs.map((dpr) => (
-            <div key={dpr.id} className="list-card hover-row" onClick={() => openDetails(dpr)} style={{ cursor: 'pointer' }}>
-              <div className="list-card-icon" style={{ background: 'var(--color-primary-50)', color: 'var(--color-primary)' }}>
-                <ClipboardList size={20} />
-              </div>
-              <div className="list-card-content">
-                <div className="list-card-title">{dpr.site?.name || 'Site Location'}</div>
-                <div className="list-card-subtitle" style={{ color: 'var(--color-text)' }}>
-                  {dpr.summary.length > 80 ? `${dpr.summary.slice(0, 80)}...` : dpr.summary}
-                </div>
-                <div className="list-card-subtitle" style={{ fontSize: 'var(--font-size-xs)', display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}><Calendar size={12} /> {new Date(dpr.report_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}><User size={12} /> Submitter: {dpr.submitter?.name || 'Supervisor'}</span>
-                  {dpr.weather && <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}><CloudSun size={12} /> {dpr.weather}</span>}
-                  {dpr.workers_count && <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}><Users size={12} /> {dpr.workers_count} Present</span>}
-                </div>
-              </div>
-              <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); openDetails(dpr); }}>
-                <Eye size={16} />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Submission Modal */}
-      <Modal
-        isOpen={showCreateModal}
-        onClose={() => { setShowCreateModal(false); resetForm(); }}
-        title="Submit Daily Progress Report (DPR)"
-        footer={
-          <>
-            <button className="btn btn-secondary" onClick={() => { setShowCreateModal(false); resetForm(); }}>Cancel</button>
-            <button className="btn btn-primary" onClick={handleCreate as any} disabled={submitting || !formSiteId || !formWorkCompleted}>
-              {submitting ? 'Submitting...' : 'Submit DPR'}
-            </button>
-          </>
-        }
-      >
-        <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-          {formError && <div className="login-error"><span>{formError}</span></div>}
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
-            <div className="form-group">
-              <label className="form-label" htmlFor="dpr-project">Select Project *</label>
-              <select id="dpr-project" className="form-input form-select" value={formProjectId} onChange={e => { setFormProjectId(e.target.value); setFormSiteId(''); }} required>
-                <option value="">Select project...</option>
-                {projects.map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="form-group">
-              <label className="form-label" htmlFor="dpr-site">Select Site Location *</label>
-              <select id="dpr-site" className="form-input form-select" value={formSiteId} onChange={e => setFormSiteId(e.target.value)} disabled={!formProjectId} required>
-                <option value="">Select site location...</option>
-                {filteredSites.map(s => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
-            <div className="form-group">
-              <label className="form-label" htmlFor="dpr-date">Report Date</label>
-              <input id="dpr-date" type="date" className="form-input" value={formDate} onChange={e => setFormDate(e.target.value)} />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label" htmlFor="dpr-weather">Weather Conditions</label>
-              <input id="dpr-weather" type="text" className="form-input" placeholder="e.g. Sunny / Rainy / Clear" value={formWeather} onChange={e => setFormWeather(e.target.value)} />
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label" htmlFor="dpr-workers">Workers Present Count</label>
-            <input id="dpr-workers" type="number" min={0} className="form-input" placeholder="e.g. 15" value={formWorkersPresent} onChange={e => setFormWorkersPresent(e.target.value)} />
-          </div>
-
-          <div className="form-group">
-            <label className="form-label" htmlFor="dpr-completed">Work Completed Details *</label>
-            <textarea id="dpr-completed" className="form-input" placeholder="Describe tasks executed, floor levels completed, concrete volume poured, etc." value={formWorkCompleted} onChange={e => setFormWorkCompleted(e.target.value)} rows={3} required />
-          </div>
-
-          <div className="form-group">
-            <label className="form-label" htmlFor="dpr-materials">Materials Consumed Today</label>
-            <textarea id="dpr-materials" className="form-input" placeholder="e.g. 50 bags Cement, 2.5 tonnes TMT Steel bars" value={formMaterials} onChange={e => setFormMaterials(e.target.value)} rows={2} />
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
-            <div className="form-group">
-              <label className="form-label" htmlFor="dpr-issues">Issues / Delays Faced</label>
-              <textarea id="dpr-issues" className="form-input" placeholder="e.g. Labor shortage, lack of water" value={formIssues} onChange={e => setFormIssues(e.target.value)} rows={2} />
-            </div>
-            <div className="form-group">
-              <label className="form-label" htmlFor="dpr-tomorrow">Tomorrow's Activity Plan</label>
-              <textarea id="dpr-tomorrow" className="form-input" placeholder="Describe scheduled concrete pours, shuttering prep, etc." value={formTomorrowPlan} onChange={e => setFormTomorrowPlan(e.target.value)} rows={2} />
-            </div>
-          </div>
-
-        </form>
-      </Modal>
-
-      {/* Details View Modal */}
-      {selectedDpr && (
-        <Modal
-          isOpen={showDetailModal}
-          onClose={() => setShowDetailModal(false)}
-          title={`DPR Log: ${selectedDpr.site?.name || 'Site location'}`}
-          footer={
-            <div style={{ display: 'flex', gap: '8px', width: '100%', justifyContent: 'flex-end' }}>
-              <button className="btn btn-primary" onClick={handleDownloadPdf} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Download size={16} /> Download PDF
-              </button>
-              <button className="btn btn-secondary" onClick={() => setShowDetailModal(false)}>Close</button>
-            </div>
-          }
+        <button 
+          onClick={() => { resetForm(); setShowCreateModal(true); }}
+          className="px-3 py-2 bg-primary text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 flex-shrink-0 hover:bg-primary/90 transition-colors"
         >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', fontSize: 'var(--font-size-sm)' }}>
-            <div style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: 'var(--space-2)' }}>
-              <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>Project association</div>
-              <div style={{ fontWeight: 'bold' }}>{selectedDpr.site?.project?.name || 'Apni Estate'}</div>
-            </div>
+          <Plus className="w-3 h-3" /> New
+        </button>
+      </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)', borderBottom: '1px solid var(--color-border)', paddingBottom: 'var(--space-2)' }}>
-              <div>
-                <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>Report Date</span>
-                <div style={{ fontWeight: 'bold' }}>{new Date(selectedDpr.report_date).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</div>
+      {filteredDprs.length === 0 ? (
+        <div className="p-8 text-center text-muted-foreground text-sm bg-card rounded-xl border border-border">No reports found</div>
+      ) : (
+        filteredDprs.map((r, i) => {
+          const dateStr = new Date(r.report_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+          const activities = r.work_completed ? r.work_completed.split('\n').filter(Boolean).slice(0, 3) : ['No activities recorded'];
+          const pmName = r.submitter?.name || "System";
+          const issuesCount = r.issues_faced ? (typeof r.issues_faced === 'string' ? JSON.parse(r.issues_faced).length : r.issues_faced.length) : 0;
+          
+          return (
+            <Card key={r.id || i} title={r.site?.name || "Unknown Site"} right={
+              <button onClick={() => openDetails(r)} className="px-2 py-1 bg-secondary text-primary rounded text-[10px] font-bold hover:bg-primary/10 transition-colors">
+                View
+              </button>
+            }>
+              <div className="space-y-3">
+                <div className="h-20 rounded-lg bg-gradient-to-br from-slate-700 to-slate-900 flex items-center justify-center cursor-pointer hover:opacity-90 transition-opacity" onClick={() => openDetails(r)}>
+                  <div className="flex items-center gap-2 text-white/40">
+                    <Building2 className="w-7 h-7" />
+                    <span className="text-xs">Site Photo — {dateStr}</span>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5">Key Activities</p>
+                  {activities.map((a, j) => (
+                    <div key={j} className="flex items-start gap-2 mb-1">
+                      <CheckCircle className="w-3 h-3 text-emerald-500 flex-shrink-0 mt-0.5" />
+                      <span className="text-xs text-foreground line-clamp-1">{a}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex justify-between items-center text-[10px] text-muted-foreground pt-2 border-t border-border">
+                  <span>PM: {pmName}</span>
+                  <div className="flex items-center gap-2">
+                    {issuesCount > 0 && <span className="text-red-500 font-medium">{issuesCount} issues</span>}
+                    <span>{dateStr}</span>
+                  </div>
+                </div>
               </div>
-              <div>
-                <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>Supervisor</span>
-                <div style={{ fontWeight: 'bold' }}>{selectedDpr.submitter?.name || 'Unassigned'}</div>
-              </div>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)', borderBottom: '1px solid var(--color-border)', paddingBottom: 'var(--space-2)' }}>
-              <div>
-                <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>Weather Conditions</span>
-                <div style={{ fontWeight: 'bold' }}>{selectedDpr.weather || '—'}</div>
-              </div>
-              <div>
-                <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>Workers Present Count</span>
-                <div style={{ fontWeight: 'bold' }}>{selectedDpr.workers_count || '—'}</div>
-              </div>
-            </div>
-
-            <div>
-              <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', fontWeight: 'bold' }}>Work Completed</span>
-              <p style={{ margin: '4px 0 0 0', lineHeight: 1.5, background: 'var(--color-bg-warm)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)' }}>
-                {selectedDpr.work_completed}
-              </p>
-            </div>
-
-            {selectedDpr.materials_consumed && (
-              <div>
-                <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', fontWeight: 'bold' }}>Materials Consumed</span>
-                <p style={{ margin: '4px 0 0 0', lineHeight: 1.5, background: 'var(--color-primary-50)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', color: 'var(--color-primary)' }}>
-                  {selectedDpr.materials_consumed}
-                </p>
-              </div>
-            )}
-
-            {selectedDpr.issues_faced && (
-              <div>
-                <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', fontWeight: 'bold' }}>Issues / Blockers Faced</span>
-                <p style={{ margin: '4px 0 0 0', lineHeight: 1.5, background: 'var(--color-danger-bg)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', color: 'var(--color-danger)' }}>
-                  {selectedDpr.issues_faced}
-                </p>
-              </div>
-            )}
-
-            {selectedDpr.tomorrow_plan && (
-              <div>
-                <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', fontWeight: 'bold' }}>Tomorrow's Schedule Plan</span>
-                <p style={{ margin: '4px 0 0 0', lineHeight: 1.5, background: 'var(--color-info-bg)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', color: 'var(--color-info)' }}>
-                  {selectedDpr.tomorrow_plan}
-                </p>
-              </div>
-            )}
-          </div>
-        </Modal>
+            </Card>
+          );
+        })
       )}
 
+      {/* Detail Modal */}
+      {showDetailModal && selectedDpr && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-card w-full max-w-md rounded-2xl shadow-xl flex flex-col max-h-[90vh]">
+            <div className="flex justify-between items-center p-4 border-b border-border">
+              <h2 className="text-sm font-bold">DPR Details</h2>
+              <button onClick={() => setShowDetailModal(false)} className="text-muted-foreground hover:text-foreground">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 overflow-y-auto space-y-4 text-sm">
+              <div>
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Site & Date</p>
+                <p className="font-semibold mt-1">{selectedDpr.site?.name}</p>
+                <p className="text-xs text-muted-foreground">{new Date(selectedDpr.report_date).toLocaleDateString()}</p>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Work Completed</p>
+                <div className="mt-1 whitespace-pre-wrap text-sm">{selectedDpr.work_completed}</div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Weather</p>
+                  <p className="mt-1">{selectedDpr.weather || 'Not specified'}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Workers Present</p>
+                  <p className="mt-1">{selectedDpr.workers_present || 'Not specified'}</p>
+                </div>
+              </div>
+            </div>
+            <div className="p-4 border-t border-border flex gap-2">
+              <button onClick={() => setShowDetailModal(false)} className="flex-1 py-2 rounded-lg border border-border text-sm font-medium hover:bg-muted transition-colors">
+                Close
+              </button>
+              <button onClick={handleDownloadPdf} className="flex-1 py-2 rounded-lg bg-primary text-white text-sm font-medium flex justify-center items-center gap-2 hover:bg-primary/90 transition-colors">
+                <Download className="w-4 h-4" /> Download PDF
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-card w-full max-w-md rounded-2xl shadow-xl flex flex-col max-h-[90vh]">
+            <div className="flex justify-between items-center p-4 border-b border-border">
+              <h2 className="text-sm font-bold">New Progress Report</h2>
+              <button onClick={() => setShowCreateModal(false)} className="text-muted-foreground hover:text-foreground">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleCreate} className="p-4 overflow-y-auto space-y-4">
+              {formError && <div className="p-3 bg-red-50 text-red-600 rounded-lg text-xs">{formError}</div>}
+              
+              <div className="space-y-3">
+                <div>
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Project (Optional)</label>
+                  <select className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary" value={formProjectId} onChange={(e) => { setFormProjectId(e.target.value); setFormSiteId(''); }}>
+                    <option value="">All Projects</option>
+                    {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Site *</label>
+                  <select required className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary" value={formSiteId} onChange={(e) => setFormSiteId(e.target.value)}>
+                    <option value="">Select a Site</option>
+                    {filteredSites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Date *</label>
+                  <input type="date" required className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary" value={formDate} onChange={(e) => setFormDate(e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Work Completed *</label>
+                  <textarea required className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary" rows={3} placeholder="What was done today?" value={formWorkCompleted} onChange={(e) => setFormWorkCompleted(e.target.value)} />
+                </div>
+              </div>
+              
+              <div className="p-4 border-t border-border flex gap-2 -mx-4 -mb-4 mt-4 bg-muted/30 rounded-b-2xl">
+                <button type="button" onClick={() => setShowCreateModal(false)} className="flex-1 py-2 rounded-lg border border-border bg-card text-sm font-medium hover:bg-muted transition-colors">
+                  Cancel
+                </button>
+                <button type="submit" disabled={submitting} className="flex-1 py-2 rounded-lg bg-primary text-white text-sm font-medium flex justify-center items-center hover:bg-primary/90 transition-colors disabled:opacity-50">
+                  {submitting ? 'Submitting...' : 'Submit Report'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -9,6 +9,7 @@
   flex-direction: column;
   min-height: 100vh;
   min-height: 100dvh;
+  position: relative;
 }
 
 .app-main {
@@ -26,6 +27,7 @@
   max-width: var(--page-max-width);
   width: 100%;
   margin: 0 auto;
+  box-sizing: border-box;
 }
 
 /* Desktop layout */
@@ -35,20 +37,21 @@
   }
 
   .app-main {
-    margin-left: var(--sidebar-collapsed-width);
+    /* Sidebar is 260px fixed, content pushes right */
+    margin-left: var(--sidebar-width, 260px);
+    width: calc(100% - var(--sidebar-width, 260px));
     transition: margin-left var(--transition-base);
-  }
-
-  .app-main.sidebar-expanded {
-    margin-left: var(--sidebar-width);
   }
 
   .app-content {
     padding: var(--space-8);
     padding-top: calc(var(--topbar-height) + var(--space-6));
     padding-bottom: var(--space-8);
+    box-sizing: border-box;
   }
 }
+
+
 
 /* ── Premium Mobile Header ── */
 .mobile-header {

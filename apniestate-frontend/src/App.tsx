@@ -37,6 +37,18 @@ import DprPage from '@/pages/DprPage';
 import PayrollPage from '@/pages/PayrollPage';
 import ApprovalsPage from '@/pages/ApprovalsPage';
 import RouteGuard from '@/components/shared/RouteGuard';
+// New Figma pages
+import CalendarPage from '@/pages/CalendarPage';
+import EquipmentPage from '@/pages/EquipmentPage';
+import MaterialRequestsPage from '@/pages/MaterialRequestsPage';
+import TimelinePage from '@/pages/TimelinePage';
+import DailyLogsPage from '@/pages/DailyLogsPage';
+import ExportAttendancePage from '@/pages/ExportAttendancePage';
+import ExportDprPage from '@/pages/ExportDprPage';
+import ProfilePage from '@/pages/ProfilePage';
+import MilestonesPage from '@/pages/MilestonesPage';
+import PurchaseOrdersPage from '@/pages/PurchaseOrdersPage';
+import ExpensesPage from '@/pages/ExpensesPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -73,7 +85,16 @@ export default function App() {
                   <Route path="/more" element={<MorePage />} />
                   <Route path="/notifications" element={<NotificationsPage />} />
                   <Route path="/settings" element={<SettingsPage />} />
+                  <Route path="/profile" element={<ProfilePage />} />
+                  <Route path="/milestones" element={<MilestonesPage />} />
+                  <Route path="/cashbook" element={<FinancePage />} />
                   <Route path="/dpr" element={<DprPage />} />
+                  {/* New Figma pages */}
+                  <Route path="/calendar" element={<CalendarPage />} />
+                  <Route path="/timeline" element={<TimelinePage />} />
+                  <Route path="/daily-logs" element={<DailyLogsPage />} />
+                  <Route path="/export-attendance" element={<ExportAttendancePage />} />
+                  <Route path="/export-dpr" element={<ExportDprPage />} />
                 </Route>
 
                 {/* Guarded Modules */}
@@ -96,6 +117,7 @@ export default function App() {
                 </Route>
                 <Route element={<RouteGuard permission="materials.read" />}>
                   <Route path="/materials" element={<MaterialsPage />} />
+                  <Route path="/material-requests" element={<MaterialRequestsPage />} />
                 </Route>
                 <Route element={<RouteGuard permission="finance.read" />}>
                   <Route path="/finance" element={<FinancePage />} />
@@ -113,6 +135,7 @@ export default function App() {
                 {/* New Guarded Modules */}
                 <Route element={<RouteGuard permission="workers.read" />}>
                   <Route path="/workers" element={<WorkersPage />} />
+                  <Route path="/equipment" element={<EquipmentPage />} />
                 </Route>
                 <Route element={<RouteGuard permission="contractors.read" />}>
                   <Route path="/contractors" element={<ContractorsPage />} />
@@ -122,6 +145,10 @@ export default function App() {
                 </Route>
                 <Route element={<RouteGuard permission="invoices.read" />}>
                   <Route path="/invoices" element={<InvoicesPage />} />
+                </Route>
+                <Route element={<RouteGuard permission="finance.read" />}>
+                  <Route path="/purchase-orders" element={<PurchaseOrdersPage />} />
+                  <Route path="/expenses" element={<ExpensesPage />} />
                 </Route>
                 <Route element={<RouteGuard permission="payments.read" />}>
                   <Route path="/payments" element={<PaymentsPage />} />
@@ -143,5 +170,4 @@ export default function App() {
     </ErrorBoundary>
   );
 }
-
 

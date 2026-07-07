@@ -1,14 +1,10 @@
-import { useState, useEffect, type FormEvent } from 'react';
+import React, { useState, useEffect, type FormEvent } from 'react';
+import { Plus, X, CreditCard, AlertTriangle } from 'lucide-react';
 import { paymentsApi, type Payment } from '@/api/payments';
 import { vendorsApi, type Vendor } from '@/api/vendors';
 import { contractorsApi, type Contractor } from '@/api/contractors';
 import { invoicesApi, type Invoice } from '@/api/invoices';
-import Modal from '@/components/shared/Modal';
-import LoadingSpinner from '@/components/shared/LoadingSpinner';
-import EmptyState from '@/components/shared/EmptyState';
-import StatCard from '@/components/shared/StatCard';
-import StatusBadge from '@/components/shared/StatusBadge';
-import { Plus, Search, Calendar, CreditCard, Edit2, Trash2, IndianRupee } from 'lucide-react';
+import { PH, Card, KPI, Chip, SrchBar } from '@/components/shared/FigmaComponents';
 
 export default function PaymentsPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -16,14 +12,10 @@ export default function PaymentsPage() {
   const [contractors, setContractors] = useState<Contractor[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [methodFilter, setMethodFilter] = useState('');
+  const [search, setSearch] = useState('');
 
   // Modals
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
-
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
 
@@ -32,7 +24,7 @@ export default function PaymentsPage() {
   const [formVendorId, setFormVendorId] = useState('');
   const [formContractorId, setFormContractorId] = useState('');
   const [formInvoiceId, setFormInvoiceId] = useState('');
-  const [formDate, setFormDate] = useState('');
+  const [formDate, setFormDate] = useState(new Date().toISOString().split('T')[0]);
   const [formMethod, setFormMethod] = useState<Payment['method']>('BANK_TRANSFER');
   const [formStatus, setFormStatus] = useState<Payment['status']>('COMPLETED');
   const [formReference, setFormReference] = useState('');
@@ -57,17 +49,33 @@ export default function PaymentsPage() {
     }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  useEffect(() => { fetchData(); }, []);
+
+  const resetForm = () => {
+    setFormAmount(0);
+    setFormVendorId('');
+    setFormContractorId('');
+    setFormInvoiceId('');
+    setFormDate(new Date().toISOString().split('T')[0]);
+    setFormMethod('BANK_TRANSFER');
+    setFormStatus('COMPLETED');
+    setFormReference('');
+    setFormNotes('');
+    setFormError('');
+  };
+
+  const openPaymentModal = (vendorId?: string) => {
+    resetForm();
+    if (vendorId) setFormVendorId(vendorId);
+    setShowCreateModal(true);
+  };
 
   const handleCreate = async (e: FormEvent) => {
     e.preventDefault();
     setFormError('');
     setSubmitting(true);
-
     try {
-      const data = {
+      await paymentsApi.createPayment({
         amount: Number(formAmount),
         vendor_id: formVendorId || null,
         contractor_id: formContractorId || null,
@@ -77,9 +85,7 @@ export default function PaymentsPage() {
         status: formStatus,
         reference: formReference || null,
         notes: formNotes || null
-      };
-
-      await paymentsApi.createPayment(data);
+      });
       setShowCreateModal(false);
       resetForm();
       fetchData();
@@ -90,452 +96,175 @@ export default function PaymentsPage() {
     }
   };
 
-  const handleUpdate = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!selectedPayment) return;
-    setFormError('');
-    setSubmitting(true);
-
-    try {
-      const data = {
-        amount: Number(formAmount),
-        vendor_id: formVendorId || null,
-        contractor_id: formContractorId || null,
-        invoice_id: formInvoiceId || null,
-        date: new Date(formDate).toISOString(),
-        method: formMethod,
-        status: formStatus,
-        reference: formReference || null,
-        notes: formNotes || null
-      };
-
-      await paymentsApi.updatePayment(selectedPayment.id, data);
-      setShowEditModal(false);
-      resetForm();
-      fetchData();
-    } catch (err: any) {
-      setFormError(err.message || 'Failed to update payment');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this payment record?')) return;
-    try {
-      await paymentsApi.deletePayment(id);
-      fetchData();
-    } catch (err) {
-      console.error('Failed to delete payment', err);
-    }
-  };
-
-  const openEditModal = (payment: Payment) => {
-    setSelectedPayment(payment);
-    setFormAmount(payment.amount);
-    setFormVendorId(payment.vendor_id || '');
-    setFormContractorId(payment.contractor_id || '');
-    setFormInvoiceId(payment.invoice_id || '');
-    setFormDate(payment.date.split('T')[0]);
-    setFormMethod(payment.method);
-    setFormStatus(payment.status);
-    setFormReference(payment.reference || '');
-    setFormNotes(payment.notes || '');
-    setShowEditModal(true);
-  };
-
-  const resetForm = () => {
-    setSelectedPayment(null);
-    setFormAmount(0);
-    setFormVendorId('');
-    setFormContractorId('');
-    setFormInvoiceId('');
-    setFormDate('');
-    setFormMethod('BANK_TRANSFER');
-    setFormStatus('COMPLETED');
-    setFormReference('');
-    setFormNotes('');
-    setFormError('');
-  };
-
-  const filtered = payments.filter(p => {
-    const term = searchQuery.toLowerCase();
-    const matchesSearch = 
-      (p.reference && p.reference.toLowerCase().includes(term)) ||
-      (p.vendor?.name && p.vendor.name.toLowerCase().includes(term)) ||
-      (p.contractor?.name && p.contractor.name.toLowerCase().includes(term)) ||
-      (p.invoice?.number && p.invoice.number.toLowerCase().includes(term));
+  // Calculate outstanding amounts for vendors based on invoices and payments
+  const vendorStats = vendors.map(v => {
+    const vInvoices = invoices.filter(inv => inv.vendor_id === v.id && inv.status !== 'CANCELLED');
+    const vPayments = payments.filter(p => p.vendor_id === v.id && p.status === 'COMPLETED');
     
-    const matchesMethod = !methodFilter || p.method === methodFilter;
-    return matchesSearch && matchesMethod;
-  });
+    const totalInvoiced = vInvoices.reduce((sum, inv) => sum + inv.total, 0);
+    const totalPaid = vPayments.reduce((sum, p) => sum + p.amount, 0);
+    const outstanding = Math.max(0, totalInvoiced - totalPaid);
+    
+    // Simplistic overdue calculation (assuming invoices past due date are overdue if unpaid)
+    const overdueInvoices = vInvoices.filter(inv => inv.due_date && new Date(inv.due_date) < new Date() && inv.status !== 'PAID');
+    const overdue = Math.max(0, overdueInvoices.reduce((sum, inv) => sum + inv.total, 0));
+    
+    const lastPaid = vPayments.length > 0 
+      ? new Date(Math.max(...vPayments.map(p => new Date(p.date).getTime()))).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+      : 'Never';
 
-  // Stats
-  const totalAmount = payments.reduce((acc, p) => acc + p.amount, 0);
-  const completedAmount = payments
-    .filter(p => p.status === 'COMPLETED')
-    .reduce((acc, p) => acc + p.amount, 0);
-  const pendingAmount = payments
-    .filter(p => ['PENDING', 'PROCESSING'].includes(p.status))
-    .reduce((acc, p) => acc + p.amount, 0);
+    return { ...v, outstanding, overdue, lastPaid };
+  }).filter(v => v.outstanding > 0 || v.lastPaid !== 'Never'); // Show only active vendors
+
+  const filteredStats = vendorStats.filter(v => 
+    !search || v.name.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const totalOutstanding = vendorStats.reduce((sum, v) => sum + v.outstanding, 0);
+  const totalOverdue = vendorStats.reduce((sum, v) => sum + v.overdue, 0);
+
+  if (loading && vendors.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="w-8 h-8 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+      </div>
+    );
+  }
+
+  const formatMoney = (val: number) => {
+    if (val === 0) return '₨0';
+    if (val >= 10000000) return `₨${(val / 10000000).toFixed(2)}Cr`;
+    if (val >= 100000) return `₨${(val / 100000).toFixed(2)}L`;
+    if (val >= 1000) return `₨${(val / 1000).toFixed(1)}K`;
+    return `₨${val.toLocaleString()}`;
+  };
 
   return (
-    <div className="animate-fade-in">
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">Payment Registers</h1>
-          <p className="page-subtitle">Track outbound transaction records, bank transfers, cheques, and cash transactions</p>
-        </div>
-        <button className="btn btn-primary" onClick={() => { resetForm(); setShowCreateModal(true); }} id="add-payment-btn">
-          <Plus size={18} />
-          Record Payment
+    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="flex justify-between items-start">
+        <PH title="Vendor Payments" sub="Accounts payable — credit health" />
+        <button 
+          onClick={() => openPaymentModal()}
+          className="px-3 py-2 bg-primary text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 hover:bg-primary/90 transition-colors shadow-sm"
+        >
+          <Plus className="w-3 h-3" /> Payment
         </button>
       </div>
 
-      {/* Stats Cards */}
-      <div className="stats-grid" style={{ marginBottom: 'var(--space-6)' }}>
-        <StatCard
-          icon={<IndianRupee size={20} />}
-          label="Total Disbursed"
-          value={`₹${totalAmount.toLocaleString('en-IN')}`}
-          color="#3B82F6"
-          bgColor="rgba(59, 130, 246, 0.1)"
-        />
-        <StatCard
-          icon={<IndianRupee size={20} />}
-          label="Cleared Transactions"
-          value={`₹${completedAmount.toLocaleString('en-IN')}`}
-          color="#10B981"
-          bgColor="rgba(16, 185, 129, 0.1)"
-        />
-        <StatCard
-          icon={<IndianRupee size={20} />}
-          label="Pending Clearance"
-          value={`₹${pendingAmount.toLocaleString('en-IN')}`}
-          color="#F59E0B"
-          bgColor="rgba(245, 158, 11, 0.1)"
-        />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <KPI label="Total Outstanding" value={formatMoney(totalOutstanding)} icon={CreditCard} trend={{ up: false, v: "–8.2%" }} />
+        <KPI label="Overdue Balance" value={formatMoney(totalOverdue)} icon={AlertTriangle} />
       </div>
 
-      {/* Filters */}
-      <div className="card" style={{ marginBottom: 'var(--space-6)', maxWidth: '600px' }}>
-        <div className="card-body" style={{ display: 'flex', gap: 'var(--space-4)', padding: 'var(--space-3)' }}>
-          <div className="search-input-wrapper" style={{ flex: 1 }}>
-            <Search size={18} className="search-icon" />
-            <input
-              type="text"
-              className="form-input"
-              placeholder="Search reference, vendor, invoice..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              id="search-payments"
-            />
-          </div>
-          <select
-            className="form-input form-select"
-            style={{ width: '160px' }}
-            value={methodFilter}
-            onChange={(e) => setMethodFilter(e.target.value)}
-          >
-            <option value="">All Methods</option>
-            <option value="BANK_TRANSFER">Bank Transfer</option>
-            <option value="CASH">Cash</option>
-            <option value="CHEQUE">Cheque</option>
-            <option value="UPI">UPI</option>
-            <option value="OTHER">Other</option>
-          </select>
+      <div className="flex flex-col sm:flex-row gap-2">
+        <div className="flex-1" onChange={(e: any) => setSearch(e.target.value)}>
+          <SrchBar placeholder="Search vendors..." />
         </div>
       </div>
 
-      {/* Payments List */}
-      {filtered.length === 0 ? (
-        <EmptyState
-          icon={<CreditCard size={36} />}
-          title="No payments logged"
-          description="Log outbound payments against vendor invoices or subcontractor claims to clear balances"
-          action={
-            <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>
-              <Plus size={18} /> Record Payment
-            </button>
-          }
-        />
-      ) : (
-        <div className="card">
-          <div className="card-body" style={{ padding: 0 }}>
-            <div className="table-container" style={{ border: 'none' }}>
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Payee</th>
-                    <th>Payment Date</th>
-                    <th>Method</th>
-                    <th>Ref / Txn ID</th>
-                    <th>Invoice / Claim</th>
-                    <th>Status</th>
-                    <th>Amount Paid (₹)</th>
-                    <th style={{ width: 100 }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map(payment => (
-                    <tr key={payment.id} className="hover-row">
-                      <td>
-                        <span style={{ fontWeight: '500' }}>
-                          {payment.vendor?.name || payment.contractor?.name || <span style={{ color: 'var(--color-text-muted)', fontStyle: 'italic' }}>Direct Expense</span>}
-                        </span>
-                        <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>
-                          {payment.vendor ? 'Vendor Supplier' : payment.contractor ? 'Subcontractor' : 'Unlinked'}
-                        </div>
-                      </td>
-                      <td>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: 'var(--font-size-sm)' }}>
-                          <Calendar size={14} style={{ opacity: 0.5 }} />
-                          {new Date(payment.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                        </span>
-                      </td>
-                      <td>
-                        <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: '500' }}>{payment.method.replace('_', ' ')}</span>
-                      </td>
-                      <td style={{ fontFamily: 'monospace', fontSize: 'var(--font-size-sm)' }}>{payment.reference || '—'}</td>
-                      <td>
-                        {payment.invoice ? (
-                          <span style={{ background: '#EFF6FF', color: '#1E40AF', padding: '2px 6px', borderRadius: '4px', fontSize: 'var(--font-size-xs)', fontFamily: 'monospace' }}>
-                            {payment.invoice.number}
-                          </span>
-                        ) : '—'}
-                      </td>
-                      <td>
-                        <StatusBadge status={payment.status} />
-                      </td>
-                      <td style={{ fontWeight: 'bold', color: 'var(--color-success)' }}>
-                        ₹{payment.amount.toLocaleString('en-IN')}
-                      </td>
-                      <td>
-                        <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                          <button
-                            className="btn btn-ghost btn-icon btn-sm"
-                            onClick={() => openEditModal(payment)}
-                            title="Edit Payment"
-                          >
-                            <Edit2 size={15} />
-                          </button>
-                          <button
-                            className="btn btn-ghost btn-icon btn-sm text-danger"
-                            onClick={() => handleDelete(payment.id)}
-                            title="Delete Payment"
-                          >
-                            <Trash2 size={15} color="#EF4444" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+      <Card noPad>
+        {filteredStats.length === 0 ? (
+          <div className="p-8 text-center text-muted-foreground text-sm">No active vendors found</div>
+        ) : (
+          filteredStats.map((v, i) => (
+            <div key={v.id || i} className={`px-4 py-3 ${i < filteredStats.length - 1 ? "border-b border-border" : ""}`}>
+              <div className="flex items-start justify-between gap-2 mb-1.5">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-foreground">{v.name}</p>
+                  <p className="text-[10px] text-muted-foreground">Last paid: {v.lastPaid}</p>
+                </div>
+                <div className="text-right flex-shrink-0">
+                  <p className="text-xs font-bold text-foreground">{formatMoney(v.outstanding)}</p>
+                  {v.overdue > 0 && <p className="text-[10px] text-red-500">OD: {formatMoney(v.overdue)}</p>}
+                </div>
+              </div>
+              <div className="flex justify-end">
+                {v.outstanding > 0 && (
+                  <button onClick={() => openPaymentModal(v.id)} className="text-[10px] bg-secondary text-primary px-2.5 py-1 rounded font-semibold hover:bg-primary/10 transition-colors">Record Payment</button>
+                )}
+              </div>
             </div>
+          ))
+        )}
+      </Card>
+
+      {/* Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-card w-full max-w-md rounded-2xl shadow-xl flex flex-col max-h-[90vh]">
+            <div className="flex justify-between items-center p-4 border-b border-border">
+              <h2 className="text-sm font-bold">Record Payment</h2>
+              <button onClick={() => setShowCreateModal(false)} className="text-muted-foreground hover:text-foreground">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <form onSubmit={handleCreate} className="p-4 overflow-y-auto space-y-4">
+              {formError && <div className="p-3 bg-red-50 text-red-600 rounded-lg text-xs">{formError}</div>}
+              
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Amount (₨) *</label>
+                    <input type="number" required min="1" step="0.01" className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary font-medium" value={formAmount || ''} onChange={e => setFormAmount(Number(e.target.value))} placeholder="0.00" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Date *</label>
+                    <input type="date" required className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary" value={formDate} onChange={e => setFormDate(e.target.value)} />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Pay To (Vendor) *</label>
+                  <select required className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary" value={formVendorId} onChange={e => setFormVendorId(e.target.value)}>
+                    <option value="">Select Vendor</option>
+                    {vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Method *</label>
+                    <select required className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary" value={formMethod} onChange={e => setFormMethod(e.target.value as any)}>
+                      <option value="BANK_TRANSFER">Bank Transfer</option>
+                      <option value="CHEQUE">Cheque</option>
+                      <option value="CASH">Cash</option>
+                      <option value="ONLINE">Online</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Status *</label>
+                    <select required className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary" value={formStatus} onChange={e => setFormStatus(e.target.value as any)}>
+                      <option value="PENDING">Pending</option>
+                      <option value="COMPLETED">Completed</option>
+                      <option value="FAILED">Failed</option>
+                    </select>
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Reference / Transaction ID</label>
+                  <input type="text" className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary" value={formReference} onChange={e => setFormReference(e.target.value)} placeholder="Txn ID or Cheque No" />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Notes (Optional)</label>
+                  <textarea className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary" rows={2} value={formNotes} onChange={e => setFormNotes(e.target.value)} placeholder="Payment details..." />
+                </div>
+              </div>
+              
+              <div className="border-t border-border flex gap-2 -mx-4 -mb-4 pt-4 px-4 bg-muted/30 rounded-b-2xl pb-4 mt-4">
+                <button type="button" onClick={() => setShowCreateModal(false)} className="flex-1 py-2 rounded-lg border border-border bg-card text-sm font-medium hover:bg-muted transition-colors">
+                  Cancel
+                </button>
+                <button type="submit" disabled={submitting} className="flex-1 py-2 rounded-lg bg-primary text-white text-sm font-medium flex justify-center items-center hover:bg-primary/90 transition-colors disabled:opacity-50">
+                  {submitting ? 'Saving...' : 'Record Payment'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
-
-      {/* Record Payment Modal */}
-      <Modal
-        isOpen={showCreateModal}
-        onClose={() => { setShowCreateModal(false); resetForm(); }}
-        title="Record Payment"
-        footer={
-          <>
-            <button className="btn btn-ghost" onClick={() => { setShowCreateModal(false); resetForm(); }}>Cancel</button>
-            <button
-              className="btn btn-primary"
-              onClick={handleCreate as any}
-              disabled={submitting || !formAmount || !formDate || !formMethod}
-              id="submit-record-payment"
-            >
-              {submitting ? 'Recording...' : 'Record Payment'}
-            </button>
-          </>
-        }
-      >
-        <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-          {formError && <div className="login-error"><span>{formError}</span></div>}
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
-            <div className="form-group">
-              <label className="form-label" htmlFor="pay-amt">Amount Paid (₹) *</label>
-              <input id="pay-amt" type="number" className="form-input" value={formAmount} onChange={(e) => setFormAmount(Number(e.target.value))} required min={1} />
-            </div>
-            <div className="form-group">
-              <label className="form-label" htmlFor="pay-date">Payment Date *</label>
-              <input id="pay-date" type="date" className="form-input" value={formDate} onChange={(e) => setFormDate(e.target.value)} required />
-            </div>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
-            <div className="form-group">
-              <label className="form-label" htmlFor="pay-method">Payment Method *</label>
-              <select id="pay-method" className="form-input form-select" value={formMethod} onChange={(e) => setFormMethod(e.target.value as Payment['method'])}>
-                <option value="BANK_TRANSFER">Bank Transfer</option>
-                <option value="CASH">Cash</option>
-                <option value="CHEQUE">Cheque</option>
-                <option value="UPI">UPI</option>
-                <option value="OTHER">Other</option>
-              </select>
-            </div>
-            <div className="form-group">
-              <label className="form-label" htmlFor="pay-status">Status</label>
-              <select id="pay-status" className="form-input form-select" value={formStatus} onChange={(e) => setFormStatus(e.target.value as Payment['status'])}>
-                <option value="COMPLETED">Completed (Cleared)</option>
-                <option value="PENDING">Pending</option>
-                <option value="PROCESSING">Processing</option>
-                <option value="FAILED">Failed</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label" htmlFor="pay-ref">Reference ID / Txn Hash / Cheque No.</label>
-            <input id="pay-ref" type="text" className="form-input" placeholder="e.g. TXN-1234567" value={formReference} onChange={(e) => setFormReference(e.target.value)} />
-          </div>
-
-          <div style={{ borderBottom: '1px solid #E5E7EB', paddingBottom: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
-            <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'bold', color: 'var(--color-text-secondary)' }}>Link Transaction To (Optional)</span>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
-            <div className="form-group">
-              <label className="form-label" htmlFor="pay-vendor">Vendor</label>
-              <select id="pay-vendor" className="form-input form-select" value={formVendorId} onChange={(e) => { setFormVendorId(e.target.value); setFormContractorId(''); }}>
-                <option value="">Unlinked Vendor</option>
-                {vendors.map(v => (
-                  <option key={v.id} value={v.id}>{v.name}</option>
-                ))}
-              </select>
-            </div>
-            <div className="form-group">
-              <label className="form-label" htmlFor="pay-contractor">Contractor</label>
-              <select id="pay-contractor" className="form-input form-select" value={formContractorId} onChange={(e) => { setFormContractorId(e.target.value); setFormVendorId(''); }}>
-                <option value="">Unlinked Contractor</option>
-                {contractors.map(c => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label" htmlFor="pay-invoice">Linked Invoice</label>
-            <select id="pay-invoice" className="form-input form-select" value={formInvoiceId} onChange={(e) => setFormInvoiceId(e.target.value)}>
-              <option value="">Unlinked Invoice</option>
-              {invoices.filter(i => !formVendorId || i.vendor_id === formVendorId).map(i => (
-                <option key={i.id} value={i.id}>{i.number} (Total: ₹{i.total})</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label" htmlFor="pay-notes">Description / Notes</label>
-            <textarea id="pay-notes" className="form-input" placeholder="Additional details..." rows={2} value={formNotes} onChange={(e) => setFormNotes(e.target.value)} />
-          </div>
-        </form>
-      </Modal>
-
-      {/* Edit Payment Modal */}
-      <Modal
-        isOpen={showEditModal}
-        onClose={() => { setShowEditModal(false); resetForm(); }}
-        title="Edit Payment"
-        footer={
-          <>
-            <button className="btn btn-ghost" onClick={() => { setShowEditModal(false); resetForm(); }}>Cancel</button>
-            <button
-              className="btn btn-primary"
-              onClick={handleUpdate as any}
-              disabled={submitting || !formAmount || !formDate || !formMethod}
-              id="submit-edit-payment"
-            >
-              {submitting ? 'Saving...' : 'Save Changes'}
-            </button>
-          </>
-        }
-      >
-        <form onSubmit={handleUpdate} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-          {formError && <div className="login-error"><span>{formError}</span></div>}
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
-            <div className="form-group">
-              <label className="form-label" htmlFor="edit-pay-amt">Amount Paid (₹) *</label>
-              <input id="edit-pay-amt" type="number" className="form-input" value={formAmount} onChange={(e) => setFormAmount(Number(e.target.value))} required min={1} />
-            </div>
-            <div className="form-group">
-              <label className="form-label" htmlFor="edit-pay-date">Payment Date *</label>
-              <input id="edit-pay-date" type="date" className="form-input" value={formDate} onChange={(e) => setFormDate(e.target.value)} required />
-            </div>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
-            <div className="form-group">
-              <label className="form-label" htmlFor="edit-pay-method">Payment Method *</label>
-              <select id="edit-pay-method" className="form-input form-select" value={formMethod} onChange={(e) => setFormMethod(e.target.value as Payment['method'])}>
-                <option value="BANK_TRANSFER">Bank Transfer</option>
-                <option value="CASH">Cash</option>
-                <option value="CHEQUE">Cheque</option>
-                <option value="UPI">UPI</option>
-                <option value="OTHER">Other</option>
-              </select>
-            </div>
-            <div className="form-group">
-              <label className="form-label" htmlFor="edit-pay-status">Status</label>
-              <select id="edit-pay-status" className="form-input form-select" value={formStatus} onChange={(e) => setFormStatus(e.target.value as Payment['status'])}>
-                <option value="COMPLETED">Completed (Cleared)</option>
-                <option value="PENDING">Pending</option>
-                <option value="PROCESSING">Processing</option>
-                <option value="FAILED">Failed</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label" htmlFor="edit-pay-ref">Reference ID / Txn Hash / Cheque No.</label>
-            <input id="edit-pay-ref" type="text" className="form-input" value={formReference} onChange={(e) => setFormReference(e.target.value)} />
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
-            <div className="form-group">
-              <label className="form-label" htmlFor="edit-pay-vendor">Vendor</label>
-              <select id="edit-pay-vendor" className="form-input form-select" value={formVendorId} onChange={(e) => { setFormVendorId(e.target.value); setFormContractorId(''); }}>
-                <option value="">Unlinked Vendor</option>
-                {vendors.map(v => (
-                  <option key={v.id} value={v.id}>{v.name}</option>
-                ))}
-              </select>
-            </div>
-            <div className="form-group">
-              <label className="form-label" htmlFor="edit-pay-contractor">Contractor</label>
-              <select id="edit-pay-contractor" className="form-input form-select" value={formContractorId} onChange={(e) => { setFormContractorId(e.target.value); setFormVendorId(''); }}>
-                <option value="">Unlinked Contractor</option>
-                {contractors.map(c => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label" htmlFor="edit-pay-invoice">Linked Invoice</label>
-            <select id="edit-pay-invoice" className="form-input form-select" value={formInvoiceId} onChange={(e) => setFormInvoiceId(e.target.value)}>
-              <option value="">Unlinked Invoice</option>
-              {invoices.map(i => (
-                <option key={i.id} value={i.id}>{i.number} (Total: ₹{i.total})</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label" htmlFor="edit-pay-notes">Description / Notes</label>
-            <textarea id="edit-pay-notes" className="form-input" rows={2} value={formNotes} onChange={(e) => setFormNotes(e.target.value)} />
-          </div>
-        </form>
-      </Modal>
     </div>
   );
 }

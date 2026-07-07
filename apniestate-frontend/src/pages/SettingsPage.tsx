@@ -1,64 +1,29 @@
-import { useState, type FormEvent } from 'react';
+import React, { useState, type FormEvent } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { usersApi } from '@/api/users';
 import { companiesApi } from '@/api/companies';
-import Modal from '@/components/shared/Modal';
-import {
-  User,
-  Bell,
-  Shield,
-  LogOut,
-  ChevronRight,
-  Building2,
-  Phone,
-  Mail,
-  CheckCircle,
-} from 'lucide-react';
+import { PH, Card } from '@/components/shared/FigmaComponents';
+import { X, LogOut, AlertTriangle, Building2, Shield, User, Bell } from 'lucide-react';
 
 export default function SettingsPage() {
   const { user, updateUser, logout, activeWorkspace } = useAuth();
 
   // Modal control
   const [showEditModal, setShowEditModal] = useState(false);
-  const [showCompanyModal, setShowCompanyModal] = useState(false);
-  const [showSecurityModal, setShowSecurityModal] = useState(false);
-  const [showNotificationsModal, setShowNotificationsModal] = useState(false);
-  
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
-  const [successMsg, setSuccessMsg] = useState('');
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
 
   // Form Fields
   const [formName, setFormName] = useState(user?.name || '');
   const [formEmail, setFormEmail] = useState(user?.email || '');
   const [formPhone, setFormPhone] = useState(user?.phone || '');
 
-  // Company states
-  const [companyName, setCompanyName] = useState(activeWorkspace?.company?.name || 'Company Name');
-  const [gstin, setGstin] = useState('Not provided');
-  
-  // Settings dummy states
-  const [emailAlerts, setEmailAlerts] = useState(true);
-  const [pushAlerts, setPushAlerts] = useState(true);
-
-  // Delete Workspace States
-  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
-  const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
-  const [isDeleting, setIsDeleting] = useState(false);
-
-  const formatRole = (role: string) => {
-    if (role === 'BUILDER' || role === 'ADMIN') return 'Builder (Owner)';
-    return role.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-  };
-
-  const getInitials = (name: string) =>
-    name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-
   const handleUpdateProfile = async (e: FormEvent) => {
     e.preventDefault();
     if (!user) return;
     setFormError('');
-    setSuccessMsg('');
     setSubmitting(true);
 
     try {
@@ -69,15 +34,13 @@ export default function SettingsPage() {
       });
 
       if (res.success && res.data) {
-        // Update user context state
         updateUser({
           ...user,
           name: formName,
           email: formEmail,
           phone: formPhone || null
         });
-        setSuccessMsg('Profile updated successfully!');
-        setTimeout(() => setShowEditModal(false), 800);
+        setShowEditModal(false);
       }
     } catch (err: any) {
       setFormError(err.message || 'Failed to update profile');
@@ -88,293 +51,197 @@ export default function SettingsPage() {
 
   const handleDeleteCompany = async () => {
     if (!activeWorkspace?.company?.id) return;
-    setIsDeleting(true);
+    setSubmitting(true);
     try {
       await companiesApi.deleteCompany(activeWorkspace.company.id);
-      window.location.href = '/companies'; // Force reload to company selection
+      window.location.href = '/companies';
     } catch (err: any) {
-      alert(err.message || 'Failed to delete workspace');
-      setIsDeleting(false);
+      setFormError(err.message || 'Failed to delete workspace');
+      setSubmitting(false);
     }
   };
 
+  const role = user?.role === 'BUILDER' || user?.role === 'ADMIN' ? 'Builder (Owner)' : (user?.role || 'User').replace(/_/g, ' ');
+  const companyName = activeWorkspace?.company?.name || 'Apni Estate (Pvt.) Ltd.';
+
+  const companySections = [
+    { title: "Company Information", icon: <Building2 className="w-4 h-4 text-primary" />, fields: [
+      ["Company Name", companyName],
+      ["Registered NTN", "4521987-6"],
+      ["Registered Address", "Plot 24, I-9/3, Islamabad"],
+    ]},
+    { title: "Finance & Tax", icon: <Shield className="w-4 h-4 text-primary" />, fields: [
+      ["Default Currency", "PKR — Pakistani Rupee"],
+      ["GST Rate", "17%"],
+      ["WHT Rate (Labor)", "4.5%"],
+    ]},
+    { title: "Approval Thresholds", icon: <Bell className="w-4 h-4 text-primary" />, fields: [
+      ["PO Auto-Approve Below", "₨5,00,000"],
+      ["Expense Auto-Approve Below", "₨50,000"],
+      ["Invoice Requires CEO Above", "₨1,00,00,000"],
+    ]},
+  ];
+
   return (
-    <div className="animate-fade-in">
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">Settings</h1>
-          <p className="page-subtitle">Account configuration, user preferences, and business entity details</p>
-        </div>
+    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
+      <div className="flex justify-between items-start">
+        <PH title="Settings" sub="Personal profile and global ERP configuration" />
+        <button 
+          onClick={logout}
+          className="px-3 py-2 bg-secondary text-primary rounded-lg text-xs font-semibold flex items-center gap-1.5 hover:bg-primary/10 transition-colors shadow-sm"
+        >
+          <LogOut className="w-3 h-3" /> Logout
+        </button>
       </div>
 
-      {/* Profile Card */}
-      <div className="card" style={{ marginBottom: 'var(--space-6)' }}>
-        <div className="card-body" style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--space-5)',
-          padding: 'var(--space-6) var(--space-5)',
-        }}>
-          <div className="avatar avatar-lg">
-            {user ? getInitials(user.name) : '?'}
+      <Card title="Personal Profile" noPad>
+        <div className="px-4 py-4 flex items-center gap-4 border-b border-border">
+          <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-white text-lg font-bold flex-shrink-0 shadow-sm">
+            {user?.name?.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase() || 'U'}
           </div>
-          <div style={{ flex: 1 }}>
-            <div style={{
-              fontSize: 'var(--font-size-lg)',
-              fontWeight: 'var(--font-weight-semibold)',
-            }}>
-              {user?.name || 'User'}
-            </div>
-            <div style={{
-              fontSize: 'var(--font-size-sm)',
-              color: 'var(--color-text-secondary)',
-              marginTop: 2,
-            }}>
-              {user ? formatRole(user.role) : ''}
-            </div>
-            <div style={{
-              fontSize: 'var(--font-size-sm)',
-              color: 'var(--color-text-muted)',
-              marginTop: 2,
-            }}>
-              {user?.email}
-            </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-foreground truncate">{user?.name}</p>
+            <p className="text-[11px] text-muted-foreground truncate">{role} · {user?.email}</p>
+            <p className="text-[11px] text-muted-foreground truncate">{user?.phone || 'No phone provided'}</p>
           </div>
-        </div>
-      </div>
-
-      {/* Settings Sections */}
-      <div className="section">
-        <div className="section-title">Account Settings</div>
-        <div className="card" style={{ overflow: 'hidden', marginBottom: 'var(--space-5)' }}>
-          <div onClick={() => setShowEditModal(true)}>
-            <SettingsItem icon={User} label="Edit Profile Information" />
-          </div>
-          <div onClick={() => setShowEditModal(true)}>
-            <SettingsItem icon={Mail} label="Update Email Address" />
-          </div>
-          <div onClick={() => setShowEditModal(true)}>
-            <SettingsItem icon={Phone} label="Update Mobile Number" />
-          </div>
-        </div>
-      </div>
-
-      <div className="section">
-        <div className="section-title">Preferences & Entity</div>
-        <div className="card" style={{ overflow: 'hidden', marginBottom: 'var(--space-5)' }}>
-          <div onClick={() => setShowNotificationsModal(true)}>
-            <SettingsItem icon={Bell} label="Alert Notifications" />
-          </div>
-          <div onClick={() => setShowCompanyModal(true)}>
-            <SettingsItem icon={Building2} label="Company & GST Info" />
-          </div>
-          <div onClick={() => setShowSecurityModal(true)}>
-            <SettingsItem icon={Shield} label="Privacy & Encryption Security" />
-          </div>
-        </div>
-      </div>
-
-      <div className="section">
-        <div className="card" style={{ overflow: 'hidden' }}>
-          <div
-            className="list-card"
-            onClick={logout}
-            style={{ color: 'var(--color-danger)', cursor: 'pointer' }}
-            id="logout-settings"
+          <button 
+            onClick={() => setShowEditModal(true)}
+            className="text-[10px] bg-secondary text-primary px-3 py-1.5 rounded font-semibold hover:bg-primary/10 transition-colors"
           >
-            <div className="list-card-icon" style={{
-              background: 'var(--color-danger-bg)',
-              color: 'var(--color-danger)',
-            }}>
-              <LogOut size={20} />
+            Edit Profile
+          </button>
+        </div>
+      </Card>
+
+      {companySections.map((s, si) => (
+        <Card key={si} title={
+          <div className="flex items-center gap-2">
+            {s.icon}
+            <span>{s.title}</span>
+          </div>
+        } noPad>
+          {s.fields.map(([l, v], fi) => (
+            <div key={fi} className={`flex items-center justify-between px-4 py-3 ${fi < s.fields.length - 1 ? "border-b border-border" : ""}`}>
+              <span className="text-xs text-muted-foreground">{l}</span>
+              <span className="text-xs font-semibold text-foreground">{v}</span>
             </div>
-            <div className="list-card-content">
-              <div className="list-card-title" style={{ color: 'var(--color-danger)', fontWeight: 'bold' }}>
-                Sign Out (Logout Session)
+          ))}
+        </Card>
+      ))}
+
+      <button className="w-full py-3 bg-primary text-white rounded-xl text-sm font-bold shadow-sm hover:bg-primary/90 transition-colors">
+        Save Company Settings
+      </button>
+
+      {(user?.role === 'BUILDER' || user?.role === 'COMPANY_ADMIN') && (
+        <div className="pt-8">
+          <Card title={<span className="text-red-500">Danger Zone</span>} noPad>
+            <div className="px-4 py-4 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-semibold text-foreground">Delete Workspace</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Permanently delete this company and all its data. This cannot be undone.</p>
+              </div>
+              <button 
+                onClick={() => setShowDeleteModal(true)}
+                className="text-[10px] bg-red-50 text-red-600 px-3 py-1.5 rounded font-semibold hover:bg-red-100 transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Edit Profile Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-card w-full max-w-md rounded-2xl shadow-xl flex flex-col">
+            <div className="flex justify-between items-center p-4 border-b border-border">
+              <h2 className="text-sm font-bold">Edit Profile</h2>
+              <button onClick={() => setShowEditModal(false)} className="text-muted-foreground hover:text-foreground">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <form onSubmit={handleUpdateProfile} className="p-4 space-y-4">
+              {formError && <div className="p-3 bg-red-50 text-red-600 rounded-lg text-xs">{formError}</div>}
+              
+              <div className="space-y-3">
+                <div>
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Full Name *</label>
+                  <input type="text" required className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary" value={formName} onChange={e => setFormName(e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Email Address *</label>
+                  <input type="email" required className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary" value={formEmail} onChange={e => setFormEmail(e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Phone Number</label>
+                  <input type="tel" className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary" value={formPhone} onChange={e => setFormPhone(e.target.value)} />
+                </div>
+              </div>
+              
+              <div className="border-t border-border flex gap-2 -mx-4 -mb-4 pt-4 px-4 bg-muted/30 rounded-b-2xl pb-4 mt-4">
+                <button type="button" onClick={() => setShowEditModal(false)} className="flex-1 py-2 rounded-lg border border-border bg-card text-sm font-medium hover:bg-muted transition-colors">
+                  Cancel
+                </button>
+                <button type="submit" disabled={submitting} className="flex-1 py-2 rounded-lg bg-primary text-white text-sm font-medium flex justify-center items-center hover:bg-primary/90 transition-colors disabled:opacity-50">
+                  {submitting ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Workspace Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-card w-full max-w-md rounded-2xl shadow-xl flex flex-col">
+            <div className="flex justify-between items-center p-4 border-b border-border bg-red-50/50 rounded-t-2xl">
+              <h2 className="text-sm font-bold text-red-600 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4" /> Delete Workspace
+              </h2>
+              <button onClick={() => setShowDeleteModal(false)} className="text-muted-foreground hover:text-foreground">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-4 space-y-4">
+              <p className="text-sm text-foreground">
+                This will permanently delete the workspace <strong>{activeWorkspace?.company?.name}</strong> and all its associated data (projects, sites, users, finances). This action <strong>cannot be undone</strong>.
+              </p>
+              
+              <div>
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                  Type "{activeWorkspace?.company?.name}" to confirm
+                </label>
+                <input 
+                  type="text" 
+                  className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-red-500" 
+                  value={deleteConfirmationText} 
+                  onChange={e => setDeleteConfirmationText(e.target.value)} 
+                />
+              </div>
+              
+              {formError && <div className="text-red-500 text-xs font-medium">{formError}</div>}
+              
+              <div className="border-t border-border flex gap-2 -mx-4 -mb-4 pt-4 px-4 bg-muted/30 rounded-b-2xl pb-4 mt-4">
+                <button onClick={() => setShowDeleteModal(false)} className="flex-1 py-2 rounded-lg border border-border bg-card text-sm font-medium hover:bg-muted transition-colors">
+                  Cancel
+                </button>
+                <button 
+                  onClick={handleDeleteCompany}
+                  disabled={submitting || deleteConfirmationText !== activeWorkspace?.company?.name} 
+                  className="flex-1 py-2 rounded-lg bg-red-600 text-white text-sm font-medium flex justify-center items-center hover:bg-red-700 transition-colors disabled:opacity-50"
+                >
+                  {submitting ? 'Deleting...' : 'Delete Permanently'}
+                </button>
               </div>
             </div>
           </div>
         </div>
-      </div>
-
-      <div style={{
-        textAlign: 'center',
-        padding: 'var(--space-6)',
-        color: 'var(--color-text-muted)',
-        fontSize: 'var(--font-size-sm)',
-      }}>
-        Apni Estate ERP v1.0.0
-      </div>
-
-      {/* Edit Profile Modal */}
-      <Modal
-        isOpen={showEditModal}
-        onClose={() => setShowEditModal(false)}
-        title="Edit Profile Information"
-        footer={
-          <>
-            <button className="btn btn-ghost" onClick={() => setShowEditModal(false)}>Cancel</button>
-            <button
-              className="btn btn-primary"
-              onClick={handleUpdateProfile as any}
-              disabled={submitting || !formName || !formEmail}
-              id="submit-settings-profile"
-            >
-              {submitting ? 'Saving...' : 'Save Details'}
-            </button>
-          </>
-        }
-      >
-        <form onSubmit={handleUpdateProfile} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-          {formError && <div className="login-error"><span>{formError}</span></div>}
-          {successMsg && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-success)', background: 'rgba(16,185,129,0.1)', padding: '10px', borderRadius: '4px' }}>
-              <CheckCircle size={16} /> <span>{successMsg}</span>
-            </div>
-          )}
-
-          <div className="form-group">
-            <label className="form-label" htmlFor="s-name">Full Name *</label>
-            <input id="s-name" type="text" className="form-input" value={formName} onChange={(e) => setFormName(e.target.value)} required />
-          </div>
-
-          <div className="form-group">
-            <label className="form-label" htmlFor="s-email">Email Address *</label>
-            <input id="s-email" type="email" className="form-input" value={formEmail} onChange={(e) => setFormEmail(e.target.value)} required />
-          </div>
-
-          <div className="form-group">
-            <label className="form-label" htmlFor="s-phone">Phone Number</label>
-            <input id="s-phone" type="tel" className="form-input" value={formPhone} onChange={(e) => setFormPhone(e.target.value)} />
-          </div>
-        </form>
-      </Modal>
-
-      {/* Company Info Modal */}
-      <Modal
-        isOpen={showCompanyModal}
-        onClose={() => setShowCompanyModal(false)}
-        title="Company & GST Information"
-        footer={<button className="btn btn-primary" onClick={() => setShowCompanyModal(false)}>Done</button>}
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-          <div className="form-group">
-            <label className="form-label" htmlFor="s-company">Registered Company Name</label>
-            <input id="s-company" type="text" className="form-input" value={companyName} readOnly />
-          </div>
-          <div className="form-group">
-            <label className="form-label" htmlFor="s-gstin">GSTIN registration number</label>
-            <input id="s-gstin" type="text" className="form-input" value={gstin} readOnly placeholder="Not available" />
-          </div>
-          
-          {user?.role === 'BUILDER' && (
-            <div style={{ marginTop: '24px', paddingTop: '24px', borderTop: '1px solid var(--color-border)' }}>
-              <h4 style={{ color: 'var(--color-danger)', marginBottom: '8px', fontWeight: 600 }}>Danger Zone</h4>
-              <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', marginBottom: '16px' }}>
-                Permanently delete this workspace. This will remove all associated projects, tasks, and members. This action cannot be undone.
-              </p>
-              
-              {isConfirmingDelete ? (
-                <div style={{ background: 'var(--color-danger-light)', padding: '16px', borderRadius: '8px', border: '1px solid var(--color-danger)' }}>
-                  <p style={{ fontSize: '13px', color: 'var(--color-danger)', marginBottom: '12px', fontWeight: 500 }}>
-                    Type <strong>{companyName}</strong> to confirm deletion:
-                  </p>
-                  <input 
-                    type="text" 
-                    className="form-input" 
-                    style={{ borderColor: 'var(--color-danger)', marginBottom: '12px' }}
-                    value={deleteConfirmationText}
-                    onChange={(e) => setDeleteConfirmationText(e.target.value)}
-                    placeholder={companyName}
-                  />
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button 
-                      className="btn" 
-                      style={{ background: 'white', color: 'var(--color-text)' }}
-                      onClick={() => setIsConfirmingDelete(false)}
-                      disabled={isDeleting}
-                    >
-                      Cancel
-                    </button>
-                    <button 
-                      className="btn btn-primary" 
-                      style={{ background: 'var(--color-danger)', borderColor: 'var(--color-danger)' }}
-                      disabled={deleteConfirmationText !== companyName || isDeleting}
-                      onClick={handleDeleteCompany}
-                    >
-                      {isDeleting ? 'Deleting...' : 'Permanently Delete'}
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <button 
-                  className="btn" 
-                  style={{ color: 'var(--color-danger)', border: '1px solid var(--color-danger)', background: 'transparent' }}
-                  onClick={() => setIsConfirmingDelete(true)}
-                >
-                  Delete Workspace
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-      </Modal>
-
-      {/* Security Privacy Modal */}
-      <Modal
-        isOpen={showSecurityModal}
-        onClose={() => setShowSecurityModal(false)}
-        title="Privacy & Encryption Security"
-        footer={<button className="btn btn-primary" onClick={() => setShowSecurityModal(false)}>Close</button>}
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', fontSize: 'var(--font-size-sm)', lineHeight: 1.6 }}>
-          <p>🔒 <strong>End-to-End Encryption:</strong> All uploaded contract documents, worker emergency contacts, and invoice files are encrypted in transit and at rest.</p>
-          <p>🔑 <strong>Role-Based Access Control:</strong> Fine-grained permissions are checked dynamically on both frontend views and backend API controllers.</p>
-          <p>🔄 <strong>Session Policy:</strong> Access tokens automatically expire after 1 hour. Refresh tokens are hashed and stored securely to ensure authorization longevity.</p>
-        </div>
-      </Modal>
-
-      {/* Notifications Preferences Modal */}
-      <Modal
-        isOpen={showNotificationsModal}
-        onClose={() => setShowNotificationsModal(false)}
-        title="Alert Notifications"
-        footer={<button className="btn btn-primary" onClick={() => setShowNotificationsModal(false)}>Save Preferences</button>}
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <div style={{ fontWeight: 'bold', fontSize: 'var(--font-size-sm)' }}>Email Alert Digests</div>
-              <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>Get summary of budget variances and invoice due dates</div>
-            </div>
-            <input type="checkbox" checked={emailAlerts} onChange={(e) => setEmailAlerts(e.target.checked)} />
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <div style={{ fontWeight: 'bold', fontSize: 'var(--font-size-sm)' }}>Push Notifications</div>
-              <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>Realtime alerts on attendance updates & material approvals</div>
-            </div>
-            <input type="checkbox" checked={pushAlerts} onChange={(e) => setPushAlerts(e.target.checked)} />
-          </div>
-        </div>
-      </Modal>
-    </div>
-  );
-}
-
-function SettingsItem({ icon: Icon, label }: { icon: React.ComponentType<{ size: number }>; label: string }) {
-  return (
-    <div className="list-card" id={`settings-${label.toLowerCase().replace(/\s+/g, '-')}`} style={{ cursor: 'pointer' }}>
-      <div className="list-card-icon" style={{
-        background: 'var(--color-bg-warm)',
-        color: 'var(--color-text-secondary)',
-      }}>
-        <Icon size={20} />
-      </div>
-      <div className="list-card-content">
-        <div className="list-card-title">{label}</div>
-      </div>
-      <ChevronRight size={18} style={{ color: 'var(--color-text-muted)', flexShrink: 0 }} />
+      )}
     </div>
   );
 }

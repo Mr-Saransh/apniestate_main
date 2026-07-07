@@ -1,17 +1,8 @@
-import { useState, useEffect, type FormEvent } from 'react';
+import React, { useState, useEffect, type FormEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { FileText, Plus, Folder, Download, Calendar, Tag, Trash2, Search } from 'lucide-react';
+import { FileText, Plus, X } from 'lucide-react';
 import { apiClient } from '@/api/client';
-import LoadingSpinner from '@/components/shared/LoadingSpinner';
-import Modal from '@/components/shared/Modal';
-import {
-  PrimaryCard,
-  EmptyState,
-  Badge,
-  Button,
-  Input,
-  Select
-} from '@/components/design-system';
+import { PH, Card, Chip, SrchBar } from '@/components/shared/FigmaComponents';
 
 interface DocumentItem {
   id: string;
@@ -21,12 +12,10 @@ interface DocumentItem {
   entity_id: string;
   uploaded_by: string;
   category?: string;
-  file_size?: number;
+  file_size?: number; // in KB
   created_at: string;
-  uploader?: { name: string; role: string };
+  status?: string;
 }
-
-const CATEGORIES = ['All', 'Blueprints', 'Contracts', 'Permits', 'Invoices', 'Reports'];
 
 export default function DocumentsPage() {
   const location = useLocation();
@@ -36,8 +25,7 @@ export default function DocumentsPage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [activeCategory, setActiveCategory] = useState('All');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [search, setSearch] = useState('');
   const [formError, setFormError] = useState('');
 
   // Form states
@@ -96,215 +84,153 @@ export default function DocumentsPage() {
     const dummySize = Math.floor(Math.random() * 4500) + 120; // 120KB to 4.6MB
 
     try {
-      const res = await apiClient.post<DocumentItem>('/documents', {
+      await apiClient.post<DocumentItem>('/documents', {
         name,
-        file_url: dummyUrl,
-        entity_type: 'PROJECT',
-        entity_id: 'default-project-id',
         category,
+        file_url: dummyUrl,
+        entity_type: 'company',
+        entity_id: 'default', // would be actual company id
         file_size: dummySize
       });
-
-      if (res.data) {
-        setDocuments(prev => [res.data!, ...prev]);
-        handleCloseModal();
-      }
+      loadDocuments();
+      handleCloseModal();
     } catch (err: any) {
-      console.error('Failed to upload document', err);
-      setFormError(err.response?.data?.message || 'Error uploading document. Please try again.');
+      setFormError(err.message || 'Failed to upload document');
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDeleteDocument = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this document from the vault?')) return;
-    try {
-      await apiClient.delete(`/documents/${id}`);
-      setDocuments(prev => prev.filter(d => d.id !== id));
-    } catch (err) {
-      console.error('Failed to delete document', err);
-    }
+  const formatSize = (kb: number) => {
+    if (kb < 1024) return `${kb} KB`;
+    return `${(kb / 1024).toFixed(1)} MB`;
   };
 
-  const filtered = documents.filter(doc => {
-    const matchesCategory = activeCategory === 'All' || doc.category === activeCategory;
-    const matchesSearch = doc.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          (doc.category && doc.category.toLowerCase().includes(searchQuery.toLowerCase()));
-    return matchesCategory && matchesSearch;
-  });
+  const filteredDocs = documents.filter(d => 
+    !search || 
+    d.name.toLowerCase().includes(search.toLowerCase()) || 
+    d.category?.toLowerCase().includes(search.toLowerCase())
+  );
 
-  const getFormatSize = (sizeBytes?: number) => {
-    if (!sizeBytes) return 'Unknown size';
-    if (sizeBytes > 1024) {
-      return `${(sizeBytes / 1024).toFixed(1)} MB`;
-    }
-    return `${sizeBytes} KB`;
+  const getStatusColor = (status?: string): "green"|"blue"|"yellow"|"gray" => {
+    if (!status) return "gray";
+    if (status.toLowerCase() === 'signed' || status.toLowerCase() === 'approved') return 'green';
+    if (status.toLowerCase() === 'reviewed') return 'blue';
+    if (status.toLowerCase() === 'pending') return 'yellow';
+    return "gray";
   };
 
-  if (loading) return <LoadingSpinner size="lg" />;
+  if (loading && documents.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="w-8 h-8 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+      </div>
+    );
+  }
+
+  // If no docs from backend, use Figma dummy data for visualization
+  const displayDocs = filteredDocs.length > 0 ? filteredDocs.map(d => ({
+    id: d.id,
+    name: d.name,
+    cat: d.category || 'Document',
+    size: formatSize(d.file_size || 500),
+    date: new Date(d.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }),
+    status: d.status || 'Reviewed'
+  })) : [
+    { id: '1', name: "Downtown Plaza — Main Contract", cat: "Contracts", size: "2.4 MB", date: "15 Jan", status: "Signed" },
+    { id: '2', name: "DHA Phase 8 — Building Permit", cat: "Permits", size: "1.1 MB", date: "03 Feb", status: "Signed" },
+    { id: '3', name: "Gulshan — Structural Drawings", cat: "Blueprints", size: "18.6 MB", date: "10 Mar", status: "Reviewed" },
+    { id: '4', name: "Clifton — Foundation Drawings", cat: "Blueprints", size: "14.2 MB", date: "05 Apr", status: "Pending" },
+    { id: '5', name: "Bahria — Environmental NOC", cat: "Permits", size: "0.8 MB", date: "22 Apr", status: "Pending" },
+    { id: '6', name: "Company — Labour Compliance Cert.", cat: "Compliance", size: "0.5 MB", date: "01 May", status: "Signed" },
+  ].filter(d => !search || d.name.toLowerCase().includes(search.toLowerCase()));
 
   return (
-    <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <PH title="Documents" sub="Legal contracts, permits & blueprints" />
       
-      {/* Header Banner */}
-      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <h1 className="page-title">Documents Vault</h1>
-          <p className="page-subtitle">Secure blueprints, contracts, and municipal permits.</p>
+      <div className="flex gap-2">
+        <div className="flex-1" onChange={(e: any) => setSearch(e.target.value)}>
+          <SrchBar placeholder="Search documents..." />
         </div>
+        <button 
+          onClick={() => setShowModal(true)}
+          className="px-3 py-2 bg-primary text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 flex-shrink-0 hover:bg-primary/90 transition-colors shadow-sm"
+        >
+          <Plus className="w-3 h-3" /> Upload
+        </button>
       </div>
 
-      {/* Search Bar & Categories */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        <div className="search-input-wrapper" style={{ maxWidth: '400px' }}>
-          <Search size={18} className="search-icon" />
-          <input
-            type="text"
-            className="form-input"
-            placeholder="Search documents by name..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-          />
-        </div>
+      <Card noPad>
+        {displayDocs.length === 0 ? (
+          <div className="p-8 text-center text-muted-foreground text-sm">No documents found</div>
+        ) : (
+          displayDocs.map((d, i) => (
+            <div key={d.id} className={`flex items-center gap-3 px-4 py-3 ${i < displayDocs.length - 1 ? "border-b border-border" : ""}`}>
+              <div className="w-9 h-9 rounded-lg bg-secondary flex items-center justify-center flex-shrink-0">
+                <FileText className="w-4 h-4 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-foreground truncate">{d.name}</p>
+                <p className="text-[10px] text-muted-foreground truncate">{d.cat} · {d.size} · {d.date}</p>
+              </div>
+              <Chip color={getStatusColor(d.status)}>{d.status}</Chip>
+            </div>
+          ))
+        )}
+      </Card>
 
-        <div className="filter-bar">
-          {CATEGORIES.map(cat => (
-            <button
-              key={cat}
-              className={`filter-chip ${activeCategory === cat ? 'active' : ''}`}
-              onClick={() => setActiveCategory(cat)}
-            >
-              {cat}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Grid listing */}
-      {filtered.length === 0 ? (
-        <EmptyState
-          icon={<Folder size={36} />}
-          title="No documents logged"
-          description="Try modifying search or upload a municipal permit or blueprint schema."
-          action={<Button size="sm" onClick={() => setShowModal(true)}>Upload Your First Document</Button>}
-        />
-      ) : (
-        <div className="grid-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '24px' }}>
-          {filtered.map(doc => (
-            <PrimaryCard key={doc.id} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      {/* Upload Modal */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-card w-full max-w-md rounded-2xl shadow-xl flex flex-col">
+            <div className="flex justify-between items-center p-4 border-b border-border">
+              <h2 className="text-sm font-bold">Upload Document</h2>
+              <button onClick={handleCloseModal} className="text-muted-foreground hover:text-foreground">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <form onSubmit={handleUploadDocument} className="p-4 space-y-4">
+              {formError && <div className="p-3 bg-red-50 text-red-600 rounded-lg text-xs">{formError}</div>}
               
-              {/* Document Icon & Name */}
-              <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                <div style={{ padding: '10px', background: 'rgba(10, 61, 145, 0.08)', borderRadius: '12px', color: '#0A3D91', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <FileText size={24} />
+              <div className="space-y-3">
+                <div>
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Document Title *</label>
+                  <input type="text" required className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Site Plan V2" />
                 </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <h4 className="truncate" style={{ fontWeight: 700, fontSize: '15px', color: '#111827', margin: '0 0 2px 0' }} title={doc.name}>
-                    {doc.name}
-                  </h4>
-                  <span style={{ fontSize: '12px', color: '#6B7280', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                    <Tag size={10} /> {doc.category || 'General'} · {getFormatSize(doc.file_size)}
-                  </span>
+
+                <div>
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Category *</label>
+                  <select required className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary" value={category} onChange={e => setCategory(e.target.value)}>
+                    <option value="Blueprints">Blueprints</option>
+                    <option value="Contracts">Contracts</option>
+                    <option value="Permits">Permits</option>
+                    <option value="Invoices">Invoices</option>
+                    <option value="Reports">Reports</option>
+                    <option value="Compliance">Compliance</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">File URL (Optional Mock)</label>
+                  <input type="url" className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary" value={fileUrl} onChange={e => setFileUrl(e.target.value)} placeholder="https://..." />
+                  <p className="text-[9px] text-muted-foreground mt-1">Leave empty to auto-generate a mock URL for this demo.</p>
                 </div>
               </div>
-
-              {/* Upload Meta */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px', color: '#374151', borderTop: '1px solid #E2E8F0', paddingTop: '12px', marginTop: '4px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: '#6B7280' }}>Uploaded By</span>
-                  <span style={{ fontWeight: 600 }}>{doc.uploader?.name || 'Admin'}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: '#6B7280' }}>Date Uploaded</span>
-                  <span>{new Date(doc.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-                </div>
-              </div>
-
-              {/* Actions Footer */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: 'auto', paddingTop: '8px' }}>
-                <a 
-                  href={doc.file_url} 
-                  target="_blank" 
-                  rel="noreferrer" 
-                  className="btn btn-secondary btn-3d btn-3d-secondary" 
-                  style={{ padding: '6px 12px', fontSize: '12px', minHeight: 'auto', display: 'inline-flex', gap: '4px', alignItems: 'center', textDecoration: 'none' }}
-                >
-                  <Download size={12} /> View File
-                </a>
-                <button 
-                  className="btn btn-danger btn-3d" 
-                  style={{ padding: '6px 12px', fontSize: '12px', minHeight: 'auto', display: 'inline-flex', gap: '4px', alignItems: 'center', border: '1px solid #DC2626', borderBottom: '3px solid #DC2626', backgroundColor: 'transparent', color: '#DC2626' }}
-                  onClick={() => handleDeleteDocument(doc.id)}
-                >
-                  <Trash2 size={12} /> Delete
+              
+              <div className="border-t border-border flex gap-2 -mx-4 -mb-4 pt-4 px-4 bg-muted/30 rounded-b-2xl pb-4 mt-4">
+                <button type="button" onClick={handleCloseModal} className="flex-1 py-2 rounded-lg border border-border bg-card text-sm font-medium hover:bg-muted transition-colors">
+                  Cancel
+                </button>
+                <button type="submit" disabled={saving} className="flex-1 py-2 rounded-lg bg-primary text-white text-sm font-medium flex justify-center items-center hover:bg-primary/90 transition-colors disabled:opacity-50">
+                  {saving ? 'Uploading...' : 'Upload Document'}
                 </button>
               </div>
-
-            </PrimaryCard>
-          ))}
+            </form>
+          </div>
         </div>
       )}
-
-
-      {/* Upload Document Modal */}
-      <Modal
-        isOpen={showModal}
-        onClose={handleCloseModal}
-        title="Upload Construction Document"
-        footer={
-          <>
-            <Button variant="secondary" onClick={handleCloseModal}>
-              Cancel
-            </Button>
-            <Button 
-              type="submit" 
-              onClick={handleUploadDocument as any} 
-              disabled={saving || !name}
-              id="submit-upload-doc"
-            >
-              {saving ? 'Storing...' : 'Store Document'}
-            </Button>
-          </>
-        }
-      >
-        <form onSubmit={handleUploadDocument} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {formError && <div className="login-error"><span>{formError}</span></div>}
-
-          <Input
-            id="doc-name"
-            label="Document Title / Name *"
-            type="text"
-            placeholder="e.g. Ground Floor Electrical Layout Plan"
-            value={name}
-            onChange={e => setName(e.target.value)}
-            required
-            autoFocus
-          />
-
-          <Select
-            id="doc-category"
-            label="Category *"
-            value={category}
-            onChange={e => setCategory(e.target.value)}
-          >
-            <option value="Blueprints">Blueprints & Maps</option>
-            <option value="Contracts">Contracts & Agreements</option>
-            <option value="Permits">Municipal Permits</option>
-            <option value="Invoices">Invoices & Receipts</option>
-            <option value="Reports">Safety & Site Reports</option>
-          </Select>
-
-          <Input
-            id="doc-url"
-            label="Storage File URL (Optional)"
-            type="url"
-            placeholder="e.g. https://storage.com/plan.pdf"
-            value={fileUrl}
-            onChange={e => setFileUrl(e.target.value)}
-          />
-        </form>
-      </Modal>
     </div>
   );
 }

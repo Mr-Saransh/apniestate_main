@@ -45,77 +45,10 @@ export default function BuilderDashboard() {
     );
   }
 
-  const tabs = [
-    { id: 'overview' as const, label: 'Overview' },
-    { id: 'portfolio' as const, label: 'Portfolio' },
-    { id: 'intelligence' as const, label: 'Insights' }
-  ];
-
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)', paddingBottom: '60px' }}>
+    <div className="flex flex-col gap-6 pb-16 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <UniversalSearchWidget isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} data={data} />
-      
-      {/* Redesigned Mockup Greeting Area (Replaces bulking AI card) */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: '8px 4px 4px 4px',
-        width: '100%'
-      }}>
-        <div>
-          <h2 style={{ fontSize: '22px', fontWeight: 800, color: '#0F172A', margin: 0, letterSpacing: '-0.02em' }}>
-            {(() => {
-              const hr = new Date().getHours();
-              const name = user?.name ? user.name.split(' ')[0] : 'Asim';
-              if (hr < 12) return `Good morning, ${name} ☀️`;
-              if (hr < 17) return `Good afternoon, ${name} ☀️`;
-              return `Good evening, ${name} 🌙`;
-            })()}
-          </h2>
-          <p style={{ fontSize: '13px', color: '#64748B', margin: '4px 0 0 0', fontWeight: 500 }}>
-            {formattedDate}
-          </p>
-        </div>
-        <div style={{
-          width: '42px',
-          height: '42px',
-          borderRadius: '50%',
-          backgroundColor: '#1D4ED8',
-          color: '#FFFFFF',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontWeight: 700,
-          fontSize: '14px',
-          boxShadow: '0 2px 8px rgba(29, 78, 216, 0.15)'
-        }}>
-          {user?.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : 'AR'}
-        </div>
-      </div>
-
-      {/* iOS-Style Segmented Tab Capsule Controls */}
-      <div className="segmented-control">
-        {tabs.map(tab => (
-          <button 
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`segmented-item ${activeTab === tab.id ? 'active' : ''}`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Render Active View */}
-      {activeTab === 'overview' ? (
-        <BuilderDashboardOverview />
-      ) : activeTab === 'portfolio' ? (
-        <PortfolioOverview data={data} />
-      ) : (
-        <BuilderIntelligenceCenter data={data} />
-      )}
-
+      <BuilderDashboardOverview />
     </div>
   );
 }

@@ -1,27 +1,26 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-
 /* ============================================
    APNI ESTATE — Premium Enterprise Design System
-   Theme: Brand Blue + Premium Yellow
+   Theme: Brand Blue (#2648E7) + Premium Gold (#FCC300)
+   Figma Migration: v2.0
    ============================================ */
 
 :root {
-  /* ── Primary Colors (Brand Blue) ── */
-  --color-primary: #1D4ED8;
-  --color-primary-light: #2563EB;
-  --color-primary-dark: #1E3A8A;
-  --color-primary-50: #EFF6FF;
-  --color-primary-100: #DBEAFE;
-  --color-primary-200: #BFDBFE;
-  --color-primary-hover: #1E40AF;
+  /* ── Primary Colors (Brand Blue — Figma exact: #2648E7) ── */
+  --color-primary: #2648E7;
+  --color-primary-light: #3B5FEF;
+  --color-primary-dark: #1A35C5;
+  --color-primary-50: #EEF2FD;
+  --color-primary-100: #D5DDFB;
+  --color-primary-200: #B0BFF7;
+  --color-primary-hover: #1E3ED0;
 
-  /* ── CTA / Accent (Premium Yellow) ── */
-  --color-cta: #F5A623;
-  --color-cta-light: #FBBF24;
-  --color-cta-dark: #D97706;
-  --color-cta-text: #FFFFFF;
-  --color-cta-50: #FEF3C7;
-  --color-cta-hover: #F59E0B;
+  /* ── CTA / Accent (Premium Gold — Figma exact: #FCC300) ── */
+  --color-cta: #FCC300;
+  --color-cta-light: #FFD140;
+  --color-cta-dark: #D9A800;
+  --color-cta-text: #0D1117;
+  --color-cta-50: #FFF8E0;
+  --color-cta-hover: #E6B000;
 
   /* ── Neutrals ── */
   --color-bg: #F0F2F8;
@@ -40,15 +39,15 @@
   --color-success: #10B981;
   --color-success-light: #34D399;
   --color-success-bg: #ECFDF5;
-  --color-warning: #F5A623;
-  --color-warning-light: #FBBF24;
-  --color-warning-bg: #FEF3C7;
+  --color-warning: #FCC300;
+  --color-warning-light: #FFD140;
+  --color-warning-bg: #FFF8E0;
   --color-danger: #EF4444;
   --color-danger-light: #F87171;
   --color-danger-bg: #FEF2F2;
-  --color-info: #3B82F6;
-  --color-info-light: #60A5FA;
-  --color-info-bg: #EFF6FF;
+  --color-info: #2648E7;
+  --color-info-light: #3B5FEF;
+  --color-info-bg: #EEF2FD;
 
   /* ── Typography ── */
   --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -107,12 +106,47 @@
   --shadow-card: 0 1px 3px rgba(15, 23, 42, 0.05), 0 0 0 1px rgba(15, 23, 42, 0.03);
   --shadow-card-hover: 0 8px 24px rgba(15, 23, 42, 0.08), 0 0 0 1px rgba(15, 23, 42, 0.04);
   --shadow-bottom-nav: 0 -4px 16px rgba(15, 23, 42, 0.06);
-  --shadow-fab: 0 8px 24px rgba(245, 166, 35, 0.3);
+  --shadow-fab: 0 8px 24px rgba(38, 72, 231, 0.3);
+
+  /* ── Figma Design Tokens ── */
+  --figma-primary: #2648E7;
+  --figma-gold: #FCC300;
+  --figma-gold-text: #0D1117;
+  --figma-bg: #F8FAFC;
+  --figma-card-bg: #FFFFFF;
+  --figma-card-border: #E2E8F0;
+  --figma-card-radius: 12px;
+  --figma-muted-bg: #F1F5F9;
+  --figma-muted-text: #64748B;
+  --figma-foreground: #0F172A;
+  /* Status chips — Figma variants */
+  --chip-blue-bg: #DBEAFE;
+  --chip-blue-text: #1D4ED8;
+  --chip-green-bg: #D1FAE5;
+  --chip-green-text: #065F46;
+  --chip-yellow-bg: #FEF3C7;
+  --chip-yellow-text: #92400E;
+  --chip-red-bg: #FEE2E2;
+  --chip-red-text: #991B1B;
+  --chip-gray-bg: #F1F5F9;
+  --chip-gray-text: #475569;
+
+  /* ── Sidebar (Figma: bg #2648E7) ── */
+  --sidebar-bg: #2648E7;
+  --sidebar-text: rgba(255, 255, 255, 0.85);
+  --sidebar-active-bg: #FFFFFF;
+  --sidebar-active-text: #2648E7;
+  --sidebar-label-color: rgba(255, 255, 255, 0.40);
+  --sidebar-hover-bg: rgba(255, 255, 255, 0.10);
+
+  /* ── Mobile Header (Figma: bg #2648E7) ── */
+  --mobile-header-bg: #2648E7;
+  --mobile-header-text: #FFFFFF;
 
   /* ── Premium Mobile-Native Tokens ── */
-  --color-accent-gold: #FFC300;
-  --color-accent-gold-light: rgba(255, 195, 0, 0.12);
-  --color-accent-gold-glow: rgba(255, 195, 0, 0.25);
+  --color-accent-gold: #FCC300;
+  --color-accent-gold-light: rgba(252, 195, 0, 0.12);
+  --color-accent-gold-glow: rgba(252, 195, 0, 0.25);
 
   --radius-native: 20px;
   --radius-native-lg: 24px;
@@ -120,7 +154,7 @@
   --shadow-native-card: 0 2px 8px rgba(15, 23, 42, 0.04), 0 0 0 1px rgba(15, 23, 42, 0.02);
   --shadow-native-elevated: 0 8px 32px rgba(15, 23, 42, 0.08), 0 2px 8px rgba(15, 23, 42, 0.04);
   --shadow-native-header: 0 2px 12px rgba(15, 23, 42, 0.06);
-  --shadow-fab-native: 0 6px 20px rgba(29, 78, 216, 0.35), 0 2px 6px rgba(29, 78, 216, 0.2);
+  --shadow-fab-native: 0 6px 20px rgba(38, 72, 231, 0.35), 0 2px 6px rgba(38, 72, 231, 0.2);
 
   --transition-native: 320ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
   --transition-bounce: 400ms cubic-bezier(0.68, -0.15, 0.27, 1.35);
@@ -128,7 +162,7 @@
   --space-mobile-inset: 20px;
   
   /* Focus Rings */
-  --focus-ring: 0 0 0 3px rgba(29, 78, 216, 0.15);
+  --focus-ring: 0 0 0 3px rgba(38, 72, 231, 0.15);
   --focus-ring-danger: 0 0 0 3px rgba(239, 68, 68, 0.15);
 
   /* ── Transitions ── */
@@ -142,7 +176,7 @@
   --sidebar-collapsed-width: 72px;
   --topbar-height: 64px;
   --bottom-nav-height: calc(72px + var(--safe-area-bottom));
-  --mobile-header-height: 64px;
+  --mobile-header-height: 56px;
   --page-max-width: 1400px;
   --safe-area-bottom: env(safe-area-inset-bottom, 0px);
   --safe-area-top: env(safe-area-inset-top, 0px);
