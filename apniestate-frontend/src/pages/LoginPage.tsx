@@ -89,24 +89,15 @@ export default function LoginPage() {
     <div className="login-page-premium">
       <div className="login-container">
         <div className="login-card">
-          {/* Left Branding Side */}
-          <div className="login-left">
-            <div className="login-left-content">
-              {/* Image area */}
-              <div className="login-image-container">
-                <div className="login-image-overlay"></div>
-                <div className="login-placeholder-img"></div>
-              </div>
-              <div className="login-brand" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <Logo size="xl" />
-                <p className="login-brand-tagline" style={{ marginTop: '12px' }}>BUILDING TOMORROW, TOGETHER</p>
-              </div>
-            </div>
-          </div>
+          {/* Left Branding Side - Background handled via CSS */}
+          <div className="login-left"></div>
 
           {/* Right Form Side */}
           <div className="login-right">
             <div className="login-form-content">
+              <div className="form-logo-wrapper">
+                <Logo size="lg" />
+              </div>
               <h2>Welcome Back!</h2>
               <p className="login-subtitle">Sign in to continue</p>
 

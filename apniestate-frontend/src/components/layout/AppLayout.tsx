@@ -4,6 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useIsDesktop } from '@/hooks/useMediaQuery';
 import Sidebar from './Sidebar';
 import UniversalSearch from '@/components/shared/UniversalSearch';
+import Logo from '@/components/shared/Logo';
 import {
   Menu, Bell, Search, LayoutDashboard, Users,
   ShoppingCart, UserCircle, Building2, BookOpen, Package
@@ -81,10 +82,7 @@ export default function AppLayout() {
               <Menu className="w-5 h-5" />
             </button>
             <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-md bg-[#FCC300] flex items-center justify-center">
-                <Building2 className="w-3 h-3 text-[#0D1117]" />
-              </div>
-              <span className="text-sm font-bold truncate max-w-[120px]">{activeTitle}</span>
+              <Logo size="sm" variant="light" />
             </div>
           </div>
           <div className="flex items-center gap-2">

@@ -8,6 +8,7 @@ import {
   Truck, DollarSign, BarChart2, FolderOpen, UserCog, Settings,
   Download, FileDown, Bell, Calendar, UserCircle, X, Building2, LogOut, FileCheck, Landmark, PieChart
 } from "lucide-react";
+import Logo from '@/components/shared/Logo';
 
 type NavItem = { id: string; label: string; icon: React.ElementType; badge?: number };
 type NavGroup = { label: string; items: NavItem[] };
@@ -87,18 +88,34 @@ const navGroups: NavGroup[] = [
 export default function Sidebar({ onClose }: { onClose?: () => void }) {
   const { user, logout } = useAuth();
   const initials = user?.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : 'AR';
+  const role = user?.role || 'ADMIN';
+
+  // Role-based filtering logic
+  const filteredGroups = navGroups.map(group => {
+    let items = group.items;
+    
+    if (role === 'SITE_SUPERVISOR') {
+      // Allow only specific items for Site Supervisor
+      const allowed = ['/dashboard', '/daily-logs', '/attendance', '/workers', '/dpr', '/material-requests', '/notifications', '/profile', '/export-attendance'];
+      items = items.filter(item => allowed.includes(item.id));
+    } else if (role === 'PROJECT_MANAGER') {
+      // Project Manager shouldn't see full Admin or Cashbook
+      const restricted = ['/users', '/settings', '/cashbook', '/invoices', '/payroll'];
+      items = items.filter(item => !restricted.includes(item.id));
+    } else if (role === 'ACCOUNTANT') {
+      // Accountant focuses on Finance
+      const allowed = ['/dashboard', '/finance', '/cashbook', '/budgets', '/purchase-orders', '/expenses', '/invoices', '/payments', '/payroll', '/vendors', '/contractors', '/reports', '/profile'];
+      items = items.filter(item => allowed.includes(item.id));
+    }
+    
+    return { ...group, items };
+  }).filter(group => group.items.length > 0);
 
   return (
     <div className="flex flex-col h-full bg-[#2648E7] text-white overflow-hidden">
       <div className="flex items-center justify-between px-4 py-4 border-b border-white/10 flex-shrink-0">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-[#FCC300] flex items-center justify-center flex-shrink-0">
-            <Building2 className="w-4 h-4 text-[#0D1117]" />
-          </div>
-          <div>
-            <p className="text-sm font-bold leading-tight">Apni Estate</p>
-            <p className="text-[9px] opacity-50 font-medium tracking-wide uppercase m-0">Construction ERP</p>
-          </div>
+          <Logo size="md" variant="light" />
         </div>
         {onClose && (
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10 ml-2 flex-shrink-0">
@@ -107,7 +124,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
         )}
       </div>
       <div className="flex-1 overflow-y-auto py-2 custom-scrollbar">
-        {navGroups.map(group => (
+        {filteredGroups.map(group => (
           <div key={group.label} className="mb-0.5">
             <p className="px-4 pt-3 pb-1 text-[9px] font-bold uppercase tracking-widest opacity-40 m-0">{group.label}</p>
             {group.items.map(item => (

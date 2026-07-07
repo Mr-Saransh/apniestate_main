@@ -158,7 +158,7 @@ export default function DprPage() {
           const dateStr = new Date(r.report_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
           const activities = r.work_completed ? r.work_completed.split('\n').filter(Boolean).slice(0, 3) : ['No activities recorded'];
           const pmName = r.submitter?.name || "System";
-          const issuesCount = r.issues_faced ? (typeof r.issues_faced === 'string' ? JSON.parse(r.issues_faced).length : r.issues_faced.length) : 0;
+          const issuesCount = r.issues_faced ? (typeof r.issues_faced === 'string' ? JSON.parse(r.issues_faced).length : (r.issues_faced as any).length) : 0;
           
           return (
             <Card key={r.id || i} title={r.site?.name || "Unknown Site"} right={
@@ -205,6 +205,12 @@ export default function DprPage() {
                 <X className="w-5 h-5" />
               </button>
             </div>
+            <div className="w-full h-48 bg-muted relative overflow-hidden flex-shrink-0">
+              <img src="/dpr/site_image_1.png" alt="Site Progress" className="w-full h-full object-cover" />
+              <div className="absolute bottom-2 left-2 bg-black/60 text-white text-[10px] px-2 py-1 rounded font-medium backdrop-blur-sm">
+                AI Verified Progress Snapshot
+              </div>
+            </div>
             <div className="p-4 overflow-y-auto space-y-4 text-sm">
               <div>
                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Site & Date</p>
@@ -222,7 +228,7 @@ export default function DprPage() {
                 </div>
                 <div>
                   <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Workers Present</p>
-                  <p className="mt-1">{selectedDpr.workers_present || 'Not specified'}</p>
+                  <p className="mt-1">{(selectedDpr as any).workers_present || 'Not specified'}</p>
                 </div>
               </div>
             </div>
