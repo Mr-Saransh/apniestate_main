@@ -160,6 +160,23 @@ export default function DprPage() {
           const pmName = r.submitter?.name || "System";
           const issuesCount = r.issues_faced ? (typeof r.issues_faced === 'string' ? JSON.parse(r.issues_faced).length : (r.issues_faced as any).length) : 0;
           
+          let photoUrl = '/dpr/site_image_1.png';
+          if (r.photos) {
+            try {
+              const parsedPhotos = typeof r.photos === 'string' ? JSON.parse(r.photos) : r.photos;
+              if (Array.isArray(parsedPhotos) && parsedPhotos.length > 0) {
+                photoUrl = parsedPhotos[0];
+              }
+            } catch (e) {
+              photoUrl = r.photos;
+            }
+          } else {
+            // Pseudo-random selection from the 4 generated images based on the DPR ID length/characters
+            const hash = r.id ? r.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) : i;
+            const index = (hash % 4) + 1;
+            photoUrl = `/dpr/site_image_${index}.png`;
+          }
+          
           return (
             <Card key={r.id || i} title={r.site?.name || "Unknown Site"} right={
               <button onClick={() => openDetails(r)} className="px-2 py-1 bg-secondary text-primary rounded text-[10px] font-bold hover:bg-primary/10 transition-colors">
@@ -167,10 +184,19 @@ export default function DprPage() {
               </button>
             }>
               <div className="space-y-3">
-                <div className="h-20 rounded-lg bg-gradient-to-br from-slate-700 to-slate-900 flex items-center justify-center cursor-pointer hover:opacity-90 transition-opacity" onClick={() => openDetails(r)}>
-                  <div className="flex items-center gap-2 text-white/40">
-                    <Building2 className="w-7 h-7" />
-                    <span className="text-xs">Site Photo — {dateStr}</span>
+                <div 
+                  className="h-28 rounded-lg flex items-end justify-start p-3 cursor-pointer hover:opacity-90 transition-all relative overflow-hidden group" 
+                  onClick={() => openDetails(r)}
+                  style={{
+                    backgroundImage: `url(${photoUrl})`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                  }}
+                >
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                  <div className="relative z-10 flex items-center gap-2 text-white/90 group-hover:text-white transition-colors">
+                    <Building2 className="w-4 h-4 drop-shadow-md" />
+                    <span className="text-xs font-medium drop-shadow-md">Site Photo — {dateStr}</span>
                   </div>
                 </div>
                 <div>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Outlet, Navigate, useLocation } from 'react-router-dom';
+import { Outlet, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useIsDesktop } from '@/hooks/useMediaQuery';
 import Sidebar from './Sidebar';
@@ -28,6 +28,7 @@ export default function AppLayout() {
   const { isAuthenticated, isLoading, user, activeWorkspace } = useAuth();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
 
   if (isLoading) {
     return (
@@ -56,7 +57,7 @@ export default function AppLayout() {
   const activeTitle = screenTitles[location.pathname] || "Apni Estate";
 
   return (
-    <div className="flex min-h-screen bg-background font-sans">
+    <div className="flex min-h-screen bg-background font-sans overflow-x-hidden">
       {/* Desktop Sidebar */}
       <aside className="hidden lg:flex flex-col fixed inset-y-0 left-0 w-64 z-40 shadow-xl">
         <Sidebar onClose={() => setDrawerOpen(false)} />
@@ -73,7 +74,7 @@ export default function AppLayout() {
       )}
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-h-screen lg:ml-64">
+      <div className="flex-1 flex flex-col min-h-screen min-w-0 lg:ml-64">
         
         {/* Mobile Header */}
         <header className="lg:hidden sticky top-0 z-30 bg-[#2648E7] text-white flex items-center justify-between px-4 h-14 flex-shrink-0 shadow-sm">
@@ -86,13 +87,13 @@ export default function AppLayout() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button className="relative p-1.5 rounded-lg hover:bg-white/10 transition-colors">
+            <button onClick={() => navigate('/notifications')} className="relative p-1.5 rounded-lg hover:bg-white/10 transition-colors">
               <Bell className="w-5 h-5" />
               <span className="absolute top-1 right-1 w-2 h-2 bg-[#FCC300] rounded-full border border-[#2648E7]" />
             </button>
-            <div className="w-7 h-7 rounded-full bg-[#FCC300] flex items-center justify-center text-[#0D1117] text-[10px] font-bold">
+            <button onClick={() => navigate('/profile')} className="w-7 h-7 rounded-full bg-[#FCC300] flex items-center justify-center text-[#0D1117] text-[10px] font-bold hover:opacity-80 transition-opacity">
               {initials}
-            </div>
+            </button>
           </div>
         </header>
 
@@ -107,18 +108,18 @@ export default function AppLayout() {
                 placeholder="Search anything (Cmd+K)..." 
               />
             </div>
-            <button className="relative p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
+            <button onClick={() => navigate('/notifications')} className="relative p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
               <Bell className="w-4 h-4" />
               <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-red-500 rounded-full" />
             </button>
-            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white text-[11px] font-bold shadow-sm">
+            <button onClick={() => navigate('/profile')} className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white text-[11px] font-bold shadow-sm hover:opacity-80 transition-opacity">
               {initials}
-            </div>
+            </button>
           </div>
         </header>
 
         {/* Content */}
-        <main className="flex-1 overflow-y-auto p-4 lg:p-6 pb-24 lg:pb-8">
+        <main className="flex-1 overflow-y-auto px-4 pt-2 pb-24 lg:p-6 lg:pb-8">
           <div className="max-w-[1400px] mx-auto">
             <Outlet />
           </div>

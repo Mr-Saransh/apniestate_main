@@ -432,7 +432,7 @@ export default function ProjectDetailPage() {
         </button>
 
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
-          <div style={{ flex: 1, minWidth: '300px' }}>
+          <div style={{ flex: 1, minWidth: '200px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
               <h1 className="page-title" style={{ margin: 0 }}>{project.name}</h1>
               <StatusBadge status={project.status} />
@@ -480,6 +480,8 @@ export default function ProjectDetailPage() {
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '8px',
                 marginBottom: 'var(--space-3)',
               }}>
                 <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', fontWeight: 'var(--font-weight-medium)' }}>
@@ -514,13 +516,13 @@ export default function ProjectDetailPage() {
             <InfoCard icon={<Wallet size={18} />} label="Project Budget" value={project.budget ? `₹${project.budget.toLocaleString('en-IN')}` : 'Not set'} />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-5)', flexWrap: 'wrap', marginBottom: 'var(--space-5)' }}>
+          <div className="grid-2" style={{ marginBottom: 'var(--space-5)' }}>
             {/* Stats Column */}
             <div className="stat-card" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', padding: 'var(--space-5)' }}>
               <h3 style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-bold)', borderBottom: '1px solid var(--color-border)', paddingBottom: 'var(--space-2)', margin: 0 }}>
                 Project Entities
               </h3>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 'var(--space-4)' }}>
                 <div style={{ textAlign: 'center', padding: 'var(--space-3)', background: 'var(--color-primary-50)', borderRadius: 'var(--radius-lg)' }}>
                   <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-primary)' }}>{totalTasksCount}</div>
                   <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>Tasks Count</div>
@@ -599,7 +601,7 @@ export default function ProjectDetailPage() {
       {/* Milestones Tab */}
       {activeTab === 'Milestones' && (
         <div className="animate-fade-in">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-2)', marginBottom: 'var(--space-4)' }}>
             <h2 className="section-title" style={{ margin: 0 }}>Project Milestones</h2>
             <button className="btn btn-primary btn-sm" onClick={() => setShowAddMilestoneModal(true)}>
               <Plus size={16} /> Add Milestone
@@ -655,7 +657,7 @@ export default function ProjectDetailPage() {
       {/* Sites Tab */}
       {activeTab === 'Sites' && (
         <div className="animate-fade-in">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-2)', marginBottom: 'var(--space-4)' }}>
             <h2 className="section-title" style={{ margin: 0 }}>Project Site Locations</h2>
             <button className="btn btn-primary btn-sm" onClick={() => setShowAddSiteModal(true)}>
               <Plus size={16} /> Add Site
@@ -732,7 +734,7 @@ export default function ProjectDetailPage() {
       {/* Finance Tab */}
       {activeTab === 'Finance' && (
         <div className="animate-fade-in">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-2)', marginBottom: 'var(--space-4)' }}>
             <h2 className="section-title" style={{ margin: 0 }}>Category Budget Allocations</h2>
             <button className="btn btn-primary btn-sm" onClick={() => setShowAddBudgetModal(true)}>
               <Plus size={16} /> Allocate Budget
