@@ -168,7 +168,7 @@ export function getSidebarConfig(role: string): NavigationSection[] {
 const builderBottomNav: NavigationItem[] = [
   { to: '/dashboard', icon: Home, label: 'Home' },
   { to: '/attendance', icon: UserCheck, label: 'Attend' },
-  { to: '/finance', icon: Wallet, label: 'Finance' },
+  { to: '/material-requests', icon: ShoppingCart, label: 'Requests', badge: true },
   { to: '/notifications', icon: Bell, label: 'Alerts', badge: true },
   { to: '/settings', icon: User, label: 'Profile' },
 ];

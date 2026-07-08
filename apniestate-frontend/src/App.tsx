@@ -87,7 +87,6 @@ export default function App() {
                   <Route path="/settings" element={<SettingsPage />} />
                   <Route path="/profile" element={<ProfilePage />} />
                   <Route path="/milestones" element={<MilestonesPage />} />
-                  <Route path="/cashbook" element={<FinancePage />} />
                   <Route path="/dpr" element={<DprPage />} />
                   {/* New Figma pages */}
                   <Route path="/calendar" element={<CalendarPage />} />

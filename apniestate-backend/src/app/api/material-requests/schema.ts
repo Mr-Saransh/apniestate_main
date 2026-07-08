@@ -5,6 +5,7 @@ export const CreateMaterialRequestSchema = z.object({
   material_id: z.string().min(1, "Material is required"),
   quantity: z.number().positive("Quantity must be positive"),
   notes: z.string().optional().nullable(),
+  priority: z.enum(["URGENT", "HIGH", "NORMAL", "LOW"]).optional(),
 });
 
 export const UpdateMaterialRequestSchema = z.object({

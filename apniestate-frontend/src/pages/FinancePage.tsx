@@ -137,10 +137,16 @@ export default function FinancePage() {
   const outflow = data?.cashSpent || 0;
 
   const formatBal = (val: number) => {
-    if (val >= 100000) return `₨${(val / 100000).toFixed(2)}L`;
-    if (val >= 1000) return `₨${(val / 1000).toFixed(1)}K`;
-    return `₨${val}`;
+    const isNeg = val < 0;
+    const absVal = Math.abs(val);
+    let str = `₨${absVal}`;
+    if (absVal >= 100000) str = `₨${(absVal / 100000).toFixed(2)}L`;
+    else if (absVal >= 1000) str = `₨${(absVal / 1000).toFixed(1)}K`;
+    return isNeg ? `-${str}` : str;
   };
+
+  const profitability = inflow - outflow;
+  const profitMargin = inflow > 0 ? (profitability / inflow) * 100 : 0;
 
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
@@ -157,16 +163,27 @@ export default function FinancePage() {
       <div className="grid grid-cols-2 gap-3 mb-2">
         <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 shadow-sm text-center">
           <p className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider mb-1">Money In</p>
-          <p className="text-xl font-black text-emerald-600">{formatBal(inflow)}</p>
+          <p className="text-lg font-bold text-emerald-600">{formatBal(inflow)}</p>
         </div>
         <div className="bg-red-50 border border-red-100 rounded-xl p-4 shadow-sm text-center">
           <p className="text-[10px] font-bold text-red-800 uppercase tracking-wider mb-1">Money Out</p>
-          <p className="text-xl font-black text-red-600">{formatBal(outflow)}</p>
+          <p className="text-lg font-bold text-red-600">{formatBal(outflow)}</p>
         </div>
       </div>
-      
-      <div className="bg-primary/10 border border-primary/20 rounded-xl p-3 text-center mb-4">
-         <p className="text-xs font-semibold text-primary">Net Balance: {formatBal(currentBal)}</p>
+      <div className="rounded-xl p-3 border border-border bg-white mb-4 flex items-center justify-between shadow-sm">
+        <div>
+          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-0.5">Total Profitability</p>
+          <div className="flex items-baseline gap-2">
+            <p className="text-lg font-bold text-foreground">{formatBal(profitability)}</p>
+            <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${profitMargin >= 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+              {profitMargin >= 0 ? '+' : ''}{profitMargin.toFixed(1)}%
+            </span>
+          </div>
+        </div>
+        <div className="text-right">
+          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-0.5">Net Balance</p>
+          <p className="text-sm font-bold text-foreground">{formatBal(currentBal)}</p>
+        </div>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-2">

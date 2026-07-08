@@ -6,6 +6,7 @@ import { milestonesApi, type Milestone } from '@/api/milestones';
 import { budgetsApi, type Budget } from '@/api/budgets';
 import { usersApi, type User } from '@/api/users';
 import { apiClient } from '@/api/client';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from 'recharts';
 import StatusBadge from '@/components/shared/StatusBadge';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import Modal from '@/components/shared/Modal';
@@ -32,7 +33,7 @@ import {
   UserPlus
 } from 'lucide-react';
 
-const tabs = ['Overview', 'Milestones', 'Sites', 'Tasks', 'Finance', 'Timeline'];
+const tabs = ['Overview', 'Milestones', 'Sites', 'Tasks', 'Finance', 'Timeline', 'Units'];
 
 export default function ProjectDetailPage() {
   const { hasPermission } = useAuth();
@@ -46,6 +47,7 @@ export default function ProjectDetailPage() {
   const [expenses, setExpenses] = useState<any[]>([]);
   const [timelineData, setTimelineData] = useState<any>(null);
   const [users, setUsers] = useState<User[]>([]);
+  const [units, setUnits] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('Overview');
   
@@ -55,6 +57,7 @@ export default function ProjectDetailPage() {
   const [showAddSiteModal, setShowAddSiteModal] = useState(false);
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
   const [showAddBudgetModal, setShowAddBudgetModal] = useState(false);
+  const [showAddUnitModal, setShowAddUnitModal] = useState(false);
 
   // Form states - Project
   const [editName, setEditName] = useState('');
@@ -105,6 +108,16 @@ export default function ProjectDetailPage() {
   const [budgetError, setBudgetError] = useState('');
   const [budgetSaving, setBudgetSaving] = useState(false);
 
+  // Form states - Unit
+  const [uNumber, setUNumber] = useState('');
+  const [uType, setUType] = useState('HOUSE');
+  const [uCustomType, setUCustomType] = useState('');
+  const [uStatus, setUStatus] = useState('VACANT');
+  const [uPrice, setUPrice] = useState('');
+  const [uClientName, setUClientName] = useState('');
+  const [unitError, setUnitError] = useState('');
+  const [unitSaving, setUnitSaving] = useState(false);
+
   const fetchProjectData = async () => {
     try {
       const projRes = await projectsApi.getById(id!);
@@ -144,6 +157,10 @@ export default function ProjectDetailPage() {
       }
       if (usersRes.data) setUsers(usersRes.data);
 
+      // Fetch Units
+      const unitsRes = await apiClient.get<any[]>(`/projects/${id}/units`);
+      if (unitsRes.data) setUnits(unitsRes.data);
+
     } catch (err) {
       console.error('Failed to load project details page data', err);
     } finally {
@@ -171,8 +188,30 @@ export default function ProjectDetailPage() {
   const totalTasksCount = project._count?.tasks || project.tasks?.length || 0;
   const progress = project.progress_percentage || 0;
 
+  // Pie chart logic
+  const categoryColors: Record<string, string> = {
+    MATERIAL: '#F97316',
+    GENERAL: '#EF4444',
+    LABOUR: '#3B82F6',
+    STOCK_TRANSFER: '#A855F7',
+    SUBCONTRACTS: '#14B8A6',
+    BROKER: '#EC4899',
+    OFFICE: '#6366F1',
+    OTHER: '#9CA3AF'
+  };
+  const hasSpent = budgets.some(b => b.spent > 0);
+  const pieData = budgets.filter(b => b.spent > 0).map((b) => ({
+    name: b.category,
+    value: b.spent,
+    color: categoryColors[b.category] || categoryColors.OTHER
+  }));
+
   // Health Score calculations
   const totalSpentExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
+  const totalRevenue = units.filter((u: any) => u.status === 'SOLD').reduce((sum: number, u: any) => sum + (u.price || 0), 0);
+  const projectProfitability = totalRevenue - totalSpentExpenses;
+  const projectProfitMargin = totalRevenue > 0 ? (projectProfitability / totalRevenue) * 100 : 0;
+  
   const allocatedBudget = project.budget || 0;
   const budgetVariance = allocatedBudget - totalSpentExpenses;
   
@@ -417,6 +456,60 @@ export default function ProjectDetailPage() {
     }
   };
 
+  // Handlers - Units
+  const handleCreateUnit = async (e: FormEvent) => {
+    e.preventDefault();
+    setUnitError('');
+    setUnitSaving(true);
+    try {
+      await apiClient.post(`/projects/${id}/units`, {
+        unit_number: uNumber,
+        type: uType,
+        custom_type: uType === 'OTHER' ? uCustomType : null,
+        status: uStatus,
+        price: uPrice || null,
+        client_name: uClientName || null,
+      });
+      setShowAddUnitModal(false);
+      setUNumber('');
+      setUType('HOUSE');
+      setUCustomType('');
+      setUStatus('VACANT');
+      setUPrice('');
+      setUClientName('');
+      fetchProjectData();
+    } catch (err: any) {
+      setUnitError(err.message || 'Failed to create unit');
+    } finally {
+      setUnitSaving(false);
+    }
+  };
+
+  const handleToggleUnitStatus = async (unitId: string, currentStatus: string) => {
+    const nextStatusMap: Record<string, string> = {
+      VACANT: 'BOOKED',
+      BOOKED: 'SOLD',
+      SOLD: 'VACANT'
+    };
+    const nextStatus = nextStatusMap[currentStatus] || 'VACANT';
+    try {
+      await apiClient.patch(`/units/${unitId}`, { status: nextStatus });
+      fetchProjectData();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleDeleteUnit = async (unitId: string) => {
+    if (!confirm('Are you sure you want to delete this unit?')) return;
+    try {
+      await apiClient.delete(`/units/${unitId}`);
+      fetchProjectData();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   return (
     <div className="animate-fade-in" style={{ paddingBottom: 'var(--space-12)' }}>
       {/* Back + Header */}
@@ -583,6 +676,73 @@ export default function ProjectDetailPage() {
             </div>
           </div>
 
+          {/* Expenditure Breakdown Pie Chart */}
+          <div className="card" style={{ marginBottom: 'var(--space-5)' }}>
+            <div className="card-body">
+              <h3 style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-bold)', margin: 0, marginBottom: 'var(--space-4)', textAlign: 'center' }}>
+                Expense Breakdown
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <div style={{ height: '240px', width: '100%' }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={pieData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={65}
+                        outerRadius={95}
+                        paddingAngle={2}
+                        dataKey="value"
+                        isAnimationActive={true}
+                        animationBegin={200}
+                        animationDuration={1500}
+                      >
+                        {pieData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <RechartsTooltip 
+                        formatter={(value: any) => `₹${Number(value).toLocaleString('en-IN')}`}
+                        contentStyle={{ borderRadius: '8px', fontSize: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                
+                {/* Custom Legend */}
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: '1fr 1fr', 
+                  gap: '16px', 
+                  width: '100%', 
+                  padding: '0 16px',
+                  marginTop: '16px' 
+                }}>
+                  {pieData.map((entry, idx) => (
+                    <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                      <div style={{ 
+                        width: '10px', 
+                        height: '10px', 
+                        borderRadius: '50%', 
+                        backgroundColor: entry.color,
+                        marginTop: '4px'
+                      }} />
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)', textTransform: 'capitalize' }}>
+                          {entry.name.replace('_', ' ').toLowerCase()}
+                        </span>
+                        <span style={{ fontSize: '14px', fontWeight: 'bold' }}>
+                          ₹{entry.value.toLocaleString('en-IN')}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Address Card */}
           {(project.address || project.city) && (
             <div className="card">
@@ -593,6 +753,65 @@ export default function ProjectDetailPage() {
                   <span style={{ fontWeight: 'var(--font-weight-semibold)' }}>{project.address}{project.city ? `, ${project.city}` : ''}</span>
                 </div>
               </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Units / Bookings Tab */}
+      {activeTab === 'Units' && (
+        <div className="animate-fade-in">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-2)', marginBottom: 'var(--space-4)' }}>
+            <h2 className="section-title" style={{ margin: 0 }}>Project Units & Bookings</h2>
+            <button className="btn btn-primary btn-sm" onClick={() => setShowAddUnitModal(true)}>
+              <Plus size={16} /> Add Unit
+            </button>
+          </div>
+
+          {units.length === 0 ? (
+            <EmptyState
+              icon={<UserPlus size={36} />}
+              title="No units defined"
+              description="Create manageable units like rooms, shops, or floors to track their booking status."
+              action={
+                <button className="btn btn-primary" onClick={() => setShowAddUnitModal(true)}>
+                  <Plus size={16} /> Create Unit
+                </button>
+              }
+            />
+          ) : (
+            <div className="card" style={{ overflow: 'hidden' }}>
+              {units.map((u: any) => (
+                <div key={u.id} className="list-card hover-row">
+                  <div className="list-card-content">
+                    <div className="list-card-title">
+                      {u.unit_number} 
+                      <span style={{ fontSize: '12px', fontWeight: 'normal', color: 'var(--color-text-muted)', marginLeft: '8px' }}>
+                        ({u.type === 'OTHER' ? u.custom_type : u.type})
+                      </span>
+                    </div>
+                    {u.client_name && <div className="list-card-subtitle">Client: {u.client_name}</div>}
+                    {u.price && (
+                      <div className="list-card-subtitle" style={{ marginTop: '4px', fontWeight: 'bold' }}>
+                        Price: ₹{u.price.toLocaleString('en-IN')}
+                      </div>
+                    )}
+                  </div>
+                  <div className="list-card-meta" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+                    <span 
+                      className={`badge cursor-pointer ${u.status === 'VACANT' ? 'badge-pending' : u.status === 'BOOKED' ? 'badge-active' : 'badge-cancelled'}`}
+                      style={{ textTransform: 'capitalize' }}
+                      onClick={() => handleToggleUnitStatus(u.id, u.status)}
+                      title="Click to cycle status: VACANT -> BOOKED -> SOLD"
+                    >
+                      {u.status}
+                    </span>
+                    <button className="btn btn-ghost btn-sm text-danger" onClick={() => handleDeleteUnit(u.id)} title="Delete">
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -739,6 +958,23 @@ export default function ProjectDetailPage() {
             <button className="btn btn-primary btn-sm" onClick={() => setShowAddBudgetModal(true)}>
               <Plus size={16} /> Allocate Budget
             </button>
+          </div>
+
+          {/* Profitability Card */}
+          <div className="rounded-xl p-3 border border-border bg-white mb-5 flex items-center justify-between shadow-sm">
+            <div>
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-0.5">Total Profitability</p>
+              <div className="flex items-baseline gap-2">
+                <p className="text-lg font-bold text-foreground">₹{projectProfitability.toLocaleString('en-IN')}</p>
+                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${projectProfitMargin >= 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                  {projectProfitMargin >= 0 ? '+' : ''}{projectProfitMargin.toFixed(1)}%
+                </span>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-0.5">Project Revenue</p>
+              <p className="text-sm font-bold text-foreground">₹{totalRevenue.toLocaleString('en-IN')}</p>
+            </div>
           </div>
 
           <div className="card" style={{ marginBottom: 'var(--space-5)', padding: 'var(--space-5)' }}>
@@ -1215,6 +1451,65 @@ export default function ProjectDetailPage() {
           <div className="form-group">
             <label className="form-label" htmlFor="b-desc">Notes / Scope Description</label>
             <textarea id="b-desc" className="form-input" placeholder="Optional allocations remarks" value={bDesc} onChange={(e) => setBDesc(e.target.value)} rows={2} />
+          </div>
+        </form>
+      </Modal>
+
+      {/* Add Unit Modal */}
+      <Modal
+        isOpen={showAddUnitModal}
+        onClose={() => setShowAddUnitModal(false)}
+        title="Create New Project Unit"
+        footer={
+          <>
+            <button className="btn btn-secondary" onClick={() => setShowAddUnitModal(false)}>Cancel</button>
+            <button className="btn btn-primary" onClick={handleCreateUnit as any} disabled={unitSaving || !uNumber}>
+              {unitSaving ? 'Saving...' : 'Create Unit'}
+            </button>
+          </>
+        }
+      >
+        <form onSubmit={handleCreateUnit} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+          {unitError && <div className="login-error"><span>{unitError}</span></div>}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
+            <div className="form-group">
+              <label className="form-label" htmlFor="u-number">Unit Number/Name *</label>
+              <input id="u-number" type="text" className="form-input" placeholder="e.g. Shop 101, Villa 5" value={uNumber} onChange={(e) => setUNumber(e.target.value)} required />
+            </div>
+            <div className="form-group">
+              <label className="form-label" htmlFor="u-type">Unit Type *</label>
+              <select id="u-type" className="form-input form-select" value={uType} onChange={(e) => setUType(e.target.value)}>
+                <option value="HOUSE">House / Villa</option>
+                <option value="MALL_SHOP">Mall Shop</option>
+                <option value="RESTAURANT">Restaurant</option>
+                <option value="OFFICE">Office Space</option>
+                <option value="OTHER">Other Custom</option>
+              </select>
+            </div>
+          </div>
+          {uType === 'OTHER' && (
+            <div className="form-group">
+              <label className="form-label" htmlFor="u-custom-type">Custom Type Name *</label>
+              <input id="u-custom-type" type="text" className="form-input" placeholder="e.g. Warehouse" value={uCustomType} onChange={(e) => setUCustomType(e.target.value)} required={uType === 'OTHER'} />
+            </div>
+          )}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
+            <div className="form-group">
+              <label className="form-label" htmlFor="u-price">Price (₹)</label>
+              <input id="u-price" type="number" className="form-input" placeholder="Optional" value={uPrice} onChange={(e) => setUPrice(e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label className="form-label" htmlFor="u-status">Status</label>
+              <select id="u-status" className="form-input form-select" value={uStatus} onChange={(e) => setUStatus(e.target.value)}>
+                <option value="VACANT">Vacant</option>
+                <option value="BOOKED">Booked</option>
+                <option value="SOLD">Sold</option>
+              </select>
+            </div>
+          </div>
+          <div className="form-group">
+            <label className="form-label" htmlFor="u-client">Client Name (if booked/sold)</label>
+            <input id="u-client" type="text" className="form-input" placeholder="e.g. John Doe" value={uClientName} onChange={(e) => setUClientName(e.target.value)} />
           </div>
         </form>
       </Modal>

@@ -63,7 +63,9 @@ export const BuilderDashboardOverview: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <KPI label="Active Projects" value={activeProjects.toString()} icon={Building2} trend={{ up: true, v: "+1 mo." }} />
+        <a href="/projects" className="cursor-pointer hover:opacity-80 transition-opacity block no-underline text-inherit">
+          <KPI label="Active Projects" value={activeProjects.toString()} icon={Building2} trend={{ up: true, v: "+1 mo." }} />
+        </a>
         <KPI label="Total Workers" value={totalWorkers.toString()} icon={HardHat} trend={{ up: true, v: "+18" }} />
         <KPI label="Revenue (Jul)" value={revenueStr} icon={TrendingUp} trend={{ up: true, v: "8.5%" }} />
         <KPI label="Budget Utilized" value={`${budgetUtilized}%`} icon={Activity} trend={{ up: false, v: "+3%" }} />

@@ -3,7 +3,7 @@ import { withAuth } from "@/middleware/auth.middleware";
 import { validateBody } from "@/middleware/validate.middleware";
 import { UpdateMaterialRequestSchema } from "../schema";
 import { getMaterialRequestById, updateMaterialRequestStatus, deleteMaterialRequest } from "../service";
-import { ok, notFound, noContent } from "@/lib/response";
+import { ok, notFound, noContent, forbidden } from "@/lib/response";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -18,6 +18,13 @@ export const PATCH = withAuth(async (req: NextRequest, user, ctx?: Ctx) => {
   const { id } = await ctx!.params;
   const parsed = await validateBody(req, UpdateMaterialRequestSchema);
   if ("error" in parsed) return parsed.error;
+  
+  if (["APPROVED", "REJECTED"].includes(parsed.data.status)) {
+    if (user.role !== "ADMIN" && user.role !== "BUILDER") {
+      return forbidden("Only Admin or Builder can approve or reject material requests.");
+    }
+  }
+
   const request = await updateMaterialRequestStatus(id, parsed.data, user.sub);
   return ok(request, "Material request updated");
 });

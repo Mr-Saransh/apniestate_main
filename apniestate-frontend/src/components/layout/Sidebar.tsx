@@ -96,7 +96,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
     
     if (role === 'SITE_SUPERVISOR') {
       // Allow only specific items for Site Supervisor
-      const allowed = ['/dashboard', '/daily-logs', '/attendance', '/workers', '/dpr', '/material-requests', '/notifications', '/profile', '/export-attendance'];
+      const allowed = ['/dashboard', '/daily-logs', '/attendance', '/workers', '/dpr', '/materials', '/notifications', '/profile', '/export-attendance'];
       items = items.filter(item => allowed.includes(item.id));
     } else if (role === 'PROJECT_MANAGER') {
       // Project Manager shouldn't see full Admin or Cashbook

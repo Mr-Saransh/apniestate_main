@@ -177,12 +177,32 @@ enum LeaveType {
 
 enum BudgetCategory {
   MATERIALS
-  LABOUR
   EQUIPMENT
   OVERHEAD
   SUBCONTRACT
   CONTINGENCY
+  MATERIAL
+  GENERAL
+  LABOUR
+  STOCK_TRANSFER
+  SUBCONTRACTS
+  BROKER
+  OFFICE
   OTHER
+}
+
+enum UnitType {
+  HOUSE
+  MALL_SHOP
+  RESTAURANT
+  OFFICE
+  OTHER
+}
+
+enum UnitStatus {
+  VACANT
+  BOOKED
+  SOLD
 }
 
 enum AccountType {
@@ -368,6 +388,7 @@ model Project {
   cashbook_entries Cashbook[]
   expenses      Expense[]
   project_assignments ProjectAssignment[]
+  units         ProjectUnit[]
 
   @@index([builder_id], name: "idx_projects_builder_id")
   @@index([manager_id], name: "idx_projects_manager_id")
@@ -376,6 +397,24 @@ model Project {
   company       Company? @relation(fields: [company_id], references: [id])
 
   @@index([company_id], name: "idx_project_company_id")
+}
+
+model ProjectUnit {
+  id          String     @id @default(cuid())
+  project_id  String
+  unit_number String
+  type        UnitType   @default(OTHER)
+  custom_type String?
+  status      UnitStatus @default(VACANT)
+  price       Float?
+  client_name String?
+  created_at  DateTime   @default(now())
+  updated_at  DateTime   @updatedAt
+
+  project     Project    @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  
+  @@index([project_id])
+  @@map("project_units")
 }
 
 model Site {
@@ -842,6 +881,12 @@ model Material {
   @@index([company_id], name: "idx_material_company_id")
   @@index([preferred_vendor_id], name: "idx_material_vendor_id")
 }
+enum RequestPriority {
+  URGENT
+  HIGH
+  NORMAL
+  LOW
+}
 
 model MaterialRequest {
   id           String                @id @default(cuid())
@@ -849,6 +894,7 @@ model MaterialRequest {
   material_id  String
   quantity     Float
   status       MaterialRequestStatus @default(PENDING)
+  priority     RequestPriority       @default(NORMAL)
   requested_by String
   approved_by  String?
   notes        String?

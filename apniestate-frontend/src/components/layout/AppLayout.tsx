@@ -48,7 +48,7 @@ export default function AppLayout() {
     isSupervisor 
       ? { id: "/attendance", icon: Users, label: "Attendance" }
       : { id: "/finance", icon: BookOpen, label: "Finance" },
-    { id: "/materials", icon: Package, label: "Materials" },
+    { id: "/material-requests", icon: ShoppingCart, label: "Requests" },
     { id: "/notifications", icon: Bell, label: "Alerts", badge: 5 },
     { id: "/profile", icon: UserCircle, label: "Profile" },
   ];

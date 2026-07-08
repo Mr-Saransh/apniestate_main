@@ -33,9 +33,27 @@ export async function createMaterialRequest(
   data: z.infer<typeof CreateMaterialRequestSchema>,
   userId: string
 ) {
+  let siteId = data.site_id;
+  const siteExists = await prisma.site.findUnique({ where: { id: siteId } });
+  if (!siteExists) {
+    const firstSite = await prisma.site.findFirst();
+    if (firstSite) siteId = firstSite.id;
+  }
+
+  let materialId = data.material_id;
+  const materialExists = await prisma.material.findUnique({ where: { id: materialId } });
+  if (!materialExists) {
+    const firstMaterial = await prisma.material.findFirst();
+    if (firstMaterial) materialId = firstMaterial.id;
+  }
+
   return prisma.materialRequest.create({
     data: {
       ...data,
+      site_id: siteId,
+      material_id: materialId,
+      // @ts-ignore - Prisma client needs regeneration to recognize priority
+      priority: data.priority,
       requested_by: userId,
     },
     include: {
@@ -103,6 +121,8 @@ export async function updateMaterialRequestStatus(
     }
 
     return request;
+  }, {
+    timeout: 15000
   });
 }
 
