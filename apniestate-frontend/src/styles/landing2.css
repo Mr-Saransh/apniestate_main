@@ -1,0 +1,145 @@
+@import 'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap';
+
+@theme inline {
+  --color-background: #F5F7FF;
+  --color-foreground: #0B1F4D;
+  --color-card: #FFFFFF;
+  --color-card-foreground: #0B1F4D;
+  --color-primary: #0B1F4D;
+  --color-primary-foreground: #FFFFFF;
+  --color-secondary: #EEF1FB;
+  --color-secondary-foreground: #0B1F4D;
+  --color-muted: #F0F2FA;
+  --color-muted-foreground: #6B7BA8;
+  --color-accent: #F5B301;
+  --color-accent-foreground: #0B1F4D;
+  --color-border: rgba(11, 31, 77, 0.08);
+  --color-ring: #F5B301;
+
+  --font-display: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --radius: 16px;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: #F5F7FF;
+  color: #0B1F4D;
+  font-family: 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(11,31,77,0.2); border-radius: 2px; }
+
+/* ─── Animations ─── */
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-12px); }
+}
+@keyframes pulse-ring {
+  0% { transform: scale(0.95); opacity: 0.6; }
+  70% { transform: scale(1.15); opacity: 0; }
+  100% { transform: scale(0.95); opacity: 0; }
+}
+@keyframes gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-marquee { animation: marquee 32s linear infinite; }
+.animate-float { animation: float 6s ease-in-out infinite; }
+
+/* ─── Utility classes ─── */
+.glass {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+}
+
+.glass-navy {
+  background: rgba(11, 31, 77, 0.06);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(11, 31, 77, 0.1);
+}
+
+.card-shadow {
+  box-shadow: 0 4px 24px rgba(11, 31, 77, 0.06), 0 1px 4px rgba(11, 31, 77, 0.04);
+}
+
+.card-shadow-hover {
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+.card-shadow-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 48px rgba(11, 31, 77, 0.12), 0 4px 12px rgba(11, 31, 77, 0.06);
+}
+
+.gold-gradient {
+  background: linear-gradient(135deg, #F5B301 0%, #FFD44A 50%, #F5B301 100%);
+}
+
+.navy-gradient {
+  background: linear-gradient(135deg, #0B1F4D 0%, #162D6E 100%);
+}
+
+.text-gradient-gold {
+  background: linear-gradient(135deg, #F5B301, #E09600);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.text-gradient-navy {
+  background: linear-gradient(135deg, #0B1F4D, #2045A0);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.ai-mesh {
+  background:
+    radial-gradient(circle at 20% 20%, rgba(245, 179, 1, 0.08) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(11, 31, 77, 0.06) 0%, transparent 50%),
+    radial-gradient(circle at 50% 50%, rgba(32, 69, 160, 0.04) 0%, transparent 70%);
+}
+
+/* Sticky bottom CTA - mobile only */
+.sticky-cta {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  z-index: 200;
+  padding: 12px 20px;
+  background: rgba(255,255,255,0.95);
+  backdrop-filter: blur(16px);
+  border-top: 1px solid rgba(11,31,77,0.08);
+  display: flex;
+  gap: 10px;
+}
+@media (min-width: 768px) {
+  .sticky-cta { display: none; }
+}
+
+/* Responsive helpers */
+@media (max-width: 767px) {
+  .hide-mobile { display: none !important; }
+}
+@media (min-width: 768px) {
+  .hide-desktop { display: none !important; }
+}

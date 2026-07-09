@@ -177,7 +177,7 @@ export default function LoginPage() {
                 </div>
                 <button 
                   onClick={() => setShowDemoModal(true)}
-                  style={{ background: 'transparent', border: '1px solid var(--lp-border)', padding: '10px', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, color: 'var(--lp-primary)', transition: 'all 0.2s ease' }}
+                  style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.4)', padding: '6px 12px', fontSize: '13px', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, color: '#FFFFFF', transition: 'all 0.2s ease' }}
                 >
                   View Demo Accounts
                 </button>
