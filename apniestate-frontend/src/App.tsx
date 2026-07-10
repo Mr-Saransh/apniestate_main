@@ -34,6 +34,7 @@ import InvoicesPage from '@/pages/InvoicesPage';
 import PaymentsPage from '@/pages/PaymentsPage';
 import BudgetsPage from '@/pages/BudgetsPage';
 import DprPage from '@/pages/DprPage';
+import WeeklyReportsPage from '@/pages/WeeklyReportsPage';
 import PayrollPage from '@/pages/PayrollPage';
 import ApprovalsPage from '@/pages/ApprovalsPage';
 import RouteGuard from '@/components/shared/RouteGuard';
@@ -88,6 +89,7 @@ export default function App() {
                   <Route path="/profile" element={<ProfilePage />} />
                   <Route path="/milestones" element={<MilestonesPage />} />
                   <Route path="/dpr" element={<DprPage />} />
+                  <Route path="/weekly-reports" element={<WeeklyReportsPage />} />
                   {/* New Figma pages */}
                   <Route path="/calendar" element={<CalendarPage />} />
                   <Route path="/timeline" element={<TimelinePage />} />

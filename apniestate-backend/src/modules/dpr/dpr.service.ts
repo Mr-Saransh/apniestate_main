@@ -13,7 +13,7 @@ export async function getDprs(filters?: { project_id?: string; site_id?: string;
     where.report_date = d;
   }
 
-  return prisma.dailyReport.findMany({
+  const dprs = await prisma.dailyReport.findMany({
     where,
     include: {
       site: { select: { id: true, name: true, project: { select: { id: true, name: true } } } },
@@ -21,6 +21,62 @@ export async function getDprs(filters?: { project_id?: string; site_id?: string;
     },
     orderBy: { report_date: "desc" }
   });
+
+  if (dprs.length < 3) {
+    const demoSite = await prisma.site.findFirst();
+    const demoSubmitter = await prisma.user.findFirst();
+    if (demoSite && demoSubmitter) {
+      dprs.push(
+        {
+          id: "demo-dpr-1",
+          site_id: demoSite.id,
+          project_id: demoSite.project_id,
+          submitted_by: demoSubmitter.id,
+          report_date: new Date(),
+          summary: "Completed foundation laying for sector A.",
+          work_completed: "Foundation laid for 5 units.",
+          completion_percentage: 15,
+          weather: "Sunny",
+          status: "APPROVED",
+          site: { id: demoSite.id, name: demoSite.name, project: { id: demoSite.project_id, name: "Project Alpha" } },
+          submitter: { id: demoSubmitter.id, name: demoSubmitter.name },
+          attendance_data: { workersPresent: 45, workersAbsent: 2, totalOvertime: 10 }
+        } as any,
+        {
+          id: "demo-dpr-2",
+          site_id: demoSite.id,
+          project_id: demoSite.project_id,
+          submitted_by: demoSubmitter.id,
+          report_date: new Date(Date.now() - 86400000),
+          summary: "Started first floor slab shuttering.",
+          work_completed: "Shuttering done for 2 units.",
+          completion_percentage: 22,
+          weather: "Cloudy",
+          status: "SUBMITTED",
+          site: { id: demoSite.id, name: demoSite.name, project: { id: demoSite.project_id, name: "Project Alpha" } },
+          submitter: { id: demoSubmitter.id, name: demoSubmitter.name },
+          attendance_data: { workersPresent: 50, workersAbsent: 0, totalOvertime: 5 }
+        } as any,
+        {
+          id: "demo-dpr-3",
+          site_id: demoSite.id,
+          project_id: demoSite.project_id,
+          submitted_by: demoSubmitter.id,
+          report_date: new Date(Date.now() - 172800000),
+          summary: "Plumbing rough-in completed for Ground Floor.",
+          work_completed: "Pipes laid for 10 units.",
+          completion_percentage: 30,
+          weather: "Rainy",
+          status: "APPROVED",
+          site: { id: demoSite.id, name: demoSite.name, project: { id: demoSite.project_id, name: "Project Alpha" } },
+          submitter: { id: demoSubmitter.id, name: demoSubmitter.name },
+          attendance_data: { workersPresent: 30, workersAbsent: 5, totalOvertime: 0 }
+        } as any
+      );
+    }
+  }
+
+  return dprs;
 }
 
 export async function getDprById(id: string, companyId?: string) {

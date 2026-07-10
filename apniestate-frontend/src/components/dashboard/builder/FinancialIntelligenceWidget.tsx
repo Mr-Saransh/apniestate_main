@@ -22,25 +22,25 @@ export const FinancialIntelligenceWidget: React.FC<FinancialIntelligenceWidgetPr
       <div className="project-metric-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', marginBottom: '24px' }}>
         <div className="project-metric">
           <span className="project-metric-label">Cashbook Balance</span>
-          <span className="project-metric-val" style={{ color: 'var(--color-primary)', fontSize: '20px' }}>
+          <span className="project-metric-val" style={{ color: 'var(--color-primary)', fontSize: '14px' }}>
             ₹{(data.creditSum - data.debitSum).toLocaleString()}
           </span>
         </div>
         <div className="project-metric">
           <span className="project-metric-label">Today's Expenses</span>
-          <span className="project-metric-val" style={{ color: '#EF4444', fontSize: '20px' }}>
+          <span className="project-metric-val" style={{ color: '#EF4444', fontSize: '14px' }}>
             ₹{data.todayExpenses?.toLocaleString() || 0}
           </span>
         </div>
         <div className="project-metric">
           <span className="project-metric-label">Monthly Burn Rate (Avg)</span>
-          <span className="project-metric-val" style={{ color: '#F59E0B', fontSize: '20px' }}>
+          <span className="project-metric-val" style={{ color: '#F59E0B', fontSize: '14px' }}>
             ₹{(data.cashBurnRate * 30).toLocaleString()}
           </span>
         </div>
         <div className="project-metric">
           <span className="project-metric-label">Expected Payments</span>
-          <span className="project-metric-val" style={{ color: '#10B981', fontSize: '20px' }}>
+          <span className="project-metric-val" style={{ color: '#10B981', fontSize: '14px' }}>
             ₹{data.expectedPayments?.toLocaleString() || 0}
           </span>
         </div>
