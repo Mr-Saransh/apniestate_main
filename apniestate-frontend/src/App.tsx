@@ -130,7 +130,7 @@ export default function App() {
                 <Route element={<RouteGuard permission="reports.read" />}>
                   <Route path="/reports" element={<ReportsPage />} />
                 </Route>
-                
+
                 {/* New Guarded Modules */}
                 <Route element={<RouteGuard permission="workers.read" />}>
                   <Route path="/workers" element={<WorkersPage />} />

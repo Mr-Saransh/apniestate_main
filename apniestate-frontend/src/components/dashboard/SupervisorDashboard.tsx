@@ -58,37 +58,51 @@ export default function SupervisorDashboard() {
         <KPI label="Tasks Done" value={`${tasksProgress}%`} icon={CheckCircle2} trend={{ up: true, v: "+15%" }} />
       </div>
 
-      <Card title="Today's Priority Tasks" noPad>
-        <div className="p-4 space-y-3">
-          {[
-            { t: 'Concrete Pouring - Level 2', time: '10:00 AM', status: 'In Progress' },
-            { t: 'Material Inspection - Steel', time: '11:30 AM', status: 'Pending' },
-            { t: 'Submit DPR', time: '05:00 PM', status: 'Pending' }
-          ].map((task, i) => (
-            <div key={i} className="flex justify-between items-center pb-2 border-b border-border last:border-0 last:pb-0">
-              <div>
-                <p className="text-xs font-bold text-foreground">{task.t}</p>
-                <p className="text-[10px] text-muted-foreground">{task.time}</p>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+        <Card title="Today's Priority Tasks" noPad>
+          <div className="p-4 space-y-3">
+            {[
+              { t: 'Concrete Pouring - Level 2', time: '10:00 AM', status: 'In Progress' },
+              { t: 'Material Inspection - Steel', time: '11:30 AM', status: 'Pending' },
+              { t: 'Submit DPR', time: '05:00 PM', status: 'Pending' }
+            ].map((task, i) => (
+              <div key={i} className="flex justify-between items-center pb-2 border-b border-border last:border-0 last:pb-0">
+                <div>
+                  <p className="text-xs font-bold text-foreground">{task.t}</p>
+                  <p className="text-[10px] text-muted-foreground">{task.time}</p>
+                </div>
+                <span className={`text-[10px] font-bold px-2 py-1 rounded ${task.status === 'In Progress' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
+                  {task.status}
+                </span>
               </div>
-              <span className={`text-[10px] font-bold px-2 py-1 rounded ${task.status === 'In Progress' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
-                {task.status}
-              </span>
+            ))}
+          </div>
+        </Card>
+        
+        <Card title="DPR & Reporting Status" noPad>
+          <div className="p-4 space-y-4">
+            <div className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-100">
+              <div>
+                <p className="text-xs font-bold text-gray-900">Today's DPR</p>
+                <p className="text-[10px] text-gray-500">Not submitted yet</p>
+              </div>
+              <a href="/dpr" className="text-[10px] font-bold bg-primary text-white px-3 py-1.5 rounded hover:bg-primary/90">
+                Submit Now
+              </a>
             </div>
-          ))}
-        </div>
-      </Card>
-      
-      <Card title="Site Alerts">
-        <div className="space-y-2">
-          <div className="flex items-start gap-2 bg-red-50 p-2 rounded-lg border border-red-100">
-            <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-xs font-bold text-red-900">Cement Stock Low</p>
-              <p className="text-[10px] text-red-700">Only 20 bags remaining. Needs urgent request.</p>
+            
+            <div className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-100">
+              <div>
+                <p className="text-xs font-bold text-gray-900">Weekly Report (This Week)</p>
+                <p className="text-[10px] text-gray-500">Auto-generates on Sunday</p>
+              </div>
+              <a href="/weekly-reports" className="text-[10px] font-bold bg-blue-100 text-blue-700 px-3 py-1.5 rounded hover:bg-blue-200">
+                View Past
+              </a>
             </div>
           </div>
-        </div>
-      </Card>
+        </Card>
+      </div>
     </div>
   );
 }

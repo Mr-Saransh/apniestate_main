@@ -39,11 +39,11 @@ export function KPI({ label, value, icon: Icon, trend }: {
   );
 }
 
-export function Card({ title, right, children, noPad, className }: {
-  title?: string; right?: React.ReactNode; children: React.ReactNode; noPad?: boolean; className?: string;
+export function Card({ title, right, children, noPad, className, onClick }: {
+  title?: string; right?: React.ReactNode; children: React.ReactNode; noPad?: boolean; className?: string; onClick?: () => void;
 }) {
   return (
-    <div className={`bg-card rounded-xl border border-border overflow-hidden shadow-sm ${className || ''}`}>
+    <div onClick={onClick} className={`bg-card rounded-xl border border-border overflow-hidden shadow-sm ${onClick ? 'cursor-pointer' : ''} ${className || ''}`}>
       {title && (
         <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card">
           <span className="text-sm font-semibold text-foreground">{title}</span>
@@ -55,11 +55,12 @@ export function Card({ title, right, children, noPad, className }: {
   );
 }
 
-export function SrchBar({ placeholder }: { placeholder?: string }) {
+export function SrchBar({ placeholder, onChange }: { placeholder?: string, onChange?: (e: any) => void }) {
   return (
     <div className="relative">
       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
       <input
+        onChange={onChange}
         className="w-full bg-card border border-border rounded-lg pl-8 pr-3 py-2 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
         placeholder={placeholder || "Search..."}
       />
@@ -73,5 +74,27 @@ export function PH({ title, sub }: { title: string; sub?: string }) {
       <h1 className="text-base font-bold text-foreground">{title}</h1>
       {sub && <p className="text-[11px] text-muted-foreground mt-0.5">{sub}</p>}
     </div>
+  );
+}
+
+export function Badge({ children, variant = "secondary" }: { children: React.ReactNode; variant?: "success" | "warning" | "danger" | "info" | "secondary" }) {
+  const v = variant === "success" ? "green" : variant === "warning" ? "yellow" : variant === "danger" ? "red" : variant === "info" ? "blue" : "gray";
+  return <Chip color={v as any}>{children}</Chip>;
+}
+
+export function Button({ children, onClick, variant = "primary", size = "md", icon }: { children: React.ReactNode; onClick?: () => void; variant?: "primary" | "secondary" | "danger" | "success"; size?: "sm" | "md"; icon?: React.ReactNode }) {
+  const base = "inline-flex items-center justify-center font-medium rounded-lg transition-colors";
+  const vs = {
+    primary: "bg-primary text-white hover:bg-primary/90",
+    secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+    danger: "bg-red-600 text-white hover:bg-red-700",
+    success: "bg-emerald-600 text-white hover:bg-emerald-700",
+  };
+  const sz = size === "sm" ? "px-3 py-1.5 text-xs" : "px-4 py-2 text-sm";
+  return (
+    <button onClick={onClick} className={`${base} ${vs[variant]} ${sz} gap-2`}>
+      {icon}
+      {children}
+    </button>
   );
 }

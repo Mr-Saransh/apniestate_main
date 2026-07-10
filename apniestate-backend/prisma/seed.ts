@@ -771,6 +771,29 @@ async function main() {
   }
   console.log('🔔 Notifications seeded');
 
+  // ── Attachments (Phase 5.5 Universal Media Engine) ─────────
+  console.log('📎 Seeding Attachments...');
+  const attachmentData = [
+    { id: 'att_001', entity_type: 'PROJECT', entity_id: 'proj_downtown_plaza', category: 'Blueprint', file_name: 'structural_plan.pdf', mime_type: 'application/pdf', file_size: 4500000, secure_url: 'https://res.cloudinary.com/demo/image/upload/v1/sample.jpg' },
+    { id: 'att_002', entity_type: 'DPR', entity_id: 'dpr_site_dp_tower_1', category: 'Progress Photo', file_name: 'site_progress_1.jpg', mime_type: 'image/jpeg', file_size: 1200000, secure_url: 'https://res.cloudinary.com/demo/image/upload/v1/sample.jpg' },
+    { id: 'att_003', entity_type: 'EXPENSE', entity_id: 'exp_proj_downtown_plaza_5', category: 'Receipt', file_name: 'cement_receipt.jpg', mime_type: 'image/jpeg', file_size: 850000, secure_url: 'https://res.cloudinary.com/demo/image/upload/v1/sample.jpg' },
+    { id: 'att_004', entity_type: 'WORKER', entity_id: 'worker_001', category: 'Profile Photo', file_name: 'worker_001_id.jpg', mime_type: 'image/jpeg', file_size: 300000, secure_url: 'https://res.cloudinary.com/demo/image/upload/v1/sample.jpg' },
+    { id: 'att_005', entity_type: 'INVENTORY_TXN', entity_id: 'inv_txn_001', category: 'Delivery Photo', file_name: 'delivery_truck.jpg', mime_type: 'image/jpeg', file_size: 2100000, secure_url: 'https://res.cloudinary.com/demo/image/upload/v1/sample.jpg' }
+  ];
+
+  for (const att of attachmentData) {
+    await prisma.attachment.upsert({
+      where: { id: att.id },
+      update: {},
+      create: {
+        ...att,
+        uploaded_by: builder.id,
+        company_id: company.id,
+      } as any,
+    });
+  }
+  console.log('📎 Attachments seeded');
+
   console.log('');
   console.log('✅ Seed completed successfully!');
   console.log('');

@@ -133,6 +133,18 @@ enum ChangeOrderStatus {
   IMPLEMENTED
 }
 
+enum DailyReportStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+}
+
+enum WeeklyReportStatus {
+  DRAFT
+  GENERATED
+  APPROVED
+}
+
 enum InventoryTransactionType {
   IN
   OUT
@@ -293,6 +305,7 @@ model User {
   purchase_orders   PurchaseOrder[]
   attachments       Attachment[]
   approval_logs     ApprovalLog[]
+  weekly_reports    WeeklyReport[]
 
   // Enterprise membership relations
   invitations_sent     Invitation[]        @relation("InvitationSender")
@@ -389,6 +402,8 @@ model Project {
   expenses      Expense[]
   project_assignments ProjectAssignment[]
   units         ProjectUnit[]
+  daily_reports DailyReport[]
+  weekly_reports WeeklyReport[]
 
   @@index([builder_id], name: "idx_projects_builder_id")
   @@index([manager_id], name: "idx_projects_manager_id")
@@ -436,6 +451,7 @@ model Site {
   supervisor       User?              @relation("SupervisorSites", fields: [supervisor_id], references: [id])
   attendances      SiteAttendance[]
   daily_reports    DailyReport[]
+  weekly_reports   WeeklyReport[]
   material_reqs    MaterialRequest[]
   equipment        Equipment[]
   tasks            Task[]
@@ -1335,34 +1351,104 @@ model Notification {
 // ─── Reports & Change Orders ─────────────────────────────
 
 model DailyReport {
-  id            String   @id @default(cuid())
-  site_id       String
-  submitted_by  String
-  report_date   DateTime @db.Date
-  summary       String
-  weather       String?
-  workers_count Int?
-  work_completed     String?
-  materials_consumed Json?
-  equipment_used     Json?
-  issues_faced       Json?
-  attendance_data    Json?
-  expenses_data      Json?
-  photos             Json?
-  tomorrow_plan      String?
-  created_at    DateTime @default(now())
-  updated_at    DateTime @updatedAt
+  id                    String            @id @default(cuid())
+  project_id            String?
+  site_id               String
+  submitted_by          String
+  report_date           DateTime          @db.Date
+  
+  // Basic Info
+  summary               String
+  weather               String?
+  temperature           Float?
+  start_time            DateTime?
+  end_time              DateTime?
+  
+  // Progress
+  work_completed        String?
+  work_in_progress      String?
+  tomorrow_plan         String?           // Pending Work
+  completion_percentage Float?
+  reasons_for_delay     String?
+  
+  // Observations
+  safety_observations   String?
+  quality_observations  String?
+  visitor_notes         String?
+  remarks               String?
 
-  site      Site @relation(fields: [site_id], references: [id])
-  submitter User @relation(fields: [submitted_by], references: [id])
+  // Legacy JSON fields (keep for backwards compatibility but we'll use dynamic fetching going forward)
+  workers_count         Int?
+  materials_consumed    Json?
+  equipment_used        Json?
+  issues_faced          Json?
+  attendance_data       Json?
+  expenses_data         Json?
+  photos                Json?
 
+  // Status & Audit
+  status                DailyReportStatus @default(DRAFT)
+  created_at            DateTime          @default(now())
+  updated_at            DateTime          @updatedAt
+  deleted_at            DateTime?
+
+  company_id            String?
+
+  // Relations
+  project               Project?          @relation(fields: [project_id], references: [id])
+  site                  Site              @relation(fields: [site_id], references: [id])
+  submitter             User              @relation(fields: [submitted_by], references: [id])
+  company               Company?          @relation(fields: [company_id], references: [id])
+
+  @@unique([site_id, report_date, deleted_at]) // One DPR per site per day
+  @@index([project_id], name: "idx_daily_reports_project_id")
   @@index([site_id], name: "idx_daily_reports_site_id")
   @@index([report_date], name: "idx_daily_reports_date")
-  @@map("daily_reports")
-  company_id    String?
-  company       Company? @relation(fields: [company_id], references: [id])
-
   @@index([company_id], name: "idx_dailyreport_company_id")
+  @@map("daily_reports")
+}
+
+model WeeklyReport {
+  id                    String            @id @default(cuid())
+  project_id            String
+  site_id               String?
+  generated_by          String
+  
+  week_start_date       DateTime          @db.Date
+  week_end_date         DateTime          @db.Date
+  
+  // Summaries
+  completed_work        String?
+  pending_work          String?
+  delay_summary         String?
+  major_achievements    String?
+  major_risks           String?
+  site_health           String?           // E.g., 'ON_TRACK', 'AT_RISK', 'DELAYED'
+  
+  // Aggregated Data
+  attendance_summary    Json?
+  material_consumption  Json?
+  budget_impact         Float?
+  
+  // Status & Audit
+  status                WeeklyReportStatus @default(DRAFT)
+  created_at            DateTime          @default(now())
+  updated_at            DateTime          @updatedAt
+  deleted_at            DateTime?
+
+  company_id            String?
+
+  // Relations
+  project               Project           @relation(fields: [project_id], references: [id])
+  site                  Site?             @relation(fields: [site_id], references: [id])
+  generator             User              @relation(fields: [generated_by], references: [id])
+  company               Company?          @relation(fields: [company_id], references: [id])
+
+  @@index([project_id], name: "idx_weekly_reports_project_id")
+  @@index([site_id], name: "idx_weekly_reports_site_id")
+  @@index([week_start_date, week_end_date], name: "idx_weekly_reports_date_range")
+  @@index([company_id], name: "idx_weeklyreport_company_id")
+  @@map("weekly_reports")
 }
 
 model ChangeOrder {
@@ -1462,6 +1548,7 @@ model Company {
   documents         Document[]
   notifications     Notification[]
   daily_reports     DailyReport[]
+  weekly_reports    WeeklyReport[]
   reports           Report[]
   activity_logs     ActivityLog[]
   tasks             Task[]
@@ -1604,18 +1691,26 @@ model Resignation {
 // ─── Attachments (Photo Evidence System) ───────────────
 
 model Attachment {
-  id          String   @id @default(cuid())
-  entity_type String   // "EXPENSE", "INVENTORY_TXN", "PO", "CASHBOOK", "DPR", "INVOICE", "SITE_VISIT"
-  entity_id   String
-  file_name   String
-  file_url    String
-  file_type   String   // "image/jpeg", "application/pdf", etc.
-  file_size   Int?
-  uploaded_by String
-  created_at  DateTime @default(now())
+  id                   String    @id @default(cuid())
+  entity_type          String    // e.g., "EXPENSE", "DPR", "WORKER", "PROJECT", "INVENTORY"
+  entity_id            String
+  category             String?   // e.g., "Progress Photo", "Invoice", "Safety Photo"
+  file_name            String
+  original_name        String?
+  mime_type            String
+  file_size            Int?
+  image_width          Int?
+  image_height         Int?
+  cloudinary_public_id String?
+  secure_url           String
+  thumbnail_url        String?
+  uploaded_by          String
+  created_at           DateTime  @default(now())
+  updated_at           DateTime  @updatedAt
+  deleted_at           DateTime? // For soft deletes
 
   uploader User @relation(fields: [uploaded_by], references: [id])
-
+  
   @@index([entity_type, entity_id], name: "idx_attachments_entity")
   @@map("attachments")
   company_id    String?
