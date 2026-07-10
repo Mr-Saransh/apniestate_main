@@ -30,6 +30,7 @@ const navGroups: NavGroup[] = [
       { id: "/attendance", label: "Attendance", icon: Users },
       { id: "/workers", label: "Workers", icon: HardHat },
       { id: "/dpr", label: "Daily Progress Report", icon: FileText },
+      { id: "/weekly-reports", label: "Weekly Progress Report", icon: FileText },
     ],
   },
   {
@@ -96,7 +97,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
     
     if (role === 'SITE_SUPERVISOR') {
       // Allow only specific items for Site Supervisor
-      const allowed = ['/dashboard', '/daily-logs', '/attendance', '/workers', '/dpr', '/materials', '/notifications', '/profile', '/export-attendance'];
+      const allowed = ['/dashboard', '/daily-logs', '/attendance', '/workers', '/dpr', '/weekly-reports', '/materials', '/notifications', '/profile', '/export-attendance'];
       items = items.filter(item => allowed.includes(item.id));
     } else if (role === 'PROJECT_MANAGER') {
       // Project Manager shouldn't see full Admin or Cashbook

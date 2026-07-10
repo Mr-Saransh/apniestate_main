@@ -9,6 +9,7 @@ export const GET = withAuth(async (req: NextRequest, user) => {
   const { searchParams } = new URL(req.url);
   const entityType = searchParams.get("entity_type");
   const entityId = searchParams.get("entity_id");
+  const category = searchParams.get("category");
 
   if (!entityType || !entityId) {
     return badRequest("entity_type and entity_id are required");
@@ -20,7 +21,9 @@ export const GET = withAuth(async (req: NextRequest, user) => {
     where: {
       entity_type: entityType,
       entity_id: entityId,
-      company_id: dbUser?.company_id || undefined
+      company_id: dbUser?.company_id || undefined,
+      deleted_at: null,
+      ...(category ? { category } : {})
     },
     orderBy: { created_at: "desc" }
   });
@@ -31,10 +34,23 @@ export const GET = withAuth(async (req: NextRequest, user) => {
 // POST /api/attachments
 export const POST = withAuth(async (req: NextRequest, user) => {
   const body = await req.json();
-  const { entity_type, entity_id, file_name, file_url, file_type, file_size } = body;
+  const {
+    entity_type,
+    entity_id,
+    category,
+    file_name,
+    original_name,
+    mime_type,
+    file_size,
+    image_width,
+    image_height,
+    cloudinary_public_id,
+    secure_url,
+    thumbnail_url
+  } = body;
 
-  if (!entity_type || !entity_id || !file_name || !file_url) {
-    return badRequest("entity_type, entity_id, file_name, and file_url are required");
+  if (!entity_type || !entity_id || !file_name || !secure_url || !mime_type) {
+    return badRequest("entity_type, entity_id, file_name, secure_url and mime_type are required");
   }
 
   const dbUser = await prisma.user.findUnique({ where: { id: user.sub } });
@@ -43,10 +59,16 @@ export const POST = withAuth(async (req: NextRequest, user) => {
     data: {
       entity_type,
       entity_id,
+      category,
       file_name,
-      file_url,
-      file_type: file_type || "application/octet-stream",
-      file_size: file_size || null,
+      original_name,
+      mime_type,
+      file_size,
+      image_width,
+      image_height,
+      cloudinary_public_id,
+      secure_url,
+      thumbnail_url,
       uploaded_by: user.sub,
       company_id: dbUser?.company_id || null
     }
@@ -59,7 +81,7 @@ export const POST = withAuth(async (req: NextRequest, user) => {
       entity_type: "ATTACHMENT",
       entity_id: attachment.id,
       action: "UPLOADED",
-      metadata: { file_name, parent_entity_type: entity_type, parent_entity_id: entity_id },
+      metadata: { file_name, parent_entity_type: entity_type, parent_entity_id: entity_id, category },
       company_id: dbUser?.company_id || null
     }
   });

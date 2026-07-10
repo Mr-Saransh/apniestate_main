@@ -29,9 +29,9 @@ export function generateDprPdf(report: any, siteName: string) {
   // Key Metrics Table
   autoTable(doc, {
     startY: startY,
-    head: [['Weather', 'Workforce Present', 'Supervisor']],
+    head: [['Weather', 'Temperature', 'Completion %', 'Status']],
     body: [
-      [report.weather || 'Clear', `${report.workers_count || 0} Workers`, report.submitter?.name || 'Supervisor']
+      [report.weather || 'Clear', report.temperature ? `${report.temperature}°C` : 'N/A', report.completion_percentage ? `${report.completion_percentage}%` : 'N/A', report.status || 'DRAFT']
     ],
     theme: 'grid',
     headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0] },
@@ -40,17 +40,39 @@ export function generateDprPdf(report: any, siteName: string) {
 
   startY = (doc as any).lastAutoTable.finalY + 10;
 
+  // Format Summaries
+  let attSummary = '';
+  if (report.attendance_data) {
+    const att = report.attendance_data;
+    attSummary = `Workers Present: ${att.workersPresent || 0}\nWorkers Absent: ${att.workersAbsent || 0}\nOvertime Hrs: ${att.totalOvertime || 0}`;
+  }
+
+  let matSummary = '';
+  if (report.materials_consumed && report.materials_consumed.consumed) {
+    matSummary = report.materials_consumed.consumed.map((m: any) => `${m.name}: ${m.quantity} ${m.unit}`).join('\n');
+  }
+
+  let taskSummary = '';
+  if (report.issues_faced && report.issues_faced.completed_tasks) {
+    taskSummary = report.issues_faced.completed_tasks.map((t: string) => `• ${t}`).join('\n');
+  }
+
   // Sections
   const sections = [
     { title: 'Executive Summary', content: report.summary },
-    { title: 'Work Completed Today', content: report.work_completed },
-    { title: 'Materials Consumed', content: report.materials_consumed },
-    { title: 'Issues Faced', content: report.issues_faced },
+    { title: 'Work Completed', content: report.work_completed },
+    { title: 'Work In Progress', content: report.work_in_progress },
     { title: "Tomorrow's Plan", content: report.tomorrow_plan },
+    { title: 'Reasons for Delay', content: report.reasons_for_delay },
+    { title: 'Labour Summary', content: attSummary || 'No data' },
+    { title: 'Materials Consumed', content: matSummary || 'None' },
+    { title: 'Tasks Completed', content: taskSummary || 'None' },
+    { title: 'Safety Observations', content: report.safety_observations },
+    { title: 'Quality Observations', content: report.quality_observations }
   ];
 
   sections.forEach(section => {
-    if (section.content) {
+    if (section.content && section.content.trim() !== '') {
       doc.setFontSize(12);
       doc.setTextColor(10, 61, 145);
       doc.text(section.title, 14, startY);
