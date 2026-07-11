@@ -26,8 +26,6 @@ import VendorsPage from '@/pages/VendorsPage';
 import DocumentsPage from '@/pages/DocumentsPage';
 import ReportsPage from '@/pages/ReportsPage';
 import FinancePage from '@/pages/FinancePage';
-import WorkersPage from '@/pages/WorkersPage';
-import ContractorsPage from '@/pages/ContractorsPage';
 import RouteGuard from '@/components/shared/RouteGuard';
 import CalendarPage from '@/pages/CalendarPage';
 import EquipmentPage from '@/pages/EquipmentPage';

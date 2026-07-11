@@ -132,7 +132,7 @@ export default function LabourRegister() {
   }
 
   if (loading) {
-      return <div className="p-12 flex justify-center"><PH /></div>;
+      return <div className="p-12 flex justify-center"><PH title="Loading..." /></div>;
   }
 
   const unaddedCategories = categories.filter(c => !entries[c.id]);

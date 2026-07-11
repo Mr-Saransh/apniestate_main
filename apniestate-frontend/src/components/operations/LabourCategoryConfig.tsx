@@ -102,7 +102,7 @@ export default function LabourCategoryConfig() {
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         {loading ? (
-          <div className="p-12 flex justify-center"><PH /></div>
+          <div className="p-12 flex justify-center"><PH title="Loading categories..." /></div>
         ) : categories.length === 0 ? (
           <div className="p-12 text-center text-slate-500">
             No labour categories configured. Add your first category to start logging attendance.
