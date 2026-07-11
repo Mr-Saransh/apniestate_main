@@ -6,7 +6,7 @@ import { Mail, Check, X, Loader2, Building2 } from 'lucide-react';
 import '@/styles/my-invitations.css';
 
 export default function MyInvitationsPage() {
-  const { switchWorkspace } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -37,7 +37,6 @@ export default function MyInvitationsPage() {
       
       if (action === 'accept' && companyId && role) {
         // Automatically switch workspace after accepting
-        await switchWorkspace(companyId, role);
         navigate('/dashboard');
       } else {
         await fetchInvitations();

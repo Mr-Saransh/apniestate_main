@@ -15,6 +15,7 @@ export interface AuthUser {
   phone?: string | null;
   onboarded?: boolean;
   company_id?: string | null;
+  company?: any;
   last_workspace_id?: string | null;
 }
 

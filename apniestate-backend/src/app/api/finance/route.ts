@@ -7,7 +7,9 @@ import { ok, created } from "@/lib/response";
 
 export const GET = withPermission("finance.read", async (req, user) => {
   const url = new URL(req.url);
-  const projectId = url.searchParams.get("project_id") || undefined;
+  const projectId = url.searchParams.get("project_id");
+  if (!projectId) return Response.json({ message: "project_id is required" }, { status: 400 });
+  
   const siteId = url.searchParams.get("site_id") || undefined;
   const items = await getExpenses(user.sub, projectId, siteId);
   return ok(items);

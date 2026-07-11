@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { InventoryTransactionType } from "@prisma/client";
 
 // Industry-standard default consumption rates for common construction materials
 // Used when insufficient historical transaction data is available
@@ -28,10 +29,17 @@ function getDefaultRate(materialName: string): number | null {
   return null;
 }
 
-export async function getInventoryItems(userId: string, role?: string) {
+const STOCK_IN_TYPES = ["IN", "GRN_RECEIPT", "RETURN", "TRANSFER_IN"];
+const STOCK_OUT_TYPES = ["OUT", "MATERIAL_ISSUE", "DAMAGE", "TRANSFER_OUT"];
+
+export async function getInventoryItems(userId: string, role?: string, projectId?: string) {
   const where: any = {};
-  if (role === "BUILDER" || role === "ADMIN") {
-    // see all
+
+  // Project scoping — always filter by project if provided
+  if (projectId) {
+    where.site = { project_id: projectId };
+  } else if (role === "BUILDER" || role === "ADMIN") {
+    // see all across company (only on company dashboard)
   } else {
     where.OR = [
       { site: { supervisor_id: userId } },
@@ -51,22 +59,22 @@ export async function getInventoryItems(userId: string, role?: string) {
   });
 
   return items.map(item => {
-    const stockIn = item.transactions.filter(t => t.type === "IN").reduce((s, t) => s + t.quantity, 0);
-    const stockOut = item.transactions.filter(t => t.type === "OUT").reduce((s, t) => s + t.quantity, 0);
+    const stockIn = item.transactions.filter(t => STOCK_IN_TYPES.includes(t.type)).reduce((s, t) => s + t.quantity, 0);
+    const stockOut = item.transactions.filter(t => STOCK_OUT_TYPES.includes(t.type)).reduce((s, t) => s + t.quantity, 0);
     const adjust = item.transactions.filter(t => t.type === "ADJUST").reduce((s, t) => s + t.quantity, 0);
     const availableStock = stockIn - stockOut + adjust;
 
     // Average daily usage: total OUT in last 30 days divided by 30
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const recentOutTxns = item.transactions.filter(t => t.type === "OUT" && new Date(t.created_at) >= thirtyDaysAgo);
+    const recentOutTxns = item.transactions.filter(t => STOCK_OUT_TYPES.includes(t.type) && new Date(t.created_at) >= thirtyDaysAgo);
     const totalRecentOut = recentOutTxns.reduce((s, t) => s + t.quantity, 0);
     
     // Check if we have sufficient historical data (>14 days of OUT transactions)
     const fourteenDaysAgo = new Date();
     fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
     const hasSufficientHistory = item.transactions.filter(
-      t => t.type === "OUT" && new Date(t.created_at) >= fourteenDaysAgo
+      t => STOCK_OUT_TYPES.includes(t.type) && new Date(t.created_at) >= fourteenDaysAgo
     ).length >= 3; // At least 3 OUT transactions in 14 days
     
     let avgDailyUsage = 0;
@@ -118,8 +126,8 @@ export async function getInventoryById(id: string) {
   });
   if (!item) return null;
 
-  const stockIn = item.transactions.filter(t => t.type === "IN").reduce((s, t) => s + t.quantity, 0);
-  const stockOut = item.transactions.filter(t => t.type === "OUT").reduce((s, t) => s + t.quantity, 0);
+  const stockIn = item.transactions.filter(t => STOCK_IN_TYPES.includes(t.type)).reduce((s, t) => s + t.quantity, 0);
+  const stockOut = item.transactions.filter(t => STOCK_OUT_TYPES.includes(t.type)).reduce((s, t) => s + t.quantity, 0);
   const adjust = item.transactions.filter(t => t.type === "ADJUST").reduce((s, t) => s + t.quantity, 0);
   const availableStock = stockIn - stockOut + adjust;
 
@@ -141,7 +149,7 @@ export async function createInventory(data: any, userId: string) {
   });
 }
 
-export async function createInventoryTransaction(data: any, userId: string) {
+export async function createInventoryTransaction(data: { material_id: string, site_id: string, type: InventoryTransactionType, quantity: number, notes?: string | null }, userId: string) {
   return prisma.$transaction(async (tx) => {
     // 1. Find or create the InventoryItem
     let item = await tx.inventoryItem.findUnique({
@@ -166,7 +174,7 @@ export async function createInventoryTransaction(data: any, userId: string) {
 
     // 2. Calculate quantity change
     let quantityChange = data.quantity;
-    if (data.type === "OUT") {
+    if (STOCK_OUT_TYPES.includes(data.type)) {
       quantityChange = -data.quantity;
     }
 
@@ -199,6 +207,10 @@ export async function createInventoryTransaction(data: any, userId: string) {
 }
 
 export async function updateInventory(id: string, data: any) {
+  // Prevent direct quantity modification through standard update API
+  if (data.quantity !== undefined) {
+    throw new Error("Cannot modify quantity directly. Use transactions.");
+  }
   return prisma.inventoryItem.update({
     where: { id },
     data,

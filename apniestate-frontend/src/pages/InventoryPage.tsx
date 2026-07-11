@@ -4,8 +4,10 @@ import { Package, Plus, X, AlertTriangle } from 'lucide-react';
 import { inventoryApi, type InventoryItem } from '@/api/inventory';
 import { apiClient } from '@/api/client';
 import { PH, Card, Chip, SrchBar } from '@/components/shared/FigmaComponents';
+import { useProject } from '@/context/ProjectContext';
 
 export default function InventoryPage() {
+  const { activeProjectId } = useProject();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -30,8 +32,9 @@ export default function InventoryPage() {
   const [notes, setNotes] = useState('');
 
   const loadInventory = async () => {
+    if (!activeProjectId) return;
     try {
-      const res = await inventoryApi.getAll();
+      const res = await inventoryApi.getAll({ project_id: activeProjectId });
       if (res.data) setInventory(res.data);
     } catch (err) {
       console.error('Failed to load inventory data:', err);
@@ -39,10 +42,11 @@ export default function InventoryPage() {
   };
 
   const loadDropdowns = async () => {
+    if (!activeProjectId) return;
     try {
       const [materialsRes, sitesRes] = await Promise.all([
         apiClient.get<any[]>('/materials'),
-        apiClient.get<any[]>('/sites')
+        apiClient.get<any[]>(`/sites?project_id=${activeProjectId}`)
       ]);
       setMaterials(materialsRes.data || []);
       setSites(sitesRes.data || []);
@@ -53,12 +57,18 @@ export default function InventoryPage() {
 
   useEffect(() => {
     async function init() {
+      if (!activeProjectId) {
+        setInventory([]);
+        setSites([]);
+        setLoading(false);
+        return;
+      }
       setLoading(true);
       await Promise.all([loadInventory(), loadDropdowns()]);
       setLoading(false);
     }
     init();
-  }, []);
+  }, [activeProjectId]);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);

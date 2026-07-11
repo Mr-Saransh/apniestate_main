@@ -36,7 +36,7 @@ export const GET = withAuth(async (req: NextRequest, user) => {
   const pendingExpenses = await prisma.expense.count({ where: { company_id: companyId, status: "PENDING" } });
   const pendingPOs = await prisma.purchaseOrder.count({ where: { company_id: companyId, status: "PENDING" } });
   const pendingLeaves = await prisma.leave.count({ where: { worker: { company_id: companyId }, status: "PENDING" } });
-  const pendingMRs = await prisma.materialRequest.count({ where: { site: { company_id: companyId }, status: "PENDING" } });
+  const pendingMRs = await prisma.materialRequest.count({ where: { site: { company_id: companyId }, status: "SUBMITTED" } });
 
   const chains = await prisma.approvalChain.findMany({
     where: { company_id: companyId },

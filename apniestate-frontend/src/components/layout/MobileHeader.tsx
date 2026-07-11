@@ -2,6 +2,8 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Bell, Menu, Building2 } from 'lucide-react';
 
+import ProjectSwitcher from '@/components/shared/ProjectSwitcher';
+
 interface MobileHeaderProps {
   onMenuClick?: () => void;
 }
@@ -55,7 +57,8 @@ export function MobileHeader({ onMenuClick }: MobileHeaderProps) {
   };
 
   return (
-    <header
+    <>
+      <header
       id="mobile-header"
       style={{
         position: 'sticky',
@@ -166,12 +169,29 @@ export function MobileHeader({ onMenuClick }: MobileHeaderProps) {
             cursor: 'pointer',
             flexShrink: 0
           }}
-          aria-label="Profile"
         >
           {user ? getInitials(user.name) : '?'}
         </button>
       </div>
     </header>
+
+      {/* Secondary Context Bar for Mobile */}
+      <div 
+        style={{ 
+          display: 'flex', 
+          gap: '8px', 
+          padding: '8px 16px', 
+          backgroundColor: '#f8fafc', 
+          borderBottom: '1px solid #e2e8f0',
+          flexWrap: 'wrap',
+          position: 'relative',
+          zIndex: 40
+        }}
+      >
+
+        <ProjectSwitcher />
+      </div>
+    </>
   );
 }
 

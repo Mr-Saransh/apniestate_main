@@ -7,9 +7,12 @@ import { ok, created } from "@/lib/response";
 
 export const GET = withAuth(async (req, user) => {
   const url = new URL(req.url);
+  const projectId = url.searchParams.get("project_id");
+  if (!projectId) return Response.json({ message: "project_id is required" }, { status: 400 });
+
   const date = url.searchParams.get("date") || undefined;
   const siteId = url.searchParams.get("site_id") || undefined;
-  const items = await getAttendances(user.sub, date, siteId);
+  const items = await getAttendances(user.sub, projectId, date, siteId);
   return ok(items);
 });
 

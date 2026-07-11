@@ -1,5 +1,5 @@
-import DashboardEngine from '@/components/dashboard/DashboardEngine';
+import ProjectCommandCenter from '@/pages/ProjectCommandCenter';
 
 export default function DashboardPage() {
-  return <DashboardEngine />;
+  return <ProjectCommandCenter />;
 }

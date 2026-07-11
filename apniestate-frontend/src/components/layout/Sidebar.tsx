@@ -14,75 +14,17 @@ type NavItem = { id: string; label: string; icon: React.ElementType; badge?: num
 type NavGroup = { label: string; items: NavItem[] };
 
 const navGroups: NavGroup[] = [
-  { label: "Overview", items: [{ id: "/dashboard", label: "Overview", icon: LayoutDashboard }] },
   {
-    label: "Entities", items: [
-      { id: "/projects", label: "Projects", icon: Building2 },
-      { id: "/sites", label: "Sites", icon: HardHat },
-      { id: "/milestones", label: "Milestones", icon: Flag },
-      { id: "/vendors", label: "Vendors", icon: Truck },
-      { id: "/contractors", label: "Contractors", icon: Users },
-    ],
-  },
-  {
-    label: "Field Operations", items: [
-      { id: "/daily-logs", label: "Daily Logs", icon: ClipboardList },
-      { id: "/attendance", label: "Attendance", icon: Users },
-      { id: "/workers", label: "Workers", icon: HardHat },
-      { id: "/dpr", label: "Daily Progress Report", icon: FileText },
-      { id: "/weekly-reports", label: "Weekly Progress Report", icon: FileText },
-    ],
-  },
-  {
-    label: "Materials", items: [
-      { id: "/materials", label: "Materials Master", icon: Package },
-      { id: "/inventory", label: "Inventory", icon: Warehouse },
-      { id: "/material-requests", label: "Material Requests", icon: ShoppingCart, badge: 8 },
-    ],
-  },
-  {
-    label: "Planning", items: [
-      { id: "/milestones", label: "Milestones", icon: Flag },
-      { id: "/timeline", label: "Timeline", icon: CalendarDays },
-    ],
-  },
-  {
-    label: "Finance", items: [
-      { id: "/finance", label: "Finance Dashboard", icon: Landmark },
-      { id: "/cashbook", label: "Cashbook", icon: BookOpen },
-      { id: "/budgets", label: "Budgets", icon: PieChart },
-      { id: "/purchase-orders", label: "Purchase Orders", icon: ShoppingCart },
-      { id: "/expenses", label: "Expenses", icon: Receipt },
-      { id: "/invoices", label: "Invoices", icon: FileText },
-      { id: "/payments", label: "Vendor Payments", icon: CreditCard },
-    ],
-  },
-  {
-    label: "Operations", items: [
-      { id: "/equipment", label: "Equipment Usage", icon: Truck },
-      { id: "/payroll", label: "Payroll", icon: DollarSign },
-    ],
-  },
-  {
-    label: "Intelligence", items: [
-      { id: "/reports", label: "Reports & Analytics", icon: BarChart2 },
-      { id: "/documents", label: "Documents", icon: FolderOpen },
-    ],
-  },
-  {
-    label: "Admin", items: [
-      { id: "/users", label: "Users", icon: UserCog },
-      { id: "/profile", label: "Profile", icon: UserCircle },
-      { id: "/settings", label: "Company Settings", icon: Settings },
-    ],
-  },
-  {
-    label: "Tools", items: [
-      { id: "/export-attendance", label: "Export Attendance", icon: Download },
-      { id: "/export-dpr", label: "Export DPR", icon: FileDown },
-      { id: "/notifications", label: "Notifications", icon: Bell, badge: 5 },
-      { id: "/calendar", label: "Calendar", icon: Calendar },
-    ],
+    label: "Main Menu", items: [
+      { id: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { id: "/projects", label: "Projects", icon: FolderOpen },
+      { id: "/progress", label: "Progress", icon: CalendarDays },
+      { id: "/purchase", label: "Purchase", icon: ShoppingCart },
+      { id: "/finance", label: "Finance", icon: Landmark },
+      { id: "/operations", label: "Operations", icon: HardHat },
+      { id: "/reports", label: "Reports", icon: BarChart2 },
+      { id: "/settings", label: "Settings", icon: Settings },
+    ]
   }
 ];
 
@@ -96,16 +38,13 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
     let items = group.items;
     
     if (role === 'SITE_SUPERVISOR') {
-      // Allow only specific items for Site Supervisor
-      const allowed = ['/dashboard', '/daily-logs', '/attendance', '/workers', '/dpr', '/weekly-reports', '/materials', '/notifications', '/profile', '/export-attendance'];
+      const allowed = ['/dashboard', '/progress', '/operations'];
       items = items.filter(item => allowed.includes(item.id));
     } else if (role === 'PROJECT_MANAGER') {
-      // Project Manager shouldn't see full Admin or Cashbook
-      const restricted = ['/users', '/settings', '/cashbook', '/invoices', '/payroll'];
+      const restricted = ['/settings'];
       items = items.filter(item => !restricted.includes(item.id));
     } else if (role === 'ACCOUNTANT') {
-      // Accountant focuses on Finance
-      const allowed = ['/dashboard', '/finance', '/cashbook', '/budgets', '/purchase-orders', '/expenses', '/invoices', '/payments', '/payroll', '/vendors', '/contractors', '/reports', '/profile'];
+      const allowed = ['/dashboard', '/finance', '/purchase', '/operations', '/reports'];
       items = items.filter(item => allowed.includes(item.id));
     }
     

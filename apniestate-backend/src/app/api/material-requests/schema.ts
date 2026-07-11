@@ -9,6 +9,9 @@ export const CreateMaterialRequestSchema = z.object({
 });
 
 export const UpdateMaterialRequestSchema = z.object({
-  status: z.enum(["PENDING", "APPROVED", "REJECTED", "DELIVERED"]),
+  status: z.enum(["DRAFT", "SUBMITTED", "APPROVED", "REJECTED", "ORDERED", "DELIVERED", "COMPLETED", "CANCELLED"]),
   notes: z.string().optional().nullable(),
+  approved_quantity: z.number().positive("Quantity must be positive").optional().nullable(),
+  assigned_vendor_id: z.string().optional().nullable(),
+  expected_delivery_date: z.string().optional().nullable(),
 });

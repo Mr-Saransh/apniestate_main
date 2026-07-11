@@ -1,6 +1,7 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import { useProject } from '@/context/ProjectContext';
 import {
   ClipboardList,
   Plus,
@@ -39,6 +40,7 @@ const priorityColors: Record<string, string> = {
 
 export default function TasksPage() {
   const { hasPermission } = useAuth();
+  const { activeProjectId } = useProject();
   const location = useLocation();
   const [activeFilter, setActiveFilter] = useState('All');
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -63,8 +65,12 @@ export default function TasksPage() {
   const [formError, setFormError] = useState('');
 
   const loadTasks = async () => {
+    if (!activeProjectId) {
+      setTasks([]);
+      return;
+    }
     try {
-      const res = await tasksApi.getAll();
+      const res = await tasksApi.getAll({ project_id: activeProjectId });
       if (res.data) {
         setTasks(res.data);
       }
@@ -74,9 +80,15 @@ export default function TasksPage() {
   };
 
   const loadMetadata = async () => {
+    if (!activeProjectId) {
+      setProjects([]);
+      setSites([]);
+      setUsers([]);
+      return;
+    }
     try {
       const projRes = await apiClient.get<any[]>('/projects').catch(() => ({ data: [] }));
-      const sitesRes = await apiClient.get<any[]>('/sites').catch(() => ({ data: [] }));
+      const sitesRes = await apiClient.get<any[]>(`/sites?project_id=${activeProjectId}`).catch(() => ({ data: [] }));
       let usersRes: any = { data: [] };
       if (hasPermission('users.read')) {
         usersRes = await apiClient.get<any[]>('/users').catch(() => ({ data: [] }));
@@ -92,12 +104,17 @@ export default function TasksPage() {
 
   useEffect(() => {
     async function init() {
+      if (!activeProjectId) {
+        setTasks([]);
+        setLoading(false);
+        return;
+      }
       setLoading(true);
       await Promise.all([loadTasks(), loadMetadata()]);
       setLoading(false);
     }
     init();
-  }, []);
+  }, [activeProjectId]);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);

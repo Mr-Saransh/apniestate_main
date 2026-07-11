@@ -145,14 +145,16 @@ export const GET = withAuth(async (req: NextRequest, user) => {
   const completedTasks = tasks.filter(t => t.status === "DONE").length;
   const tasksProgress = tasks.length > 0 ? Math.round((completedTasks / tasks.length) * 100) : 0;
 
-  // 3. Pending Material Requests & Details
+  // 3. Recent Requests (last 5)
   const matReqs = await prisma.materialRequest.findMany({
     where: { site_id: site.id },
     include: { material: true, requester: { select: { name: true } } },
     orderBy: { created_at: "desc" },
     take: 5
   });
-  const pendingMRs = matReqs.filter(r => r.status === "PENDING").length;
+  const pendingMRs = await prisma.materialRequest.count({
+    where: { site_id: site.id, status: "SUBMITTED" }
+  });
 
   // 4. DPR Submission Status
   const todayDPR = await prisma.dailyReport.findFirst({

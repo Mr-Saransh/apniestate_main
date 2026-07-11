@@ -1,8 +1,9 @@
 import { prisma } from "@/lib/prisma";
 
-export async function getSites(userId: string, role: string, companyId?: string | null) {
+export async function getSites(userId: string, role: string, companyId?: string | null, projectId?: string) {
   if (!companyId) return [];
   const where: any = { company_id: companyId };
+  if (projectId) where.project_id = projectId;
 
   if (role === "BUILDER" || role === "ADMIN") {
     // see all

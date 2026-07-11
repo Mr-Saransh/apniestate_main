@@ -3,6 +3,7 @@ import { apiClient } from '@/api/client';
 import { Truck } from 'lucide-react';
 import { PH, Card, Chip, SrchBar } from '@/components/shared/FigmaComponents';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { useProject } from '@/context/ProjectContext';
 
 interface Equipment {
   id: string;
@@ -14,17 +15,24 @@ interface Equipment {
 }
 
 export default function EquipmentPage() {
+  const { activeProjectId } = useProject();
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
   useEffect(() => {
-    apiClient.get<any>('/equipment').then(res => {
+    if (!activeProjectId) {
+      setEquipment([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    apiClient.get<any>(`/equipment?project_id=${activeProjectId}`).then(res => {
       if (res.success && res.data) {
         setEquipment(Array.isArray(res.data) ? res.data : res.data.data || []);
       }
     }).catch(() => {}).finally(() => setLoading(false));
-  }, []);
+  }, [activeProjectId]);
 
   const running = equipment.filter(e => e.status === 'IN_USE').length;
   const idle = equipment.filter(e => e.status === 'AVAILABLE').length;

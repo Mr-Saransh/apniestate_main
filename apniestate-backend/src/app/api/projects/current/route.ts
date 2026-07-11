@@ -71,7 +71,7 @@ export const GET = withAuth(async (_req, user) => {
   const pendingMaterialRequests = await prisma.materialRequest.count({
     where: {
       site_id: site.id,
-      status: "PENDING"
+      status: "SUBMITTED"
     }
   });
 

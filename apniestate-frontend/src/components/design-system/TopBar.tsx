@@ -40,7 +40,7 @@ interface TopBarProps {
 }
 
 export function TopBar({ title: customTitle, icon: customIcon, leftAction }: TopBarProps) {
-  const { user, memberships, logout, switchWorkspace } = useAuth();
+  const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [showDropdown, setShowDropdown] = useState(false);
@@ -279,51 +279,7 @@ export function TopBar({ title: customTitle, icon: customIcon, leftAction }: Top
               overflow: 'hidden',
             }}
           >
-            <div style={{ padding: '8px 12px', fontSize: '11px', fontWeight: 700, color: Colors.mutedText, textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid #E2E8F0', backgroundColor: '#F8FAFC' }}>
-              Switch Workspace
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', maxHeight: '180px', overflowY: 'auto' }}>
-              {memberships.map((m) => {
-                const isCurrent = user?.company_id === m.company_id;
-                return (
-                  <button
-                    key={m.company_id}
-                    type="button"
-                    onClick={async (e) => {
-                      e.stopPropagation();
-                      if (!isCurrent) {
-                        await switchWorkspace(m.company_id, m.roles[0]);
-                        navigate('/dashboard');
-                      }
-                      setShowDropdown(false);
-                    }}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      width: '100%',
-                      padding: '10px 12px',
-                      fontSize: '13px',
-                      fontWeight: isCurrent ? 600 : 500,
-                      color: isCurrent ? '#1D4ED8' : Colors.primaryText,
-                      background: isCurrent ? 'rgba(29, 78, 216, 0.04)' : 'transparent',
-                      border: 'none',
-                      textAlign: 'left',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Building2 size={14} color={isCurrent ? '#1D4ED8' : Colors.secondaryText} />
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                        <span>{m.company.name}</span>
-                        <span style={{ fontSize: '10px', color: Colors.mutedText }}>Role: {m.roles[0].replace('_', ' ')}</span>
-                      </div>
-                    </div>
-                    {isCurrent && <Check size={14} color="#1D4ED8" />}
-                  </button>
-                );
-              })}
-            </div>
+            
             <div style={{ height: '1px', backgroundColor: '#E2E8F0' }} />
             
             <button

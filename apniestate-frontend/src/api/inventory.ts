@@ -27,7 +27,12 @@ export interface InventoryTransactionInput {
 }
 
 export const inventoryApi = {
-  getAll: () => apiClient.get<InventoryItem[]>('/inventory'),
+  getAll: (filters?: { project_id?: string }) => {
+    const params = new URLSearchParams();
+    if (filters?.project_id) params.append('project_id', filters.project_id);
+    const qs = params.toString();
+    return apiClient.get<InventoryItem[]>(`/inventory${qs ? `?${qs}` : ''}`);
+  },
   create: (data: Partial<InventoryItem>) => apiClient.post<InventoryItem>('/inventory', data),
   update: (id: string, data: Partial<InventoryItem>) => apiClient.patch<InventoryItem>(`/inventory/${id}`, data),
   delete: (id: string) => apiClient.delete<null>(`/inventory/${id}`),

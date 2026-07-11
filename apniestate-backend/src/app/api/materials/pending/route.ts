@@ -28,7 +28,7 @@ export const GET = withAuth(async (_req, user) => {
   const requests = await prisma.materialRequest.findMany({
     where: {
       site_id: site.id,
-      status: "PENDING"
+      status: "SUBMITTED"
     },
     include: {
       material: { select: { name: true, unit: true } }

@@ -11,13 +11,14 @@ import {
 } from "@/lib/engines";
 
 export const GET = withAuth(async (req: NextRequest, user) => {
-  const dbUser = await prisma.user.findUnique({
-    where: { id: user.sub }
-  });
+  try {
+    const dbUser = await prisma.user.findUnique({
+      where: { id: user.sub }
+    });
 
-  const company_id = dbUser?.company_id || undefined;
+    const company_id = dbUser?.company_id || undefined;
 
-  if (!company_id) {
+    if (!company_id) {
     return ok({
       overview: {
         totalProjects: 0,
@@ -549,7 +550,7 @@ export const GET = withAuth(async (req: NextRequest, user) => {
   // Approvals Pending counts
   const pendingLeaves = await prisma.leave.count({ where: { worker: { company_id }, status: "PENDING" } });
   const pendingExpenses = await prisma.expense.count({ where: { company_id, status: "PENDING" } });
-  const pendingMRsCount = await prisma.materialRequest.count({ where: { site: { company_id }, status: "PENDING" } });
+  const pendingMRsCount = await prisma.materialRequest.count({ where: { site: { company_id }, status: "SUBMITTED" } });
   const pendingPOsCount = await prisma.purchaseOrder.count({ where: { project: { company_id }, status: "PENDING" } });
 
   // Add Dynamic Decision Card for pending vendor approvals instead of hardcoded numbers
@@ -640,50 +641,53 @@ export const GET = withAuth(async (req: NextRequest, user) => {
     });
   }
 
-  return ok({
-    overview: {
-      totalProjects,
-      activeSites,
-      completedProjects,
-      delayedProjects,
-      todayLabourCost,
-      monthlyLabourCost,
-      currentCashBalance,
-      budgetUtilization,
-      expectedProfit: financialIntelligence.profitForecast,
-      outstandingPayments: Math.round(financialIntelligence.debitSum * 0.1), // This could also be a real sum
-      equipmentDowntime: underMaintenanceEquipment
-    },
-    alerts,
-    decisionCards,
-    projectIntelligence,
-    financialIntelligence,
-    workforceIntelligence,
-    calendarEvents,
-    revenueTrend,
-    budgetBurn,
-    vendorPerformance,
-    upcomingMilestones,
-    materialShortages,
-    labourTrend,
-    approvalsPending: {
-      total: pendingLeaves + pendingExpenses + pendingMRsCount + pendingPOsCount,
-      expenses: pendingExpenses,
-      leaves: pendingLeaves,
-      materialRequests: pendingMRsCount,
-      purchaseOrders: pendingPOsCount
-    },
-    workflowAlerts: {
-      projectsWithoutPM,
-      projectsWithoutSupervisor,
-      pendingInvitations: pendingInvitationsCount,
-      pendingApprovals: pendingApprovalsCount,
-      pendingResignations: pendingResignationsCount,
-      projectsWithoutBudget: projectsWithoutBudgetCount,
-      sitesWithoutAttendanceToday,
-      missingDprToday,
-      unassignedProjects,
-      inactiveMembers: inactiveMembersCount
-    }
-  });
+    return ok({
+      overview: {
+        totalProjects,
+        activeSites,
+        completedProjects,
+        delayedProjects,
+        todayLabourCost,
+        monthlyLabourCost,
+        currentCashBalance,
+        budgetUtilization,
+        expectedProfit: financialIntelligence.profitForecast,
+        outstandingPayments: Math.round(financialIntelligence.debitSum * 0.1),
+        equipmentDowntime: underMaintenanceEquipment
+      },
+      alerts,
+      decisionCards,
+      projectIntelligence,
+      financialIntelligence,
+      workforceIntelligence,
+      calendarEvents,
+      revenueTrend,
+      budgetBurn,
+      vendorPerformance,
+      upcomingMilestones,
+      materialShortages,
+      labourTrend,
+      approvalsPending: {
+        total: pendingLeaves + pendingExpenses + pendingMRsCount + pendingPOsCount,
+        expenses: pendingExpenses,
+        leaves: pendingLeaves,
+        materialRequests: pendingMRsCount,
+        purchaseOrders: pendingPOsCount
+      },
+      workflowAlerts: {
+        projectsWithoutPM,
+        projectsWithoutSupervisor,
+        pendingInvitations: pendingInvitationsCount,
+        pendingApprovals: pendingApprovalsCount,
+        pendingResignations: pendingResignationsCount,
+        projectsWithoutBudget: projectsWithoutBudgetCount,
+        sitesWithoutAttendanceToday,
+        missingDprToday,
+        unassignedProjects,
+        inactiveMembers: inactiveMembersCount
+      }
+    });
+  } catch (error: any) {
+    return Response.json({ error: error.message, stack: error.stack }, { status: 500 });
+  }
 });

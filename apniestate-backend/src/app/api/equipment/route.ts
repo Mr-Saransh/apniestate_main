@@ -1,25 +1,21 @@
-// @ts-nocheck
 import { NextRequest } from "next/server";
 import { withAuth } from "@/middleware/auth.middleware";
 import { prisma } from "@/lib/prisma";
-import { ok } from "@/lib/response";
+import { ok, badRequest } from "@/lib/response";
 
-/**
- * GET /api/equipment
- * Returns all equipment with site and vendor details for the company
- */
 export const GET = withAuth(async (req: NextRequest, user) => {
-  const dbUser = await prisma.user.findUnique({ where: { id: user.sub } });
-  const company_id = dbUser?.company_id;
+  const url = new URL(req.url);
+  const projectId = url.searchParams.get("project_id");
+  const siteId = url.searchParams.get("site_id");
 
-  if (!company_id) {
-    return ok([]);
-  }
+  const where: any = { company_id: user.company_id };
+  if (projectId) where.project_id = projectId;
+  if (siteId) where.site_id = siteId;
 
   const equipment = await prisma.equipment.findMany({
-    where: { site: { company_id } },
+    where,
     include: {
-      site: { select: { id: true, name: true } },
+      site: { select: { id: true, name: true, project_id: true } },
       vendor: { select: { id: true, name: true } },
     },
     orderBy: { name: 'asc' },
@@ -28,20 +24,29 @@ export const GET = withAuth(async (req: NextRequest, user) => {
   return ok(equipment);
 });
 
-/**
- * POST /api/equipment
- * Create new equipment entry
- */
 export const POST = withAuth(async (req: NextRequest, user) => {
   const body = await req.json();
-  const { name, type, site_id, vendor_id, status } = body;
+  const { name, type, site_id, project_id, vendor_id, ownership, rental_cost, fuel_cost, operator_cost, maintenance_cost, status } = body;
 
   if (!name || !type) {
-    return new Response(JSON.stringify({ success: false, error: 'name and type are required' }), { status: 400 });
+    return badRequest('name and type are required');
   }
 
   const equipment = await prisma.equipment.create({
-    data: { name, type, site_id, vendor_id, status: status || 'AVAILABLE' },
+    data: { 
+        company_id: user.company_id,
+        name, 
+        type, 
+        site_id, 
+        project_id,
+        vendor_id, 
+        ownership: ownership || 'OWNED',
+        rental_cost: Number(rental_cost) || 0,
+        fuel_cost: Number(fuel_cost) || 0,
+        operator_cost: Number(operator_cost) || 0,
+        maintenance_cost: Number(maintenance_cost) || 0,
+        status: status || 'AVAILABLE' 
+    },
     include: {
       site: { select: { id: true, name: true } },
       vendor: { select: { id: true, name: true } },
@@ -49,4 +54,43 @@ export const POST = withAuth(async (req: NextRequest, user) => {
   });
 
   return ok(equipment);
+});
+
+export const PUT = withAuth(async (req: NextRequest, user) => {
+  const url = new URL(req.url);
+  const id = url.searchParams.get("id");
+  if (!id) return badRequest("Equipment ID is required");
+
+  const body = await req.json();
+  
+  const equipment = await prisma.equipment.update({
+    where: { id, company_id: user.company_id },
+    data: { 
+        name: body.name, 
+        type: body.type, 
+        site_id: body.site_id, 
+        project_id: body.project_id,
+        vendor_id: body.vendor_id, 
+        ownership: body.ownership,
+        rental_cost: body.rental_cost !== undefined ? Number(body.rental_cost) : undefined,
+        fuel_cost: body.fuel_cost !== undefined ? Number(body.fuel_cost) : undefined,
+        operator_cost: body.operator_cost !== undefined ? Number(body.operator_cost) : undefined,
+        maintenance_cost: body.maintenance_cost !== undefined ? Number(body.maintenance_cost) : undefined,
+        status: body.status 
+    },
+  });
+
+  return ok(equipment);
+});
+
+export const DELETE = withAuth(async (req: NextRequest, user) => {
+  const url = new URL(req.url);
+  const id = url.searchParams.get("id");
+  if (!id) return badRequest("Equipment ID is required");
+
+  await prisma.equipment.delete({
+    where: { id, company_id: user.company_id },
+  });
+
+  return ok({ deleted: true });
 });

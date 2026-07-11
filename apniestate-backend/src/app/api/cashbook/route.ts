@@ -8,8 +8,9 @@ export const GET = withAuth(async (req, user) => {
   const startDate = url.searchParams.get("start_date") || undefined;
   const endDate = url.searchParams.get("end_date") || undefined;
   const siteId = url.searchParams.get("site_id") || undefined;
+  const projectId = url.searchParams.get("project_id") || undefined;
   
-  const data = await getCashbook(startDate, endDate, siteId);
+  const data = await getCashbook(startDate, endDate, siteId, projectId);
   return ok(data);
 });
 

@@ -6,7 +6,7 @@ import { PH, Card } from '@/components/shared/FigmaComponents';
 import { X, LogOut, AlertTriangle, Building2, Shield, User, Bell } from 'lucide-react';
 
 export default function SettingsPage() {
-  const { user, updateUser, logout, activeWorkspace } = useAuth();
+  const { user, updateUser, logout } = useAuth();
 
   // Modal control
   const [showEditModal, setShowEditModal] = useState(false);
@@ -50,10 +50,10 @@ export default function SettingsPage() {
   };
 
   const handleDeleteCompany = async () => {
-    if (!activeWorkspace?.company?.id) return;
+    if (!user?.company_id) return;
     setSubmitting(true);
     try {
-      await companiesApi.deleteCompany(activeWorkspace.company.id);
+      await companiesApi.deleteCompany(user.company_id);
       window.location.href = '/companies';
     } catch (err: any) {
       setFormError(err.message || 'Failed to delete workspace');
@@ -62,7 +62,7 @@ export default function SettingsPage() {
   };
 
   const role = user?.role === 'BUILDER' || user?.role === 'ADMIN' ? 'Builder (Owner)' : (user?.role || 'User').replace(/_/g, ' ');
-  const companyName = activeWorkspace?.company?.name || 'Apni Estate (Pvt.) Ltd.';
+  const companyName = "Apni Estate (Pvt.) Ltd.";
 
   const companySections = [
     { title: "Company Information", icon: <Building2 className="w-4 h-4 text-primary" />, fields: [
@@ -209,12 +209,12 @@ export default function SettingsPage() {
             
             <div className="p-4 space-y-4">
               <p className="text-sm text-foreground">
-                This will permanently delete the workspace <strong>{activeWorkspace?.company?.name}</strong> and all its associated data (projects, sites, users, finances). This action <strong>cannot be undone</strong>.
+                This will permanently delete the workspace <strong>{"Apni Estate (Pvt.) Ltd."}</strong> and all its associated data (projects, sites, users, finances). This action <strong>cannot be undone</strong>.
               </p>
               
               <div>
                 <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                  Type "{activeWorkspace?.company?.name}" to confirm
+                  Type "{"Apni Estate (Pvt.) Ltd."}" to confirm
                 </label>
                 <input 
                   type="text" 
@@ -232,7 +232,7 @@ export default function SettingsPage() {
                 </button>
                 <button 
                   onClick={handleDeleteCompany}
-                  disabled={submitting || deleteConfirmationText !== activeWorkspace?.company?.name} 
+                  disabled={submitting || deleteConfirmationText !== "Apni Estate (Pvt.) Ltd."} 
                   className="flex-1 py-2 rounded-lg bg-red-600 text-white text-sm font-medium flex justify-center items-center hover:bg-red-700 transition-colors disabled:opacity-50"
                 >
                   {submitting ? 'Deleting...' : 'Delete Permanently'}

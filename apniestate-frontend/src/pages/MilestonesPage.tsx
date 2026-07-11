@@ -3,23 +3,25 @@ import { Flag, Calendar, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { PH, Card, Chip, SrchBar } from '@/components/shared/FigmaComponents';
 import { apiClient } from '@/api/client';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
+import { useProject } from '@/context/ProjectContext';
 
 export default function MilestonesPage() {
+  const { activeProjectId } = useProject();
   const [milestones, setMilestones] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
   useEffect(() => {
     async function fetchMilestones() {
+      if (!activeProjectId) {
+        setMilestones([]);
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
       try {
-        const res = await apiClient.get('/dashboard/supervisor');
-        // fallback to dummy data if milestone endpoint not perfect
-        setMilestones([
-          { id: 1, name: 'Foundation Completion', date: '2026-07-15', status: 'PENDING', project: 'Downtown Plaza' },
-          { id: 2, name: 'Slab Casting Floor 2', date: '2026-07-20', status: 'IN_PROGRESS', project: 'Gulshan Residency' },
-          { id: 3, name: 'MEP Clearance', date: '2026-07-10', status: 'DELAYED', project: 'Downtown Plaza' },
-          { id: 4, name: 'Site Mobilization', date: '2026-06-01', status: 'COMPLETED', project: 'DHA Villas' },
-        ]);
+        const res = await apiClient.get(`/milestones?project_id=${activeProjectId}`);
+        if (res.data) setMilestones(Array.isArray(res.data) ? res.data : []);
       } catch (e) {
         console.error(e);
       } finally {
@@ -27,7 +29,7 @@ export default function MilestonesPage() {
       }
     }
     fetchMilestones();
-  }, []);
+  }, [activeProjectId]);
 
   if (loading) return <LoadingSpinner size="lg" />;
 

@@ -2,6 +2,7 @@ import { useState, useEffect, type FormEvent } from 'react';
 import { MapPin, Plus, Loader2, Sparkles, User, Hammer, Calendar } from 'lucide-react';
 import { apiClient } from '@/api/client';
 import { useAuth } from '@/context/AuthContext';
+import { useProject } from '@/context/ProjectContext';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import EmptyState from '@/components/shared/EmptyState';
 
@@ -25,6 +26,7 @@ interface Project {
 
 export default function SitesPage() {
   const { hasPermission } = useAuth();
+  const { activeProjectId } = useProject();
   const [sites, setSites] = useState<Site[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [users, setUsers] = useState<any[]>([]);
@@ -43,8 +45,14 @@ export default function SitesPage() {
 
   useEffect(() => {
     async function loadData() {
+      if (!activeProjectId) {
+        setSites([]);
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
       try {
-        const sitesRes = await apiClient.get<Site[]>('/sites').catch(() => ({ data: [] }));
+        const sitesRes = await apiClient.get<Site[]>(`/sites?project_id=${activeProjectId}`).catch(() => ({ data: [] }));
         const projectsRes = await apiClient.get<Project[]>('/projects').catch(() => ({ data: [] }));
         let usersRes: any = { data: [] };
         if (hasPermission('users.read')) {
@@ -64,7 +72,7 @@ export default function SitesPage() {
       }
     }
     loadData();
-  }, []);
+  }, [activeProjectId]);
 
   const handleCreateSite = async (e: FormEvent) => {
     e.preventDefault();

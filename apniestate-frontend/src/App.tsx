@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '@/context/AuthContext';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -6,7 +6,6 @@ import AppLayout from '@/components/layout/AppLayout';
 import LoginPage from '@/pages/LoginPage';
 import LandingPage from '@/pages/LandingPage';
 import SignupPage from '@/pages/SignupPage';
-import WorkspaceSelectPage from '@/pages/WorkspaceSelectPage';
 import OnboardingPage from '@/pages/OnboardingPage';
 import MyInvitationsPage from '@/pages/MyInvitationsPage';
 import CompanyInvitationsPage from '@/pages/CompanyInvitationsPage';
@@ -23,26 +22,16 @@ import SettingsPage from '@/pages/SettingsPage';
 import UsersPage from '@/pages/UsersPage';
 import SitesPage from '@/pages/SitesPage';
 import MaterialsPage from '@/pages/MaterialsPage';
-import FinancePage from '@/pages/FinancePage';
 import VendorsPage from '@/pages/VendorsPage';
 import DocumentsPage from '@/pages/DocumentsPage';
 import ReportsPage from '@/pages/ReportsPage';
+import FinancePage from '@/pages/FinancePage';
 import WorkersPage from '@/pages/WorkersPage';
 import ContractorsPage from '@/pages/ContractorsPage';
-import LeavesPage from '@/pages/LeavesPage';
-import InvoicesPage from '@/pages/InvoicesPage';
-import PaymentsPage from '@/pages/PaymentsPage';
-import BudgetsPage from '@/pages/BudgetsPage';
-import DprPage from '@/pages/DprPage';
-import WeeklyReportsPage from '@/pages/WeeklyReportsPage';
-import PayrollPage from '@/pages/PayrollPage';
-import ApprovalsPage from '@/pages/ApprovalsPage';
 import RouteGuard from '@/components/shared/RouteGuard';
-// New Figma pages
 import CalendarPage from '@/pages/CalendarPage';
 import EquipmentPage from '@/pages/EquipmentPage';
 import MaterialRequestsPage from '@/pages/MaterialRequestsPage';
-import TimelinePage from '@/pages/TimelinePage';
 import DailyLogsPage from '@/pages/DailyLogsPage';
 import ExportAttendancePage from '@/pages/ExportAttendancePage';
 import ExportDprPage from '@/pages/ExportDprPage';
@@ -50,6 +39,14 @@ import ProfilePage from '@/pages/ProfilePage';
 import MilestonesPage from '@/pages/MilestonesPage';
 import PurchaseOrdersPage from '@/pages/PurchaseOrdersPage';
 import ExpensesPage from '@/pages/ExpensesPage';
+import LeavesPage from '@/pages/LeavesPage';
+import PayrollPage from '@/pages/PayrollPage';
+import ApprovalsPage from '@/pages/ApprovalsPage';
+
+import ProgressWorkspace from '@/pages/ProgressWorkspace';
+import PurchaseWorkspace from '@/pages/PurchaseWorkspace';
+import FinanceWorkspace from '@/pages/FinanceWorkspace';
+import OperationsWorkspace from '@/pages/OperationsWorkspace';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -61,71 +58,92 @@ const queryClient = new QueryClient({
   },
 });
 
+import { ProjectProvider } from '@/context/ProjectContext';
+
 export default function App() {
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <BrowserRouter>
-            <Routes>
-              {/* Public */}
-              <Route path="/" element={<LandingPage />} />
+          <ProjectProvider>
+            <BrowserRouter>
+              <Routes>
+              {/* Public routes */}
               <Route path="/login" element={<LoginPage />} />
               <Route path="/signup" element={<SignupPage />} />
-              <Route path="/select-workspace" element={<WorkspaceSelectPage />} />
+              <Route path="/landing" element={<LandingPage />} />
+              
+              {/* Guarded onboarding/invitations */}
               <Route path="/onboarding" element={<OnboardingPage />} />
               <Route path="/my-invitations" element={<MyInvitationsPage />} />
 
-              {/* Protected — wrapped by AppLayout which handles auth check */}
-              <Route element={<AppLayout />}>
-                {/* Universally checked by config */}
-                <Route element={<RouteGuard />}>
-                  <Route path="/dashboard" element={<DashboardPage />} />
+              {/* Main App */}
+              <Route path="/" element={<AppLayout />}>
+                <Route index element={<Navigate to="/dashboard" replace />} />
+                <Route path="/dashboard" element={<DashboardPage />} />
+                
+                <Route element={<RouteGuard permission="projects.read" />}>
                   <Route path="/projects" element={<ProjectsPage />} />
                   <Route path="/projects/:id" element={<ProjectDetailPage />} />
-                  <Route path="/more" element={<MorePage />} />
-                  <Route path="/notifications" element={<NotificationsPage />} />
-                  <Route path="/settings" element={<SettingsPage />} />
-                  <Route path="/profile" element={<ProfilePage />} />
-                  <Route path="/milestones" element={<MilestonesPage />} />
-                  <Route path="/dpr" element={<DprPage />} />
-                  <Route path="/weekly-reports" element={<WeeklyReportsPage />} />
-                  {/* New Figma pages */}
-                  <Route path="/calendar" element={<CalendarPage />} />
-                  <Route path="/timeline" element={<TimelinePage />} />
-                  <Route path="/daily-logs" element={<DailyLogsPage />} />
-                  <Route path="/export-attendance" element={<ExportAttendancePage />} />
-                  <Route path="/export-dpr" element={<ExportDprPage />} />
                 </Route>
+
+                {/* Common unguarded routes within layout */}
+                <Route path="/more" element={<MorePage />} />
+                <Route path="/notifications" element={<NotificationsPage />} />
+                <Route path="/profile" element={<ProfilePage />} />
 
                 {/* Guarded Modules */}
                 <Route element={<RouteGuard permission="tasks.read" />}>
                   <Route path="/tasks" element={<TasksPage />} />
                 </Route>
-                <Route element={<RouteGuard permission="attendance.read" />}>
-                  <Route path="/attendance" element={<AttendancePage />} />
+
+                {/* Progress Workspace */}
+                <Route element={<RouteGuard permission="sites.read" />}>
+                  <Route path="/progress" element={<ProgressWorkspace />} />
+                  <Route path="/timeline" element={<Navigate to="/progress?tab=timeline" replace />} />
+                  <Route path="/milestones" element={<Navigate to="/progress?tab=milestones" replace />} />
+                  <Route path="/dpr" element={<Navigate to="/progress?tab=dpr" replace />} />
+                  <Route path="/calendar" element={<Navigate to="/progress?tab=calendar" replace />} />
                 </Route>
-                <Route element={<RouteGuard permission="inventory.read" />}>
-                  <Route path="/inventory" element={<InventoryPage />} />
+
+                {/* Purchase Workspace */}
+                <Route element={<RouteGuard permission="materials.read" />}>
+                  <Route path="/purchase" element={<PurchaseWorkspace />} />
+                  <Route path="/boq" element={<Navigate to="/purchase?tab=boq" replace />} />
+                  <Route path="/material-requests" element={<Navigate to="/purchase?tab=requests" replace />} />
+                  <Route path="/purchase-orders" element={<Navigate to="/purchase?tab=orders" replace />} />
+                  <Route path="/inventory" element={<Navigate to="/purchase?tab=inventory" replace />} />
+                  <Route path="/materials" element={<Navigate to="/purchase?tab=materials" replace />} />
+                  <Route path="/vendors" element={<Navigate to="/purchase?tab=vendors" replace />} />
                 </Route>
+
+                {/* Finance Workspace */}
+                <Route element={<RouteGuard permission="finance.read" />}>
+                  <Route path="/finance" element={<FinanceWorkspace />} />
+                  <Route path="/cashbook" element={<Navigate to="/finance?tab=cashbook" replace />} />
+                  <Route path="/expenses" element={<Navigate to="/finance?tab=expenses" replace />} />
+                  <Route path="/invoices" element={<Navigate to="/finance?tab=invoices" replace />} />
+                  <Route path="/payments" element={<Navigate to="/finance?tab=payments" replace />} />
+                  <Route path="/budgets" element={<Navigate to="/finance?tab=budgets" replace />} />
+                </Route>
+
+                {/* Operations Workspace */}
+                <Route element={<RouteGuard permission="sites.read" />}>
+                  <Route path="/operations" element={<OperationsWorkspace />} />
+                  <Route path="/attendance" element={<Navigate to="/operations?tab=labour" replace />} />
+                  <Route path="/equipment" element={<Navigate to="/operations?tab=equipment" replace />} />
+                  <Route path="/sites" element={<Navigate to="/operations?tab=sites" replace />} />
+                  <Route path="/contractors" element={<Navigate to="/operations?tab=contractors" replace />} />
+                  <Route path="/workers" element={<Navigate to="/operations?tab=labour" replace />} />
+                </Route>
+
                 <Route element={<RouteGuard permission="users.read" />}>
                   <Route path="/users" element={<UsersPage />} />
                   <Route path="/users/invitations" element={<CompanyInvitationsPage />} />
                   <Route path="/users/resignations" element={<CompanyResignationsPage />} />
+                  <Route path="/settings" element={<SettingsPage />} />
                 </Route>
-                <Route element={<RouteGuard permission="sites.read" />}>
-                  <Route path="/sites" element={<SitesPage />} />
-                </Route>
-                <Route element={<RouteGuard permission="materials.read" />}>
-                  <Route path="/materials" element={<MaterialsPage />} />
-                  <Route path="/material-requests" element={<MaterialRequestsPage />} />
-                </Route>
-                <Route element={<RouteGuard permission="finance.read" />}>
-                  <Route path="/finance" element={<FinancePage />} />
-                </Route>
-                <Route element={<RouteGuard permission="vendors.read" />}>
-                  <Route path="/vendors" element={<VendorsPage />} />
-                </Route>
+                
                 <Route element={<RouteGuard permission="documents.read" />}>
                   <Route path="/documents" element={<DocumentsPage />} />
                 </Route>
@@ -133,42 +151,21 @@ export default function App() {
                   <Route path="/reports" element={<ReportsPage />} />
                 </Route>
 
-                {/* New Guarded Modules */}
-                <Route element={<RouteGuard permission="workers.read" />}>
-                  <Route path="/workers" element={<WorkersPage />} />
-                  <Route path="/equipment" element={<EquipmentPage />} />
-                </Route>
-                <Route element={<RouteGuard permission="contractors.read" />}>
-                  <Route path="/contractors" element={<ContractorsPage />} />
-                </Route>
-                <Route element={<RouteGuard permission="leaves.read" />}>
-                  <Route path="/leaves" element={<LeavesPage />} />
-                </Route>
-                <Route element={<RouteGuard permission="invoices.read" />}>
-                  <Route path="/invoices" element={<InvoicesPage />} />
-                </Route>
-                <Route element={<RouteGuard permission="finance.read" />}>
-                  <Route path="/purchase-orders" element={<PurchaseOrdersPage />} />
-                  <Route path="/expenses" element={<ExpensesPage />} />
-                </Route>
-                <Route element={<RouteGuard permission="payments.read" />}>
-                  <Route path="/payments" element={<PaymentsPage />} />
-                </Route>
-                <Route element={<RouteGuard permission="budgets.read" />}>
-                  <Route path="/budgets" element={<BudgetsPage />} />
-                </Route>
-                <Route element={<RouteGuard permission="workers.read" />}>
-                  <Route path="/payroll" element={<PayrollPage />} />
-                </Route>
-                <Route element={<RouteGuard permission="finance.read" />}>
-                  <Route path="/approvals" element={<ApprovalsPage />} />
-                </Route>
+                {/* Leftover routes that weren't assigned workspaces yet */}
+                <Route path="/daily-logs" element={<DailyLogsPage />} />
+                <Route path="/export-attendance" element={<ExportAttendancePage />} />
+                <Route path="/export-dpr" element={<ExportDprPage />} />
+                <Route path="/leaves" element={<LeavesPage />} />
+                <Route path="/payroll" element={<PayrollPage />} />
+                <Route path="/approvals" element={<ApprovalsPage />} />
+                <Route path="/cost-dashboard" element={<Navigate to="/finance?tab=cashbook" replace />} />
+                <Route path="/boq-approvals" element={<Navigate to="/purchase?tab=boq" replace />} />
               </Route>
             </Routes>
           </BrowserRouter>
+          </ProjectProvider>
         </AuthProvider>
       </QueryClientProvider>
     </ErrorBoundary>
   );
 }
-

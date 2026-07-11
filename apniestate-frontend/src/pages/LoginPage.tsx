@@ -7,7 +7,7 @@ import Logo from '@/components/shared/Logo';
 import '@/styles/login.css';
 
 export default function LoginPage() {
-  const { login, restoreWorkspace, isAuthenticated, isLoading } = useAuth();
+  const { login, isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -26,12 +26,7 @@ export default function LoginPage() {
         navigate('/onboarding', { replace: true });
         return;
       }
-      const restored = await restoreWorkspace();
-      if (restored) {
-        navigate('/dashboard', { replace: true });
-      } else {
-        navigate('/select-workspace', { replace: true });
-      }
+      navigate('/dashboard', { replace: true });
     } catch (err) {
       console.error('Demo login failed', err);
     } finally {
@@ -64,15 +59,8 @@ export default function LoginPage() {
         return;
       }
 
-      // Try to intelligently restore the last workspace
-      const restored = await restoreWorkspace();
-      
-      if (restored) {
-        navigate('/dashboard', { replace: true });
-      } else {
-        // Needs manual selection or has multiple roles
-        navigate('/select-workspace', { replace: true });
-      }
+      // For now, route directly to the dashboard
+      navigate('/dashboard', { replace: true });
       
     } catch (err) {
       if (err instanceof ApiError) {

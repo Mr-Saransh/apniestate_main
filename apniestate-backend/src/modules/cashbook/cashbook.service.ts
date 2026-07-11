@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/prisma";
 
-export async function getCashbook(startDate?: string, endDate?: string, siteId?: string) {
+export async function getCashbook(startDate?: string, endDate?: string, siteId?: string, projectId?: string) {
   const where: any = {};
+  if (projectId) where.project_id = projectId;
   
   if (startDate || endDate) {
     where.date = {};

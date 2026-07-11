@@ -1,26 +1,33 @@
 import { prisma } from "@/lib/prisma";
 
-export async function getAttendances(userId: string, dateStr?: string, siteId?: string) {
+export async function getAttendances(userId: string, projectId: string, dateStr?: string, siteId?: string) {
   const date = dateStr ? new Date(dateStr) : new Date();
   date.setUTCHours(0, 0, 0, 0);
 
   const whereWorker: any = { is_active: true };
+
+  // Always scope to the project
   if (siteId) {
     whereWorker.site_id = siteId;
+  } else {
+    whereWorker.site = { project_id: projectId };
   }
 
   const workers = await prisma.worker.findMany({
     where: whereWorker,
     include: {
-      site: { select: { id: true, name: true } },
+      site: { select: { id: true, name: true, project_id: true } },
       contractor: { select: { id: true, name: true } }
     }
   });
 
+  // Get site IDs within this project for attendance query
+  const projectSiteIds = [...new Set(workers.map(w => w.site_id).filter(Boolean))] as string[];
+
   const attendances = await prisma.workerAttendance.findMany({
     where: {
       date: date,
-      ...(siteId ? { site_id: siteId } : {})
+      ...(siteId ? { site_id: siteId } : { site_id: { in: projectSiteIds } })
     }
   });
 
@@ -65,8 +72,7 @@ export async function createAttendance(data: any, userId: string) {
     siteId = worker?.site_id || undefined;
   }
   if (!siteId) {
-    const defaultSite = await prisma.site.findFirst();
-    siteId = defaultSite?.id || "";
+    return Response.json({ success: false, error: { message: "Worker has no assigned site. Cannot mark attendance." } }, { status: 400 });
   }
 
   const existing = await prisma.workerAttendance.findUnique({

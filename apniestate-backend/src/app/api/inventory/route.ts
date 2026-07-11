@@ -5,8 +5,10 @@ import { CreateInventorySchema } from "@/modules/inventory/inventory.schema";
 import { getInventoryItems, createInventory } from "@/modules/inventory/inventory.service";
 import { ok, created } from "@/lib/response";
 
-export const GET = withAuth(async (_req, user) => {
-  const items = await getInventoryItems(user.sub, user.role);
+export const GET = withAuth(async (req, user) => {
+  const url = new URL(req.url);
+  const projectId = url.searchParams.get("project_id") || undefined;
+  const items = await getInventoryItems(user.sub, user.role, projectId);
   return ok(items);
 });
 

@@ -6,6 +6,7 @@ import { getProjects, createProject } from "@/modules/projects/projects.service"
 import { ok, created } from "@/lib/response";
 
 export const GET = withAuth(async (_req, user) => {
+
   const projects = await getProjects(user.sub, user.role, user.company_id);
   return ok(projects);
 });

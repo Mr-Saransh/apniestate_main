@@ -4,14 +4,14 @@ import { useAuth } from '@/context/AuthContext';
 import { UserMinus, Check, X, Loader2 } from 'lucide-react';
 
 export default function CompanyResignationsPage() {
-  const { activeWorkspace } = useAuth();
+  const { user } = useAuth();
   const [resignations, setResignations] = useState<Resignation[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   useEffect(() => {
     fetchResignations();
-  }, [activeWorkspace]);
+  }, [user]);
 
   const fetchResignations = async () => {
     try {
@@ -52,7 +52,7 @@ export default function CompanyResignationsPage() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '32px' }}>
         <div>
           <h1 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '8px' }}>Resignations</h1>
-          <p style={{ color: 'var(--color-text-muted)' }}>Review resignation requests from members of {activeWorkspace?.company.name}</p>
+          <p style={{ color: 'var(--color-text-muted)' }}>Review resignation requests from members of {user?.company.name}</p>
         </div>
       </div>
 

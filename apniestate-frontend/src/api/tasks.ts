@@ -17,7 +17,12 @@ export interface Task {
 }
 
 export const tasksApi = {
-  getAll: () => apiClient.get<Task[]>('/tasks'),
+  getAll: (filters?: { project_id?: string }) => {
+    const params = new URLSearchParams();
+    if (filters?.project_id) params.append('project_id', filters.project_id);
+    const qs = params.toString();
+    return apiClient.get<Task[]>(`/tasks${qs ? `?${qs}` : ''}`);
+  },
   create: (data: Partial<Task>) => apiClient.post<Task>('/tasks', data),
   update: (id: string, data: Partial<Task>) => apiClient.patch<Task>(`/tasks/${id}`, data),
   delete: (id: string) => apiClient.delete<null>(`/tasks/${id}`),

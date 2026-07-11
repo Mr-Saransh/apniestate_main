@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { apiClient } from '@/api/client';
 import { PH, Card, Chip, SrchBar } from '@/components/shared/FigmaComponents';
 import { useAuth } from '@/context/AuthContext';
+import { useProject } from '@/context/ProjectContext';
 
 interface MaterialRequest {
   id: string;
@@ -17,18 +18,20 @@ interface MaterialRequest {
 
 export default function MaterialRequestsPage() {
   const { user } = useAuth();
+  const { activeProjectId } = useProject();
   const [requests, setRequests] = useState<MaterialRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showNewModal, setShowNewModal] = useState(false);
-  const [newReq, setNewReq] = useState({ materialName: '', quantity: 1, unit: '', priority: 'NORMAL' });
+  const [newReq, setNewReq] = useState({ materialName: '', quantity: 1, unit: '', priority: 'NORMAL', site_id: '', material_id: '' });
 
   const handleCreateRequest = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!activeProjectId) return;
     try {
       await apiClient.post('/material-requests', {
-        site_id: 'cl_demo_site_1',
-        material_id: 'cl_demo_material_1',
+        site_id: newReq.site_id,
+        material_id: newReq.material_id,
         quantity: Number(newReq.quantity),
         priority: newReq.priority,
         notes: `Requested: ${newReq.quantity} ${newReq.unit || 'units'} of ${newReq.materialName}`
@@ -41,15 +44,20 @@ export default function MaterialRequestsPage() {
   };
 
   const fetchRequests = () => {
+    if (!activeProjectId) {
+      setRequests([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
-    apiClient.get<any>('/material-requests').then(res => {
+    apiClient.get<any>(`/material-requests?project_id=${activeProjectId}`).then(res => {
       if (res.success && res.data) {
         setRequests(Array.isArray(res.data) ? res.data : res.data.data || []);
       }
     }).catch(() => {}).finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchRequests(); }, []);
+  useEffect(() => { fetchRequests(); }, [activeProjectId]);
 
   const filtered = requests.filter(r => 
     !search ||

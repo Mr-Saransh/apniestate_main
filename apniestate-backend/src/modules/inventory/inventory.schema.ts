@@ -12,7 +12,7 @@ export const UpdateInventorySchema = CreateInventorySchema.partial();
 export const CreateInventoryTransactionSchema = z.object({
   material_id: z.string().min(1, "Material is required"),
   site_id: z.string().min(1, "Site is required"),
-  type: z.enum(["IN", "OUT", "ADJUST"]),
+  type: z.enum(["IN", "OUT", "ADJUST", "GRN_RECEIPT", "MATERIAL_ISSUE", "RETURN", "DAMAGE", "TRANSFER_IN", "TRANSFER_OUT"]),
   quantity: z.number().positive("Quantity must be positive"),
   notes: z.string().optional().nullable(),
 });

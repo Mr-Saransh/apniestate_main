@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { apiClient } from '@/api/client';
 import { Plus } from 'lucide-react';
 import { PH, SrchBar, Card, Chip } from '@/components/shared/FigmaComponents';
+import { useProject } from '@/context/ProjectContext';
 
 interface DailyLog {
   id: string;
@@ -17,18 +18,25 @@ interface DailyLog {
 }
 
 export default function DailyLogsPage() {
+  const { activeProjectId } = useProject();
   const navigate = useNavigate();
   const [logs, setLogs] = useState<DailyLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
   useEffect(() => {
-    apiClient.get<any>('/dpr').then(res => {
+    if (!activeProjectId) {
+      setLogs([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    apiClient.get<any>(`/dpr?project_id=${activeProjectId}`).then(res => {
       if (res.success && res.data) {
         setLogs(Array.isArray(res.data) ? res.data : res.data.data || []);
       }
     }).catch(() => {}).finally(() => setLoading(false));
-  }, []);
+  }, [activeProjectId]);
 
   const filtered = logs.filter(l =>
     l.site?.name?.toLowerCase().includes(search.toLowerCase()) ||

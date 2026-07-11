@@ -4,6 +4,7 @@ import { Plus, X } from 'lucide-react';
 import { apiClient } from '@/api/client';
 import { PH, Card, Chip, SrchBar } from '@/components/shared/FigmaComponents';
 import { ResponsiveContainer, AreaChart, Area, CartesianGrid, XAxis, YAxis, Tooltip } from 'recharts';
+import { useProject } from '@/context/ProjectContext';
 
 interface CashbookEntry {
   id: string;
@@ -25,6 +26,7 @@ interface CashbookData {
 }
 
 export default function FinancePage() {
+  const { activeProjectId } = useProject();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -44,8 +46,14 @@ export default function FinancePage() {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
 
   const loadCashbook = async () => {
+    if (!activeProjectId) {
+      setData(null);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     try {
-      const res = await apiClient.get<CashbookData>('/cashbook');
+      const res = await apiClient.get<CashbookData>(`/cashbook?project_id=${activeProjectId}`);
       if (res.data) setData(res.data);
     } catch (err) {
       console.error('Failed to load cashbook data', err);
@@ -56,7 +64,7 @@ export default function FinancePage() {
 
   useEffect(() => {
     loadCashbook();
-  }, []);
+  }, [activeProjectId]);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);

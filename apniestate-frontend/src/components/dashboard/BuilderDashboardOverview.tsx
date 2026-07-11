@@ -4,6 +4,7 @@ import { useDashboardQuery } from '@/hooks/useDashboardQuery';
 import { Building2, HardHat, TrendingUp, Activity, ArrowUp, ArrowDown } from 'lucide-react';
 import { KPI, Card } from '@/components/shared/FigmaComponents';
 import { ResponsiveContainer, AreaChart, Area, CartesianGrid, XAxis, YAxis, Tooltip } from 'recharts';
+import { ProcurementIntelligenceWidget } from './builder/ProcurementIntelligenceWidget';
 
 export const BuilderDashboardOverview: React.FC = () => {
   const { user } = useAuth();
@@ -147,6 +148,10 @@ export const BuilderDashboardOverview: React.FC = () => {
               <div className="flex items-center gap-1.5"><div className="w-3 h-1 bg-[#FCC300] rounded-full" /><span className="text-xs text-muted-foreground font-medium">Expenses</span></div>
             </div>
           </Card>
+
+          <div className="mt-4">
+            <ProcurementIntelligenceWidget data={data.procurementOverview} />
+          </div>
         </div>
       </div>
     </div>

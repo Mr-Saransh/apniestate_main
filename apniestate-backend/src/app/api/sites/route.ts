@@ -5,8 +5,10 @@ import { CreateSiteSchema } from "@/modules/sites/sites.schema";
 import { getSites, createSite } from "@/modules/sites/sites.service";
 import { ok, created } from "@/lib/response";
 
-export const GET = withAuth(async (_req, user) => {
-  const items = await getSites(user.sub, user.role, user.company_id);
+export const GET = withAuth(async (req, user) => {
+  const url = new URL(req.url);
+  const projectId = url.searchParams.get("project_id") || undefined;
+  const items = await getSites(user.sub, user.role, user.company_id, projectId);
   return ok(items);
 });
 

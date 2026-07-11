@@ -5,6 +5,7 @@ import { PH, Card, Chip, SrchBar } from '@/components/shared/FigmaComponents';
 import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip } from 'recharts';
 import { format, addDays, startOfWeek, isSameDay } from 'date-fns';
 import { useAuth } from '@/context/AuthContext';
+import { useProject } from '@/context/ProjectContext';
 
 interface WorkerRecord {
   id: string;
@@ -32,6 +33,7 @@ interface Site {
 
 export default function AttendancePage() {
   const { user } = useAuth();
+  const { activeProjectId } = useProject();
   const [date, setDate] = useState(new Date());
   const [sites, setSites] = useState<Site[]>([]);
   const [selectedSiteId, setSelectedSiteId] = useState('');
@@ -40,13 +42,22 @@ export default function AttendancePage() {
   const [search, setSearch] = useState('');
 
   const fetchSitesAndWorkers = async () => {
+    if (!activeProjectId) {
+      setWorkers([]);
+      setSites([]);
+      setLoading(false);
+      return;
+    }
+
     try {
-      const sitesRes = await apiClient.get<Site[]>('/sites');
+      setLoading(true);
+      const sitesRes = await apiClient.get<Site[]>(`/sites?project_id=${activeProjectId}`);
       if (sitesRes.data) setSites(sitesRes.data);
 
       const dateStr = date.toISOString().split('T')[0];
       const params = new URLSearchParams();
       params.append('date', dateStr);
+      params.append('project_id', activeProjectId);
       if (selectedSiteId) params.append('site_id', selectedSiteId);
 
       const workersRes = await apiClient.get<WorkerRecord[]>(`/attendance?${params.toString()}`);

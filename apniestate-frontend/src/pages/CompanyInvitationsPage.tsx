@@ -5,7 +5,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Role } from '@/api/auth';
 
 export default function CompanyInvitationsPage() {
-  const { activeWorkspace } = useAuth();
+  const { user } = useAuth();
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -18,7 +18,7 @@ export default function CompanyInvitationsPage() {
 
   useEffect(() => {
     fetchInvitations();
-  }, [activeWorkspace]);
+  }, [user]);
 
   const fetchInvitations = async () => {
     try {
@@ -76,7 +76,7 @@ export default function CompanyInvitationsPage() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '32px' }}>
         <div>
           <h1 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '8px' }}>Company Invitations</h1>
-          <p style={{ color: 'var(--color-text-muted)' }}>Manage invites sent to join {activeWorkspace?.company.name}</p>
+          <p style={{ color: 'var(--color-text-muted)' }}>Manage invites sent to join {user?.company.name}</p>
         </div>
         <button 
           onClick={() => setShowCreate(true)}
