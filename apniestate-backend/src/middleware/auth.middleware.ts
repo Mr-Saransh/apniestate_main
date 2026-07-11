@@ -34,7 +34,7 @@ export function withAuth(handler: RouteHandler) {
     if (!dbUser && !payload.company_id) return unauthorized();
 
     if (!payload.company_id) {
-      payload.company_id = dbUser.company_id || null;
+      payload.company_id = dbUser?.company_id || null;
     }
 
     return handler(req, payload, context);
