@@ -38,7 +38,7 @@ export default function AppLayout() {
       <div className="flex-1 flex overflow-hidden relative">
         {/* Desktop sidebar */}
         {inProject && (
-          <aside className="hidden lg:flex flex-col w-64 shrink-0 h-full">
+          <aside className="hidden lg:flex flex-col w-64 shrink-0 h-full z-10 relative shadow-xl">
             <Sidebar />
           </aside>
         )}
@@ -50,7 +50,7 @@ export default function AppLayout() {
             onClick={() => setSidebarOpen(false)}
           />
           <div
-            className={`relative w-72 h-full transition-transform duration-250 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}
+            className={`relative w-72 h-full bg-[#2648E7] transition-transform duration-250 shadow-2xl ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}
             style={{ transitionTimingFunction: "cubic-bezier(0.4,0,0.2,1)" }}
           >
             <Sidebar onClose={() => setSidebarOpen(false)} />
@@ -58,7 +58,7 @@ export default function AppLayout() {
         </div>
 
         {/* Main content */}
-        <main className="flex-1 overflow-y-auto relative">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden relative w-full bg-slate-50/50">
           <Outlet />
         </main>
       </div>

@@ -30,7 +30,7 @@ export interface VendorSummary {
   id: string;
   name: string;
   category: string;
-  rating: string;
+  gst: string;
   orders: number;
   due: string;
 }
@@ -42,6 +42,32 @@ export interface ReceivedSummary {
   amount: string;
   received: string;
   quality: string;
+  billUrl?: string | null;
+  fullItems?: { name: string; qty: number; unit: string; price: number; total: number }[];
+}
+
+export interface QuotationSummary {
+  id: string;
+  vendor: string;
+  material: string;
+  rate: string;
+  total: string;
+  status: string;
+}
+
+export interface InventorySummary {
+  id: string;
+  material: string;
+  stock: string;
+  reorderLevel: string;
+}
+
+export interface ConsumptionLog {
+  id: string;
+  material: string;
+  qty: string;
+  date: string;
+  time: string;
 }
 
 export interface PurchaseSummaryResponse {
@@ -50,6 +76,9 @@ export interface PurchaseSummaryResponse {
   orders: OrderSummary[];
   vendors: VendorSummary[];
   received: ReceivedSummary[];
+  quotations: QuotationSummary[];
+  inventory: InventorySummary[];
+  consumption_logs: ConsumptionLog[];
 }
 
 export const purchaseApi = {
