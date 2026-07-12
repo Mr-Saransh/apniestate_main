@@ -63,7 +63,7 @@ export const PUT = withAuth(async (req: NextRequest, user) => {
 
   const body = await req.json();
   
-  const equipment = await prisma.equipment.update({
+  const equipment = await prisma.equipment.updateMany({
     where: { id, company_id: user.company_id },
     data: { 
         name: body.name, 
@@ -88,7 +88,7 @@ export const DELETE = withAuth(async (req: NextRequest, user) => {
   const id = url.searchParams.get("id");
   if (!id) return badRequest("Equipment ID is required");
 
-  await prisma.equipment.delete({
+  await prisma.equipment.deleteMany({
     where: { id, company_id: user.company_id },
   });
 

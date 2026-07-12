@@ -67,6 +67,8 @@ enum MilestoneStatus {
 enum MaterialRequestStatus {
   DRAFT
   SUBMITTED
+  PENDING_APPROVAL
+  QUOTATION
   APPROVED
   REJECTED
   ORDERED
@@ -951,6 +953,7 @@ model Material {
   consumptions    MaterialConsumption[]
   company_id      String?
   company         Company?               @relation(fields: [company_id], references: [id])
+  BOQItem         BOQItem[]
 
   @@index([company_id], name: "idx_material_company_id")
   @@index([preferred_vendor_id], name: "idx_material_vendor_id")
@@ -1161,6 +1164,7 @@ model Quotation {
   delivery_time  String?
   validity_days  Int?
   terms          String?
+  is_recommended Boolean         @default(false)
   created_at     DateTime        @default(now())
   updated_at     DateTime        @updatedAt
 
@@ -1189,15 +1193,16 @@ model QuotationItem {
 // ─── Goods Receipt Note (GRN) ────────────────────────────
 
 model GoodsReceiptNote {
-  id          String    @id @default(cuid())
-  po_id       String
-  site_id     String
-  received_by String
-  date        DateTime  @default(now())
-  status      GRNStatus @default(DRAFT)
-  remarks     String?
-  created_at  DateTime  @default(now())
-  updated_at  DateTime  @updatedAt
+  id             String    @id @default(cuid())
+  po_id          String
+  site_id        String
+  received_by    String
+  date           DateTime  @default(now())
+  status         GRNStatus @default(DRAFT)
+  quality_status String    @default("GOOD")
+  remarks        String?
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
 
   purchase_order PurchaseOrder          @relation(fields: [po_id], references: [id])
   site           Site                   @relation(fields: [site_id], references: [id])
@@ -1423,10 +1428,11 @@ model Expense {
   invoice_id  String?
   user_id     String
   date        DateTime      @db.Date
-  receipt_url String?
-  status      ExpenseStatus @default(PENDING)
-  created_at  DateTime      @default(now())
-  updated_at  DateTime      @updatedAt
+  receipt_url  String?
+  status       ExpenseStatus @default(PENDING)
+  reference_id String?       @unique // Used to link to external entities like attendance or POs for idempotency
+  created_at   DateTime      @default(now())
+  updated_at   DateTime      @updatedAt
 
   site       Site?    @relation(fields: [site_id], references: [id])
   project    Project? @relation(fields: [project_id], references: [id])
@@ -2138,9 +2144,11 @@ model BOQCategory {
 model BOQItem {
   id             String   @id @default(cuid())
   category_id    String
+  material_id    String?
   code           String?
   description    String
   quantity       Float
+  used_quantity  Float    @default(0)
   unit           String
   material_rate  Float    @default(0)
   labour_rate    Float    @default(0)
@@ -2153,6 +2161,7 @@ model BOQItem {
   updated_at     DateTime @updatedAt
 
   category BOQCategory @relation(fields: [category_id], references: [id], onDelete: Cascade)
+  material Material?   @relation(fields: [material_id], references: [id])
 
   @@index([category_id])
   @@map("boq_items")

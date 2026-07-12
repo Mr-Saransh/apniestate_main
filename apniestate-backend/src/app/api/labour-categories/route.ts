@@ -79,3 +79,39 @@ export const PUT = withAuth(async (request: any, user) => {
     return NextResponse.json({ success: false, error: error.message || 'Failed to update category' }, { status: 500 });
   }
 });
+
+export const DELETE = withAuth(async (request: any, user) => {
+  try {
+    if (user.role !== 'BUILDER' && user.role !== 'ADMIN') {
+      return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
+    }
+    if (!user.company_id) return NextResponse.json({ success: false, error: 'User has no company' }, { status: 403 });
+
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+        return NextResponse.json({ success: false, error: 'Missing category ID' }, { status: 400 });
+    }
+
+    // Check if logs exist for this category
+    const logsCount = await prisma.labourLog.count({ where: { category_id: id } });
+    if (logsCount > 0) {
+      // Soft delete
+      await prisma.labourCategory.updateMany({
+        where: { id, company_id: user.company_id },
+        data: { status: 'INACTIVE' }
+      });
+      return NextResponse.json({ success: true, message: 'Category deactivated' });
+    } else {
+      // Hard delete
+      await prisma.labourCategory.deleteMany({
+        where: { id, company_id: user.company_id }
+      });
+      return NextResponse.json({ success: true, message: 'Category deleted' });
+    }
+  } catch (error: any) {
+    console.error('Delete category error:', error);
+    return NextResponse.json({ success: false, error: error.message || 'Failed to delete category' }, { status: 500 });
+  }
+});

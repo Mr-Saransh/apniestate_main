@@ -117,16 +117,32 @@ export const getProjectById = async (id: string, companyId?: string | null) => {
   };
 };
 
-export const createProject = (data: CreateProjectInput, builderId: string, companyId?: string | null) => {
+export const createProject = async (data: CreateProjectInput, builderId: string, companyId?: string | null) => {
   const { start_date, end_date, ...rest } = data;
-  return prisma.project.create({
-    data: {
-      ...rest,
-      builder_id: builderId,
-      company_id: companyId || null,
-      start_date: new Date(start_date),
-      end_date: end_date ? new Date(end_date) : null,
-    }
+  
+  return prisma.$transaction(async (tx) => {
+    const project = await tx.project.create({
+      data: {
+        ...rest,
+        builder_id: builderId,
+        company_id: companyId || null,
+        start_date: new Date(start_date),
+        end_date: end_date ? new Date(end_date) : null,
+      }
+    });
+
+    // Auto-create a default site to avoid broken workflows
+    await tx.site.create({
+      data: {
+        name: "Main Site",
+        location: (data as any).address || (data as any).city || "Project Location",
+        project_id: project.id,
+        company_id: companyId || null,
+        status: "NOT_STARTED",
+      }
+    });
+
+    return project;
   });
 };
 
@@ -314,6 +330,18 @@ export const deleteProject = async (id: string, companyId?: string | null) => {
     await tx.site.deleteMany({
       where: { project_id: id }
     });
+
+    // Delete BOQ items and categories explicitly if Cascade isn't enough
+    const boqs = await tx.bOQ.findMany({ where: { project_id: id }, select: { id: true } });
+    if (boqs.length > 0) {
+      const boqIds = boqs.map(b => b.id);
+      const categories = await tx.bOQCategory.findMany({ where: { boq_id: { in: boqIds } }, select: { id: true } });
+      if (categories.length > 0) {
+        await tx.bOQItem.deleteMany({ where: { category_id: { in: categories.map(c => c.id) } } });
+      }
+      await tx.bOQCategory.deleteMany({ where: { boq_id: { in: boqIds } } });
+      await tx.bOQ.deleteMany({ where: { project_id: id } });
+    }
 
     // 23. Finally, delete the project
     return tx.project.delete({

@@ -107,18 +107,69 @@ export async function createAttendance(data: any, userId: string) {
   };
 
   if (existing) {
-    return prisma.workerAttendance.update({
+    const updated = await prisma.workerAttendance.update({
       where: { id: existing.id },
       data: upsertData
     });
+    
+    // UPSERT EXPENSE IDEMPOTENTLY
+    const worker = await prisma.worker.findUnique({ where: { id: data.worker_id } });
+    const amount = (worker?.daily_rate || 0) * (upsertData.is_half_day ? 0.5 : 1);
+    if (amount > 0 && siteId) {
+      const site = await prisma.site.findUnique({ where: { id: siteId } });
+      if (site) {
+        await prisma.expense.upsert({
+          where: { reference_id: `att_${updated.id}` },
+          create: {
+            amount,
+            category: "LABOUR",
+            description: `Auto-generated wages for ${worker?.name} on ${attendanceDate.toISOString().split('T')[0]}`,
+            site_id: siteId,
+            project_id: site.project_id,
+            user_id: userId,
+            date: attendanceDate,
+            reference_id: `att_${updated.id}`,
+            status: "APPROVED"
+          },
+          update: {
+            amount,
+            description: `Auto-generated wages for ${worker?.name} on ${attendanceDate.toISOString().split('T')[0]}`
+          }
+        });
+      }
+    }
+    return updated;
   } else {
-    return prisma.workerAttendance.create({
+    const created = await prisma.workerAttendance.create({
       data: {
         worker_id: data.worker_id,
         date: attendanceDate,
         ...upsertData
       }
     });
+
+    // CREATE EXPENSE
+    const worker = await prisma.worker.findUnique({ where: { id: data.worker_id } });
+    const amount = (worker?.daily_rate || 0) * (upsertData.is_half_day ? 0.5 : 1);
+    if (amount > 0 && siteId) {
+      const site = await prisma.site.findUnique({ where: { id: siteId } });
+      if (site) {
+        await prisma.expense.create({
+          data: {
+            amount,
+            category: "LABOUR",
+            description: `Auto-generated wages for ${worker?.name} on ${attendanceDate.toISOString().split('T')[0]}`,
+            site_id: siteId,
+            project_id: site.project_id,
+            user_id: userId,
+            date: attendanceDate,
+            reference_id: `att_${created.id}`,
+            status: "APPROVED"
+          }
+        });
+      }
+    }
+    return created;
   }
 }
 
@@ -132,5 +183,6 @@ export async function updateAttendance(id: string, data: any) {
 }
 
 export async function deleteAttendance(id: string) {
+  await prisma.expense.deleteMany({ where: { reference_id: `att_${id}` } });
   return prisma.workerAttendance.delete({ where: { id } });
 }

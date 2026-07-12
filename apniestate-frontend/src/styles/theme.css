@@ -2,8 +2,9 @@
 
 :root {
   --font-size: 16px;
-  --font-sans: "Plus Jakarta Sans", system-ui, sans-serif;
-  --background: #F0F2F8;
+  --font-sans: "DM Sans", system-ui, sans-serif;
+  --font-display: "Outfit", system-ui, sans-serif;
+  --background: #FFFFFF;
   --foreground: #0D1117;
   --card: #FFFFFF;
   --card-foreground: #0D1117;
@@ -13,8 +14,8 @@
   --primary-foreground: #FFFFFF;
   --secondary: #EBF0FF;
   --secondary-foreground: #2648E7;
-  --muted: #E4E8F5;
-  --muted-foreground: #64748B;
+  --muted: #F3F4F6;
+  --muted-foreground: #6B7280;
   --accent: #FCC300;
   --accent-foreground: #0D1117;
   --destructive: #d4183d;

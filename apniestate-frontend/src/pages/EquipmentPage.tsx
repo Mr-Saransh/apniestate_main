@@ -1,8 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { apiClient } from '@/api/client';
-import { Truck } from 'lucide-react';
-import { PH, Card, Chip, SrchBar } from '@/components/shared/FigmaComponents';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { Fuel, Plus, Search } from 'lucide-react';
 import { useProject } from '@/context/ProjectContext';
 
 interface Equipment {
@@ -12,6 +10,20 @@ interface Equipment {
   status: string;
   site?: { name: string };
   vendor?: { name: string };
+  cost_per_day?: number;
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-3">{children}</p>
+  );
+}
+
+function fmt(n: number | null | undefined) {
+  if (!n) return '₹0';
+  if (n >= 100000) return `₹${(n / 100000).toFixed(1)}L`;
+  if (n >= 1000) return `₹${(n / 1000).toFixed(0)}K`;
+  return `₹${n.toLocaleString('en-IN')}`;
 }
 
 export default function EquipmentPage() {
@@ -34,16 +46,6 @@ export default function EquipmentPage() {
     }).catch(() => {}).finally(() => setLoading(false));
   }, [activeProjectId]);
 
-  const running = equipment.filter(e => e.status === 'IN_USE').length;
-  const idle = equipment.filter(e => e.status === 'AVAILABLE').length;
-  const maintenance = equipment.filter(e => e.status === 'UNDER_MAINTENANCE').length;
-
-  // Mock hours data since runtime tracking isn't implemented yet
-  const usageData = equipment.slice(0, 6).map(e => ({
-    name: e.name.split(' ')[0],
-    hours: Math.floor(Math.random() * 200) + 50
-  }));
-
   const filtered = equipment.filter(e => 
     !search || 
     e.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -51,95 +53,101 @@ export default function EquipmentPage() {
     e.site?.name.toLowerCase().includes(search.toLowerCase())
   );
 
-  const getStatusColor = (status: string): "green"|"yellow"|"red"|"gray" => {
-    switch(status) {
-      case 'IN_USE': return 'green';
-      case 'AVAILABLE': return 'yellow';
-      case 'UNDER_MAINTENANCE': return 'red';
-      default: return 'gray';
-    }
-  };
+  const running = filtered.filter(e => e.status === 'IN_USE');
+  const idle = filtered.filter(e => e.status === 'AVAILABLE');
+  const maintenance = filtered.filter(e => e.status === 'UNDER_MAINTENANCE' || e.status === 'BROKEN');
 
-  const getStatusLabel = (status: string): string => {
-    switch(status) {
-      case 'IN_USE': return 'Running';
-      case 'AVAILABLE': return 'Idle';
-      case 'UNDER_MAINTENANCE': return 'Maintenance';
-      case 'RETIRED': return 'Retired';
-      default: return status;
-    }
-  };
+  const renderList = (list: Equipment[], dotColor: string, statusLabel: string) => (
+    <div className="space-y-3">
+      {list.map((eq) => {
+        const mockFuel = eq.status === 'IN_USE' ? Math.floor(Math.random() * 5000) + 1000 : 0;
+        const icon = eq.name.toLowerCase().includes("excavator") ? "🚜" 
+                   : eq.name.toLowerCase().includes("crane") ? "🏗️" 
+                   : eq.name.toLowerCase().includes("mixer") ? "🔄"
+                   : "⚙️";
+
+        return (
+          <div key={eq.id} className="bg-white rounded-2xl p-4 shadow-sm border border-border flex items-center justify-between">
+            <div className="flex items-center gap-3 min-w-0 pr-3">
+              <div className="size-10 rounded-xl bg-muted flex items-center justify-center text-xl shrink-0">
+                {icon}
+              </div>
+              <div className="min-w-0">
+                <p className="font-bold text-foreground text-sm leading-tight truncate">{eq.name}</p>
+                <div className="flex items-center gap-1.5 mt-1">
+                  <span className={`size-1.5 rounded-full ${dotColor}`} />
+                  <p className="text-xs text-muted-foreground capitalize truncate">{statusLabel} • {eq.site?.name || 'Unassigned'}</p>
+                </div>
+              </div>
+            </div>
+            <div className="text-right shrink-0">
+              {mockFuel > 0 && (
+                <p className="text-xs font-bold text-emerald-600 flex items-center gap-1 justify-end">
+                  <Fuel size={11} /> {fmt(mockFuel)}
+                </p>
+              )}
+              {eq.cost_per_day && (
+                <p className="text-[10px] text-muted-foreground mt-0.5">Rental: {fmt(eq.cost_per_day)}/d</p>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
 
   if (loading && equipment.length === 0) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+        <div className="w-8 h-8 rounded-full border-4 border-[#2648E7] border-t-transparent animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <PH title="Equipment Usage" sub="Machinery runtime and fuel consumption" />
-      
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-        {[
-          [running.toString(), "Running", "text-primary"], 
-          [idle.toString(), "Idle", "text-primary"], 
-          [maintenance.toString(), "In Service", "text-primary"]
-        ].map(([v, l, c]) => (
-          <div key={l} className="bg-card border border-border rounded-xl p-3 text-center shadow-sm">
-            <p className={`text-lg font-bold ${c}`}>{v}</p>
-            <p className="text-[10px] text-muted-foreground">{l}</p>
-          </div>
-        ))}
+    <div className="space-y-6 pb-6">
+      {/* Search */}
+      <div className="flex items-center gap-2 bg-white px-3 py-2.5 rounded-xl border border-border shadow-sm">
+        <Search size={16} className="text-muted-foreground shrink-0" />
+        <input 
+          type="text" 
+          placeholder="Search equipment..." 
+          className="flex-1 text-sm font-medium focus:outline-none bg-transparent min-w-0"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
       </div>
 
-      <Card title="Monthly Runtime Hours (This Month)">
-        <ResponsiveContainer width="100%" height={140}>
-          <BarChart data={usageData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.05)" />
-            <XAxis dataKey="name" tick={{ fontSize: 9 }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
-            <Tooltip contentStyle={{ fontSize: 10, borderRadius: 8 }} />
-            <Bar dataKey="hours" fill="var(--color-primary)" radius={[3, 3, 0, 0]} name="Hours Used" />
-          </BarChart>
-        </ResponsiveContainer>
-      </Card>
-
-      <div className="flex flex-col sm:flex-row gap-2">
-        <div className="flex-1" onChange={(e: any) => setSearch(e.target.value)}>
-          <SrchBar placeholder="Search equipment..." />
+      {running.length > 0 && (
+        <div>
+          <SectionLabel>Running</SectionLabel>
+          {renderList(running, "bg-emerald-500", "In Use")}
         </div>
-      </div>
+      )}
 
-      <Card noPad>
-        {filtered.length === 0 ? (
-          <div className="p-8 text-center text-muted-foreground text-sm">No equipment found</div>
-        ) : (
-          filtered.map((eq, i) => {
-            const mockFuel = eq.status === 'IN_USE' ? Math.floor(Math.random() * 500) + 100 : 0;
-            const mockHours = eq.status === 'AVAILABLE' ? 0 : Math.floor(Math.random() * 200) + 10;
-            
-            return (
-              <div key={eq.id || i} className={`flex items-center gap-3 px-4 py-3 ${i < filtered.length - 1 ? "border-b border-border" : ""}`}>
-                <div className="w-9 h-9 rounded-lg bg-secondary flex items-center justify-center flex-shrink-0">
-                  <Truck className="w-4 h-4 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-foreground truncate">{eq.name}</p>
-                  <p className="text-[10px] text-muted-foreground truncate">{eq.type} · {eq.site?.name || 'Unassigned'}</p>
-                </div>
-                <div className="text-right mr-2 flex-shrink-0">
-                  <p className="text-xs font-bold text-foreground">{mockHours}h</p>
-                  {mockFuel > 0 && <p className="text-[10px] text-muted-foreground">{mockFuel}L</p>}
-                </div>
-                <Chip color={getStatusColor(eq.status)}>{getStatusLabel(eq.status)}</Chip>
-              </div>
-            );
-          })
-        )}
-      </Card>
+      {idle.length > 0 && (
+        <div>
+          <SectionLabel>Idle / Available</SectionLabel>
+          {renderList(idle, "bg-amber-500", "Idle")}
+        </div>
+      )}
+
+      {maintenance.length > 0 && (
+        <div>
+          <SectionLabel>Maintenance</SectionLabel>
+          {renderList(maintenance, "bg-red-500", "In Service")}
+        </div>
+      )}
+
+      {filtered.length === 0 && (
+        <div className="p-8 text-center text-muted-foreground text-sm bg-white rounded-2xl border border-border border-dashed">
+          No equipment found matching your criteria.
+        </div>
+      )}
+
+      <button className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-bold text-white hover:opacity-90 transition-opacity" style={{ backgroundColor: "#2648E7" }}>
+        <Plus size={18} />Request Equipment
+      </button>
     </div>
   );
 }

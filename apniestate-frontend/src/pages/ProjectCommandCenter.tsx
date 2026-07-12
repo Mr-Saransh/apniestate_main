@@ -1,16 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useProject } from '@/context/ProjectContext';
 import { apiClient } from '@/api/client';
 import {
-  Users, IndianRupee, Package, CreditCard, Truck, Wrench,
-  AlertTriangle, AlertCircle, Info, ChevronRight,
-  Plus, ClipboardList, UserCheck, FileText, ShoppingCart, Landmark,
-  Target, Calendar, ArrowRight, Activity, Clock, Edit, BarChart2,
-  Building2, MapPin, TrendingUp
+  Users, IndianRupee, Package, CloudSun,
+  ChevronRight, Calendar, TrendingUp, ShoppingCart, Wallet, HardHat
 } from 'lucide-react';
 
-// Types for the project summary API response
 interface ProjectSummary {
   project: {
     id: string; name: string; status: string; budget: number | null;
@@ -33,129 +29,28 @@ interface ProjectSummary {
   recentActivity: { id: string; type: string; action: string; description: string; time: string; metadata: any }[];
 }
 
-// === Helper Components ===
-
-function StatCard({ icon: Icon, label, value, suffix, link, color }: {
-  icon: any; label: string; value: number | string; suffix?: string; link: string; color: string;
-}) {
-  const navigate = useNavigate();
+function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <button
-      onClick={() => navigate(link)}
-      className="stat-card"
-      style={{
-        display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '8px',
-        padding: '16px', borderRadius: '14px', border: '1px solid var(--color-border)',
-        background: 'var(--color-surface)', cursor: 'pointer', width: '100%', textAlign: 'left',
-        transition: 'all 0.2s ease', position: 'relative', overflow: 'hidden',
-      }}
-    >
-      <div style={{
-        position: 'absolute', top: '-20px', right: '-20px', width: '80px', height: '80px',
-        borderRadius: '50%', background: color, opacity: 0.06
-      }} />
-      <div style={{
-        width: '36px', height: '36px', borderRadius: '10px', display: 'flex',
-        alignItems: 'center', justifyContent: 'center', background: color + '15', color: color,
-      }}>
-        <Icon size={18} />
-      </div>
-      <div>
-        <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--color-foreground)', lineHeight: 1.1 }}>
-          {typeof value === 'number' ? value.toLocaleString('en-IN') : value}
-          {suffix && <span style={{ fontSize: '13px', fontWeight: 500, opacity: 0.6, marginLeft: '2px' }}>{suffix}</span>}
-        </div>
-        <div style={{ fontSize: '11px', fontWeight: 500, color: 'var(--color-text-muted)', marginTop: '2px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-          {label}
-        </div>
-      </div>
-    </button>
+    <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-3">{children}</p>
   );
 }
 
-function AlertItem({ alert, onClick }: { alert: any; onClick: () => void }) {
-  const iconMap: Record<string, any> = {
-    error: AlertCircle,
-    warning: AlertTriangle,
-    info: Info,
-  };
-  const colorMap: Record<string, string> = {
-    error: '#EF4444',
-    warning: '#F59E0B',
-    info: '#3B82F6',
-  };
-  const Icon = iconMap[alert.severity] || Info;
-  const color = colorMap[alert.severity] || '#3B82F6';
-
+function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
-    <button
-      onClick={onClick}
-      style={{
-        display: 'flex', alignItems: 'center', gap: '12px', width: '100%',
-        padding: '12px 14px', borderRadius: '12px', border: `1px solid ${color}20`,
-        background: `${color}08`, cursor: 'pointer', textAlign: 'left',
-        transition: 'all 0.2s ease',
-      }}
-    >
-      <div style={{
-        width: '32px', height: '32px', borderRadius: '8px', display: 'flex',
-        alignItems: 'center', justifyContent: 'center', background: `${color}15`,
-        color: color, flexShrink: 0
-      }}>
-        <Icon size={16} />
-      </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-foreground)', lineHeight: 1.3 }}>
-          {alert.message}
-        </div>
-      </div>
-      <ChevronRight size={14} style={{ color: 'var(--color-text-muted)', flexShrink: 0 }} />
-    </button>
+    <div className={`bg-white rounded-2xl shadow-sm border border-border ${className}`}>{children}</div>
   );
 }
 
-function QuickActionButton({ icon: Icon, label, link, color }: {
-  icon: any; label: string; link: string; color: string;
-}) {
-  const navigate = useNavigate();
-  return (
-    <button
-      onClick={() => navigate(link)}
-      style={{
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        gap: '8px', padding: '16px 8px', borderRadius: '14px', border: '1px solid var(--color-border)',
-        background: 'var(--color-surface)', cursor: 'pointer', width: '100%',
-        transition: 'all 0.2s ease', minHeight: '90px',
-      }}
-    >
-      <div style={{
-        width: '40px', height: '40px', borderRadius: '12px', display: 'flex',
-        alignItems: 'center', justifyContent: 'center', background: color, color: '#fff',
-      }}>
-        <Icon size={20} />
-      </div>
-      <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-foreground)', textAlign: 'center', lineHeight: 1.2 }}>
-        {label}
-      </span>
-    </button>
-  );
+function fmt(n: number | null | undefined) {
+  if (!n) return '₹0';
+  if (n >= 10000000) return `₹${(n / 10000000).toFixed(1)}Cr`;
+  if (n >= 100000) return `₹${(n / 100000).toFixed(1)}L`;
+  if (n >= 1000) return `₹${(n / 1000).toFixed(0)}K`;
+  return `₹${n.toLocaleString('en-IN')}`;
 }
-
-function SectionHeader({ title, icon: Icon }: { title: string; icon?: any }) {
-  return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', paddingTop: '4px',
-    }}>
-      {Icon && <Icon size={16} style={{ color: 'var(--color-primary)' }} />}
-      <h2 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-foreground)', margin: 0 }}>{title}</h2>
-    </div>
-  );
-}
-
-// === Main Component ===
 
 export default function ProjectCommandCenter() {
-  const { activeProject, activeProjectId } = useProject();
+  const { activeProject, activeProjectId, loading: projectLoading } = useProject();
   const navigate = useNavigate();
   const [data, setData] = useState<ProjectSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -175,309 +70,154 @@ export default function ProjectCommandCenter() {
       .finally(() => setLoading(false));
   }, [activeProjectId]);
 
+  if (projectLoading || loading) {
+    return (
+      <div className="flex h-[60vh] items-center justify-center">
+        <div className="w-8 h-8 rounded-full border-4 border-[#2648E7] border-t-transparent animate-spin" />
+      </div>
+    );
+  }
+
   if (!activeProjectId || !activeProject) {
     return (
-      <div style={{
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        minHeight: '60vh', gap: '16px', padding: '24px', textAlign: 'center',
-      }}>
-        <Building2 size={48} style={{ color: 'var(--color-text-muted)', opacity: 0.4 }} />
-        <h2 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--color-foreground)' }}>Select a Project</h2>
-        <p style={{ fontSize: '14px', color: 'var(--color-text-muted)', maxWidth: '320px' }}>
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 p-6 text-center">
+        <h2 className="text-xl font-bold text-foreground">Select a Project</h2>
+        <p className="text-sm text-muted-foreground max-w-xs">
           Choose a project from the switcher above to view your command center.
         </p>
       </div>
     );
   }
 
-  if (loading) {
-    return (
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh',
-      }}>
-        <div style={{
-          width: '32px', height: '32px', borderRadius: '50%',
-          border: '3px solid var(--color-border)', borderTopColor: 'var(--color-primary)',
-          animation: 'spin 0.8s linear infinite',
-        }} />
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-      </div>
-    );
-  }
-
   const project = data?.project;
   const summary = data?.todaySummary;
-  const alerts = data?.alerts || [];
   const progress = data?.progress;
-  const activity = data?.recentActivity || [];
-
-  const statusColor: Record<string, string> = {
-    PLANNING: '#6B7280', ACTIVE: '#10B981', ON_HOLD: '#F59E0B', COMPLETED: '#3B82F6', CANCELLED: '#EF4444'
-  };
-
-  const formatCurrency = (n: number | null | undefined) => {
-    if (!n) return '₹0';
-    if (n >= 10000000) return `₹${(n / 10000000).toFixed(1)}Cr`;
-    if (n >= 100000) return `₹${(n / 100000).toFixed(1)}L`;
-    if (n >= 1000) return `₹${(n / 1000).toFixed(1)}K`;
-    return `₹${n.toLocaleString('en-IN')}`;
-  };
-
-  const formatDate = (d: string | null | undefined) => {
-    if (!d) return '--';
-    return new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-  };
-
-  const timeAgo = (d: string) => {
-    const diff = Date.now() - new Date(d).getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 1) return 'Just now';
-    if (mins < 60) return `${mins}m ago`;
-    const hrs = Math.floor(mins / 60);
-    if (hrs < 24) return `${hrs}h ago`;
-    const days = Math.floor(hrs / 24);
-    return `${days}d ago`;
-  };
 
   return (
-    <div style={{
-      maxWidth: '800px', margin: '0 auto', padding: '0 4px',
-      display: 'flex', flexDirection: 'column', gap: '20px', paddingBottom: '100px',
-    }}>
-
-      {/* === PROJECT HEADER === */}
-      <div style={{
-        background: 'linear-gradient(135deg, var(--color-primary), #1e40af)',
-        borderRadius: '16px', padding: '20px', color: '#fff', position: 'relative', overflow: 'hidden',
-      }}>
-        <div style={{ position: 'absolute', top: '-40px', right: '-40px', width: '160px', height: '160px', borderRadius: '50%', background: 'rgba(255,255,255,0.08)' }} />
-        <div style={{ position: 'absolute', bottom: '-30px', left: '-30px', width: '120px', height: '120px', borderRadius: '50%', background: 'rgba(255,255,255,0.05)' }} />
-
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px', position: 'relative' }}>
+    <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+      {/* Hero */}
+      <div className="rounded-2xl p-5 text-white" style={{ backgroundColor: "#2648E7" }}>
+        <div className="flex items-start justify-between mb-4">
           <div>
-            <h1 style={{ fontSize: '20px', fontWeight: 800, margin: 0, lineHeight: 1.2 }}>{project?.name}</h1>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
-              <span style={{
-                fontSize: '10px', fontWeight: 700, padding: '3px 8px', borderRadius: '6px',
-                background: (statusColor[project?.status || ''] || '#6B7280') + '30',
-                color: '#fff', textTransform: 'uppercase', letterSpacing: '0.5px',
-              }}>
-                {project?.status}
-              </span>
-              <span style={{ fontSize: '12px', opacity: 0.8 }}>
-                <MapPin size={11} style={{ marginRight: '3px', verticalAlign: '-1px' }} />
-                {project?.sitesCount} site{(project?.sitesCount || 0) > 1 ? 's' : ''}
-              </span>
+            <p className="text-sm text-blue-200 font-medium">Project Progress</p>
+            <p className="text-3xl font-bold mt-0.5" style={{ fontFamily: "var(--font-display)" }}>{project?.progress_percentage || 0}%</p>
+            <p className="text-sm text-blue-200 mt-0.5">Budget used: {fmt(project?.actual_cost)} of {fmt(project?.budget)}</p>
+          </div>
+          <div className="text-right">
+            <div className="flex items-center gap-1.5 justify-end mb-1">
+              <CloudSun size={16} />
+              <span className="text-xl font-bold">32°C</span>
             </div>
-          </div>
-          <div style={{ display: 'flex', gap: '6px' }}>
-            <button onClick={() => navigate(`/projects/${project?.id}`)} style={{
-              padding: '6px 12px', borderRadius: '8px', background: 'rgba(255,255,255,0.15)',
-              color: '#fff', fontSize: '11px', fontWeight: 600, cursor: 'pointer', border: 'none',
-              display: 'flex', alignItems: 'center', gap: '4px',
-            }}>
-              <Edit size={12} /> Edit
-            </button>
-            <button onClick={() => navigate('/reports')} style={{
-              padding: '6px 12px', borderRadius: '8px', background: 'rgba(255,255,255,0.15)',
-              color: '#fff', fontSize: '11px', fontWeight: 600, cursor: 'pointer', border: 'none',
-              display: 'flex', alignItems: 'center', gap: '4px',
-            }}>
-              <BarChart2 size={12} /> Reports
-            </button>
+            <p className="text-xs text-blue-200">Clear · Good visibility</p>
+            <p className="text-xs text-blue-200 mt-0.5">
+              Due: {project?.end_date ? new Date(project.end_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '--'}
+            </p>
           </div>
         </div>
-
-        {/* Stats row */}
-        <div style={{
-          display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px',
-          background: 'rgba(255,255,255,0.1)', borderRadius: '12px', padding: '12px',
-          position: 'relative',
-        }}>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '16px', fontWeight: 800 }}>{formatCurrency(project?.budget)}</div>
-            <div style={{ fontSize: '10px', opacity: 0.7, marginTop: '2px' }}>Budget</div>
-          </div>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '16px', fontWeight: 800 }}>{formatDate(project?.start_date)}</div>
-            <div style={{ fontSize: '10px', opacity: 0.7, marginTop: '2px' }}>Start</div>
-          </div>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '16px', fontWeight: 800 }}>{project?.progress_percentage || 0}%</div>
-            <div style={{ fontSize: '10px', opacity: 0.7, marginTop: '2px' }}>Complete</div>
-          </div>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '16px', fontWeight: 800 }}>{project?.manager}</div>
-            <div style={{ fontSize: '10px', opacity: 0.7, marginTop: '2px' }}>Supervisor</div>
-          </div>
-        </div>
-
-        {/* Progress bar */}
-        <div style={{ marginTop: '12px', background: 'rgba(255,255,255,0.15)', borderRadius: '6px', height: '6px', overflow: 'hidden' }}>
-          <div style={{
-            width: `${project?.progress_percentage || 0}%`, height: '100%',
-            background: '#34D399', borderRadius: '6px', transition: 'width 0.8s ease',
-          }} />
+        <div className="h-2 rounded-full bg-white/20 overflow-hidden">
+          <div className="h-full rounded-full bg-white" style={{ width: `${project?.progress_percentage || 0}%` }} />
         </div>
       </div>
 
-      {/* === TODAY'S SUMMARY === */}
+      {/* Stats row */}
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          { icon: <Users size={18} className="text-[#2648E7]" />, val: `${summary?.labourCount || 0}`, label: "Workers Today", bg: "bg-[#2648E7]/8" },
+          { icon: <IndianRupee size={18} className="text-red-500" />, val: fmt(summary?.todayExpense), label: "Today's Spend", bg: "bg-red-50" },
+          { icon: <Package size={18} className="text-amber-600" />, val: `${summary?.pendingMaterialRequests || 0}`, label: "Pending Material", bg: "bg-amber-50" },
+        ].map((s, i) => (
+          <Card key={i} className="p-4 text-center">
+            <div className={`size-9 rounded-xl ${s.bg} flex items-center justify-center mx-auto mb-2`}>{s.icon}</div>
+            <p className="text-xl font-bold text-foreground">{s.val}</p>
+            <p className="text-xs text-muted-foreground mt-0.5 leading-tight">{s.label}</p>
+          </Card>
+        ))}
+      </div>
+
+      {/* Needs attention */}
       <div>
-        <SectionHeader title="Today's Summary" icon={Calendar} />
-        <div style={{
-          display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px',
-        }}>
-          <StatCard icon={Users} label="Labour" value={summary?.labourCount || 0} link="/operations?tab=labour" color="#3B82F6" />
-          <StatCard icon={IndianRupee} label="Expense" value={formatCurrency(summary?.todayExpense || 0)} link="/finance?tab=expenses" color="#EF4444" />
-          <StatCard icon={Package} label="Material Req" value={summary?.pendingMaterialRequests || 0} suffix="pending" link="/purchase?tab=requests" color="#F59E0B" />
-          <StatCard icon={CreditCard} label="Payments Due" value={summary?.pendingVendorPayments || 0} suffix="pending" link="/finance?tab=payments" color="#8B5CF6" />
-          <StatCard icon={Truck} label="Received" value={summary?.materialsReceivedToday || 0} suffix="today" link="/purchase?tab=inventory" color="#10B981" />
-          <StatCard icon={Wrench} label="Equipment" value={summary?.equipmentRunning || 0} suffix="running" link="/operations?tab=equipment" color="#06B6D4" />
+        <SectionLabel>Needs Attention</SectionLabel>
+        <div className="space-y-2">
+          {[
+            { color: "#f59e0b", icon: <Package size={16} className="text-amber-500" />, title: `${summary?.pendingMaterialRequests || 0} Material Requests Pending`, sub: "Approval needed", link: "/purchase?tab=requests" },
+            { color: "#ef4444", icon: <IndianRupee size={16} className="text-red-500" />, title: `${summary?.pendingVendorPayments || 0} Vendor Payments Due`, sub: "Overdue payments", link: "/finance" },
+            { color: "#6366f1", icon: <Users size={16} className="text-indigo-500" />, title: "Attendance Not Submitted", sub: "Mark today's attendance now", link: "/operations?tab=labour" },
+          ].map((a) => (
+            <button
+              key={a.title}
+              onClick={() => navigate(a.link)}
+              className="w-full bg-white rounded-xl px-4 py-3.5 border-l-4 flex items-center gap-3 shadow-sm hover:shadow-md transition-shadow text-left"
+              style={{ borderLeftColor: a.color }}
+            >
+              <span className="shrink-0">{a.icon}</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-foreground">{a.title}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{a.sub}</p>
+              </div>
+              <ChevronRight size={14} className="text-muted-foreground shrink-0" />
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* === NEEDS ATTENTION === */}
-      {alerts.length > 0 && (
+      {/* Quick actions */}
+      <div>
+        <SectionLabel>Quick Actions</SectionLabel>
+        <div className="grid grid-cols-3 gap-3">
+          {[
+            { icon: <IndianRupee size={20} />, label: "Add Expense", style: { backgroundColor: "#2648E7" }, textClass: "text-white", link: "/finance?create=true" },
+            { icon: <Package size={20} />, label: "Material Request", bg: "bg-amber-50", textClass: "text-amber-700", link: "/purchase?tab=requests" },
+            { icon: <Users size={20} />, label: "Attendance", bg: "bg-purple-50", textClass: "text-purple-700", link: "/operations?tab=labour" },
+            { icon: <TrendingUp size={20} />, label: "Daily Progress", bg: "bg-emerald-50", textClass: "text-emerald-700", link: "/progress?tab=timeline" },
+            { icon: <ShoppingCart size={20} />, label: "Purchase", bg: "bg-orange-50", textClass: "text-orange-700", link: "/purchase?tab=boq" },
+            { icon: <Wallet size={20} />, label: "Finance", bg: "bg-rose-50", textClass: "text-rose-700", link: "/finance" },
+          ].map(({ icon, label, style, bg, textClass, link }) => (
+            <button
+              key={label}
+              onClick={() => navigate(link)}
+              className={`rounded-2xl p-4 flex flex-col items-center gap-2 border border-transparent shadow-sm hover:shadow-md transition-shadow active:scale-95 ${bg ?? ""} ${textClass}`}
+              style={style}
+            >
+              {icon}
+              <p className="text-xs font-bold text-center leading-tight">{label}</p>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Next milestone */}
+      {progress?.nextMilestone && (
         <div>
-          <SectionHeader title="Needs Attention" icon={AlertTriangle} />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {alerts.map((alert, i) => (
-              <AlertItem key={i} alert={alert} onClick={() => navigate(alert.link)} />
-            ))}
-          </div>
+          <SectionLabel>Next Milestone</SectionLabel>
+          <Card className="p-4 flex items-center gap-4">
+            <div className="size-12 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: "#FCC300" }}>
+              <Calendar size={20} className="text-gray-900" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-foreground">{progress.nextMilestone.name}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Due: {new Date(progress.nextMilestone.targetDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+            </div>
+            <div className="text-right shrink-0">
+              <p className="font-bold text-amber-600">
+                {Math.max(0, Math.ceil((new Date(progress.nextMilestone.targetDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))} days
+              </p>
+              <p className="text-xs text-muted-foreground">remaining</p>
+            </div>
+          </Card>
         </div>
       )}
 
-      {/* === PROJECT PROGRESS === */}
-      <div>
-        <SectionHeader title="Project Progress" icon={Target} />
-        <div style={{
-          borderRadius: '14px', border: '1px solid var(--color-border)',
-          background: 'var(--color-surface)', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px',
-        }}>
-          {/* Progress bar */}
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-              <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-foreground)' }}>
-                Overall Completion
-              </span>
-              <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-primary)' }}>
-                {progress?.completionPercent || 0}%
-              </span>
-            </div>
-            <div style={{ background: 'var(--color-border)', borderRadius: '6px', height: '8px', overflow: 'hidden' }}>
-              <div style={{
-                width: `${progress?.completionPercent || 0}%`, height: '100%',
-                background: 'var(--color-primary)', borderRadius: '6px', transition: 'width 0.8s ease',
-              }} />
-            </div>
-            <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
-              {progress?.completedMilestones || 0} of {progress?.totalMilestones || 0} milestones completed
-            </div>
-          </div>
-
-          {/* Milestones */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-            {progress?.currentMilestone && (
-              <div style={{
-                padding: '12px', borderRadius: '10px', background: 'var(--color-primary-bg, rgba(59,130,246,0.06))',
-                border: '1px solid rgba(59,130,246,0.12)',
-              }}>
-                <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  Current Milestone
-                </div>
-                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-foreground)', marginTop: '4px' }}>
-                  {progress.currentMilestone.name}
-                </div>
-                <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
-                  Due: {formatDate(progress.currentMilestone.targetDate)}
-                </div>
-              </div>
-            )}
-            {progress?.nextMilestone && (
-              <div style={{
-                padding: '12px', borderRadius: '10px', background: 'rgba(107,114,128,0.06)',
-                border: '1px solid rgba(107,114,128,0.12)',
-              }}>
-                <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  Next Milestone
-                </div>
-                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-foreground)', marginTop: '4px' }}>
-                  {progress.nextMilestone.name}
-                </div>
-                <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
-                  Due: {formatDate(progress.nextMilestone.targetDate)}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Recent DPR */}
-          {progress?.recentDpr && (
-            <div style={{
-              padding: '12px', borderRadius: '10px', borderTop: '1px solid var(--color-border)',
-            }}>
-              <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
-                Latest DPR — {progress.recentDpr.site}
-              </div>
-              <div style={{ fontSize: '13px', color: 'var(--color-foreground)', lineHeight: 1.4 }}>
-                {progress.recentDpr.summary?.slice(0, 120)}{progress.recentDpr.summary?.length > 120 ? '...' : ''}
-              </div>
-              <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
-                {formatDate(progress.recentDpr.date)}
-              </div>
-            </div>
-          )}
+      {/* Supervisor */}
+      <Card className="p-4 flex items-center gap-3">
+        <div className="size-10 rounded-full bg-[#2648E7]/10 flex items-center justify-center shrink-0">
+          <HardHat size={18} className="text-[#2648E7]" />
         </div>
-      </div>
-
-      {/* === RECENT ACTIVITY === */}
-      {activity.length > 0 && (
         <div>
-          <SectionHeader title="Recent Activity" icon={Activity} />
-          <div style={{
-            borderRadius: '14px', border: '1px solid var(--color-border)',
-            background: 'var(--color-surface)', overflow: 'hidden',
-          }}>
-            {activity.map((item, i) => (
-              <div key={item.id} style={{
-                display: 'flex', alignItems: 'center', gap: '12px',
-                padding: '12px 14px',
-                borderBottom: i < activity.length - 1 ? '1px solid var(--color-border)' : 'none',
-              }}>
-                <div style={{
-                  width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0,
-                  background: item.action === 'CREATE' ? '#10B981' : item.action === 'UPDATE' ? '#3B82F6' : '#6B7280',
-                }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: '13px', color: 'var(--color-foreground)', fontWeight: 500 }}>
-                    {item.description}
-                  </div>
-                </div>
-                <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '3px' }}>
-                  <Clock size={10} /> {timeAgo(item.time)}
-                </div>
-              </div>
-            ))}
-          </div>
+          <p className="text-xs text-muted-foreground">Site Supervisor</p>
+          <p className="font-bold text-sm text-foreground">{project?.manager || 'Not Assigned'}</p>
         </div>
-      )}
-
-      {/* === QUICK ACTIONS === */}
-      <div>
-        <SectionHeader title="Quick Actions" icon={ArrowRight} />
-        <div style={{
-          display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px',
-        }}>
-          <QuickActionButton icon={Package} label="Material Request" link="/material-requests" color="#F59E0B" />
-          <QuickActionButton icon={IndianRupee} label="Add Expense" link="/expenses" color="#EF4444" />
-          <QuickActionButton icon={UserCheck} label="Mark Attendance" link="/attendance" color="#10B981" />
-          <QuickActionButton icon={FileText} label="Create DPR" link="/dpr" color="#3B82F6" />
-          <QuickActionButton icon={ShoppingCart} label="Purchase Orders" link="/purchase-orders" color="#8B5CF6" />
-          <QuickActionButton icon={Landmark} label="View Finance" link="/finance" color="#06B6D4" />
-        </div>
-      </div>
-
+        <span className="ml-auto text-xs bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-full font-bold">On Site</span>
+      </Card>
     </div>
   );
 }

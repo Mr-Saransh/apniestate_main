@@ -59,15 +59,32 @@ export const POST = withAuth(async (request: any, user) => {
 
         // Delete existing logs for this site and date to replace them fresh
         await tx.labourLog.deleteMany({
-            where: {
-                site_id,
-                date: targetDate
-            }
+            where: { site_id, date: targetDate }
         });
 
-        // Insert new ones
+        // 1. Fetch categories to compute cost
+        const categoryIds = entries.map((e: any) => e.category_id);
+        const categories = await tx.labourCategory.findMany({
+            where: { id: { in: categoryIds } }
+        });
+        const categoryMap = categories.reduce((acc: any, cat: any) => {
+            acc[cat.id] = cat;
+            return acc;
+        }, {});
+
+        let totalComputedCost = 0;
+
+        // Insert new logs and compute cost
         for (const entry of entries) {
             if (entry.present_count > 0 || entry.half_day_count > 0 || entry.ot_hours > 0) {
+                const cat = categoryMap[entry.category_id];
+                if (cat) {
+                    const regularCost = (entry.present_count || 0) * cat.daily_wage;
+                    const halfCost = (entry.half_day_count || 0) * (cat.daily_wage * cat.half_day_multiplier);
+                    const otCost = (entry.ot_hours || 0) * ((cat.daily_wage / 8) * cat.ot_multiplier);
+                    totalComputedCost += (regularCost + halfCost + otCost);
+                }
+
                 ops.push(
                     tx.labourLog.create({
                         data: {
@@ -83,7 +100,37 @@ export const POST = withAuth(async (request: any, user) => {
             }
         }
 
-        return await Promise.all(ops);
+        // Wait for all labour logs to be created
+        await Promise.all(ops);
+
+        // 2. Idempotent Finance Workflow: Upsert Expense
+        const site = await tx.site.findUnique({ where: { id: site_id }, select: { project_id: true } });
+        const refId = `LABOUR_LOG_${site_id}_${targetDate.toISOString().split('T')[0]}`;
+        
+        // Always delete existing auto-generated expense for this date to prevent duplicate deductions
+        await tx.expense.deleteMany({
+            where: { reference_id: refId }
+        });
+
+        // Create new expense if cost > 0
+        if (totalComputedCost > 0) {
+            await tx.expense.create({
+                data: {
+                    amount: totalComputedCost,
+                    category: 'Labour',
+                    description: `Automated deduction for daily labour attendance on ${targetDate.toISOString().split('T')[0]}`,
+                    site_id,
+                    project_id: site?.project_id,
+                    user_id: user.sub,
+                    date: targetDate,
+                    status: 'APPROVED',
+                    reference_id: refId,
+                    company_id: user.company_id
+                }
+            });
+        }
+
+        return { success: true };
     });
 
     return NextResponse.json({ success: true, data: result });

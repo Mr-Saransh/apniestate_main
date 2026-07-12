@@ -30,6 +30,7 @@ class ApiClient {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
+    console.log(`[API Client] Requesting: ${endpoint}`);
     try {
       const response = await fetch(`${API_BASE}${endpoint}`, {
         ...options,

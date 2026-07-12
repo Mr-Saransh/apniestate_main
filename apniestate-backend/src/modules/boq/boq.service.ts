@@ -28,19 +28,26 @@ export async function createBOQ(data: z.infer<typeof CreateBOQSchema>, user_id: 
   // Pre-calculate totals for items if we want to save them cleanly
   const categoriesData = data.categories.map((cat: any) => {
     const itemsData = (cat.items || []).map((item: any) => {
-      const totalRate = item.material_rate + item.labour_rate + item.equipment_rate + item.other_rate;
-      const totalAmount = totalRate * item.quantity;
+      const matRate = Number(item.material_rate) || 0;
+      const labRate = Number(item.labour_rate) || 0;
+      const eqRate = Number(item.equipment_rate) || 0;
+      const othRate = Number(item.other_rate) || 0;
+      const providedTotal = Number(item.total_rate) || 0;
+      const qty = Number(item.quantity) || 0;
+      
+      const totalRate = providedTotal > 0 ? providedTotal : (matRate + labRate + eqRate + othRate);
+      const totalAmount = totalRate * qty;
       totalEstimatedCost += totalAmount;
 
       return {
         code: item.code,
         description: item.description,
-        quantity: item.quantity,
+        quantity: qty,
         unit: item.unit,
-        material_rate: item.material_rate,
-        labour_rate: item.labour_rate,
-        equipment_rate: item.equipment_rate,
-        other_rate: item.other_rate,
+        material_rate: matRate,
+        labour_rate: labRate,
+        equipment_rate: eqRate,
+        other_rate: othRate,
         total_rate: totalRate,
         total_amount: totalAmount,
         remarks: item.remarks,
