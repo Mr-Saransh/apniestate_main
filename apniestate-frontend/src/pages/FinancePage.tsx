@@ -2,6 +2,7 @@ import React, { useState, useEffect, type FormEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Plus, X, Truck, FileText, TrendingUp, IndianRupee } from 'lucide-react';
 import { apiClient } from '@/api/client';
+import { expensesApi, type Expense } from '@/api/expenses';
 import { useProject } from '@/context/ProjectContext';
 
 interface CashbookEntry {
@@ -23,6 +24,13 @@ interface CashbookData {
   entries: CashbookEntry[];
 }
 
+interface FinanceSummary {
+  total_budget: number;
+  total_spent: number;
+  budget_variance: number;
+  cash_flow: number;
+}
+
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-3">{children}</p>
@@ -36,9 +44,6 @@ function Card({ children, className = "" }: { children: React.ReactNode; classNa
 }
 
 function fmt(n: number) {
-  if (n >= 10000000) return `₹${(n / 10000000).toFixed(1)}Cr`;
-  if (n >= 100000) return `₹${(n / 100000).toFixed(1)}L`;
-  if (n >= 1000) return `₹${(n / 1000).toFixed(0)}K`;
   return `₹${n.toLocaleString('en-IN')}`;
 }
 
@@ -48,6 +53,8 @@ export default function FinancePage() {
   const navigate = useNavigate();
 
   const [data, setData] = useState<CashbookData | null>(null);
+  const [summary, setSummary] = useState<FinanceSummary | null>(null);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -60,24 +67,31 @@ export default function FinancePage() {
   const [reference, setReference] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
 
-  const loadCashbook = async () => {
+  const loadData = async () => {
     if (!activeProjectId) {
       setData(null);
+      setSummary(null);
       setLoading(false);
       return;
     }
     setLoading(true);
     try {
-      const res = await apiClient.get<CashbookData>(`/cashbook?project_id=${activeProjectId}`);
-      if (res.data) setData(res.data);
+      const [cashRes, summaryRes, expRes] = await Promise.all([
+        apiClient.get<CashbookData>(`/cashbook?project_id=${activeProjectId}`),
+        apiClient.get<FinanceSummary>(`/finance/summary?project_id=${activeProjectId}`),
+        expensesApi.getExpenses(activeProjectId)
+      ]);
+      if (cashRes.data) setData(cashRes.data);
+      if (summaryRes.data) setSummary(summaryRes.data);
+      if (expRes.data) setExpenses(expRes.data.slice(0, 5));
     } catch (err) {
-      console.error('Failed to load cashbook data', err);
+      console.error('Failed to load finance data', err);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { loadCashbook(); }, [activeProjectId]);
+  useEffect(() => { loadData(); }, [activeProjectId]);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -116,7 +130,7 @@ export default function FinancePage() {
         date
       });
       handleCloseModal();
-      loadCashbook();
+      loadData();
     } catch (err: any) {
       setFormError(err.message || 'Failed to create entry');
     } finally {
@@ -133,31 +147,34 @@ export default function FinancePage() {
   }
 
   const currentBal = data?.currentBalance || 0;
-  const inflow = data?.cashReceived || 0;
-  const outflow = data?.cashSpent || 0;
-
-  // Calculate today's spend
-  const todayStr = new Date().toISOString().split('T')[0];
-  const todaysSpend = data?.entries
-    .filter(e => e.type === 'DEBIT' && e.date.startsWith(todayStr))
-    .reduce((sum, e) => sum + e.amount, 0) || 0;
+  const budget = summary?.total_budget || 0;
+  const spend = summary?.total_spent || 0;
+  const available = summary?.budget_variance || 0;
 
   return (
     <div className="flex flex-col h-full bg-background">
       {/* Hero */}
       <div className="px-4 py-6 text-white shrink-0" style={{ backgroundColor: "#2648E7" }}>
         <div className="max-w-2xl mx-auto">
-          <p className="text-sm text-blue-200 font-medium mb-1">Money Available</p>
-          <p className="text-4xl font-bold mb-1" style={{ fontFamily: "var(--font-display)" }}>{fmt(currentBal)}</p>
+          <div className="flex justify-between items-end mb-1">
+            <div>
+              <p className="text-sm text-blue-200 font-medium mb-1">Project Budget</p>
+              <p className="text-2xl font-bold" style={{ fontFamily: "var(--font-display)" }}>{fmt(budget)}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-sm text-blue-200 font-medium mb-1">Cash in Hand</p>
+              <p className="text-xl font-bold">{fmt(currentBal)}</p>
+            </div>
+          </div>
           <p className="text-sm text-blue-200 mb-5">As of {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
-          <div className="grid grid-cols-3 gap-3">
+          
+          <div className="grid grid-cols-2 gap-3">
             {[
-              { val: fmt(todaysSpend), label: "Today's Spend" },
-              { val: fmt(inflow), label: "Total Inflow" },
-              { val: fmt(outflow), label: "Total Outflow" },
+              { val: fmt(spend), label: "Total Accrued Spend" },
+              { val: fmt(available), label: "Remaining Budget" },
             ].map((s) => (
               <div key={s.label} className="bg-white/12 rounded-xl p-3">
-                <p className="text-lg font-bold">{s.val}</p>
+                <p className="text-xl font-bold">{s.val}</p>
                 <p className="text-xs text-blue-200 mt-0.5">{s.label}</p>
               </div>
             ))}
@@ -168,16 +185,15 @@ export default function FinancePage() {
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-2xl mx-auto px-4 py-5 space-y-6">
           {/* Actions */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             {[
               { icon: <Plus size={20} />, label: "Add Entry", style: { backgroundColor: "#2648E7" }, textClass: "text-white", onClick: () => setShowModal(true) },
-              { icon: <Truck size={20} />, label: "Pay Vendor", cls: "bg-white border border-border opacity-50", textClass: "text-foreground", onClick: () => {} },
               { icon: <FileText size={20} />, label: "Upload Invoice", cls: "bg-white border border-border opacity-50", textClass: "text-foreground", onClick: () => {} },
             ].map(({ icon, label, style, cls, textClass, onClick }) => (
               <button
                 key={label}
                 onClick={onClick}
-                className={`rounded-2xl p-4 flex flex-col items-center gap-2 font-bold text-sm text-center shadow-sm hover:shadow-md transition-shadow ${cls ?? ""} ${textClass}`}
+                className={`rounded-2xl p-4 flex justify-center items-center gap-2 font-bold text-sm text-center shadow-sm hover:shadow-md transition-shadow ${cls ?? ""} ${textClass}`}
                 style={style}
               >
                 {icon}{label}
@@ -187,26 +203,24 @@ export default function FinancePage() {
 
           {/* Transactions */}
           <div>
-            <SectionLabel>Recent Transactions</SectionLabel>
+            <SectionLabel>Recent Expenses</SectionLabel>
             <Card className="overflow-hidden">
-              {!data?.entries || data.entries.length === 0 ? (
-                <div className="p-8 text-center text-muted-foreground text-sm font-semibold">No transactions found</div>
+              {expenses.length === 0 ? (
+                <div className="p-8 text-center text-muted-foreground text-sm font-semibold">No expenses found</div>
               ) : (
-                data.entries.map((t, i) => (
-                  <div key={t.id}>
+                expenses.map((e, i) => (
+                  <div key={e.id}>
                     {i > 0 && <div className="h-px bg-border mx-4" />}
                     <div className="px-4 py-3.5 flex items-center gap-3">
-                      <div className={`size-9 rounded-xl flex items-center justify-center shrink-0 ${t.type === "CREDIT" ? "bg-emerald-50" : "bg-red-50"}`}>
-                        {t.type === "CREDIT"
-                          ? <TrendingUp size={15} className="text-emerald-600" />
-                          : <IndianRupee size={15} className="text-red-500" />}
+                      <div className="size-9 rounded-xl flex items-center justify-center shrink-0 bg-red-50">
+                        <IndianRupee size={15} className="text-red-500" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-foreground text-sm truncate">{t.description || t.category}</p>
-                        <p className="text-xs text-muted-foreground truncate">{new Date(t.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} · {t.category}</p>
+                        <p className="font-semibold text-foreground text-sm truncate">{e.description || e.category}</p>
+                        <p className="text-xs text-muted-foreground truncate">{new Date(e.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} · {e.category}</p>
                       </div>
-                      <p className={`font-bold text-sm shrink-0 ${t.type === "CREDIT" ? "text-emerald-600" : "text-foreground"}`}>
-                        {t.type === "CREDIT" ? "+" : "-"}{fmt(t.amount)}
+                      <p className="font-bold text-sm shrink-0 text-foreground">
+                        {fmt(e.amount)}
                       </p>
                     </div>
                   </div>

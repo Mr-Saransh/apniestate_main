@@ -3,10 +3,11 @@ import { withAuth } from "@/middleware/auth.middleware";
 import { prisma } from "@/lib/prisma";
 import { ok } from "@/lib/response";
 
-// GET /api/finance/summary — Overall finance summary with computed formulas
 export const GET = withAuth(async (req, user) => {
-  const company_id = user.company_id || undefined;
-  if (!company_id) {
+  const url = new URL(req.url);
+  const projectId = url.searchParams.get("project_id");
+
+  if (!projectId) {
     return ok({
       total_expenses: 0,
       total_payments: 0,
@@ -26,44 +27,93 @@ export const GET = withAuth(async (req, user) => {
     });
   }
 
-  const [expenses, payments, invoices, budgets] = await Promise.all([
-    prisma.expense.findMany({ where: { company_id } }),
-    prisma.payment.findMany({ where: { company_id } }),
-    prisma.invoice.findMany({ where: { company_id } }),
-    prisma.budget.findMany({ where: { project: { company_id } } }),
-  ]);
+  // 1. Fetch Budget from Project directly
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { budget: true }
+  });
+  
+  let totalBudget = project?.budget || 0;
+  
+  if (totalBudget === 0) {
+    const budgets = await prisma.budget.findMany({ where: { project_id: projectId } });
+    totalBudget = budgets.reduce((s, b) => s + b.allocated, 0);
+  }
 
+  // 2. Fetch Direct Expenses
+  const expenses = await prisma.expense.findMany({ where: { project_id: projectId } });
   const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
-  const totalPayments = payments.filter(p => p.status === "COMPLETED").reduce((s, p) => s + p.amount, 0);
-  const pendingPayments = payments.filter(p => p.status === "PENDING").reduce((s, p) => s + p.amount, 0);
 
-  const totalInvoiced = invoices.reduce((s, i) => s + i.total, 0);
-  const receivable = invoices.filter(i => ["SENT", "OVERDUE"].includes(i.status)).reduce((s, i) => s + i.total, 0);
-  const payable = expenses.filter(e => ["APPROVED", "PENDING"].includes(e.status)).reduce((s, e) => s + e.amount, 0);
+  // 3. Fetch Purchases (Approved POs for this project)
+  const pos = await prisma.purchaseOrder.findMany({ 
+    where: { project_id: projectId, status: { in: ['APPROVED', 'SENT'] } } 
+  });
+  const totalPurchases = pos.reduce((s, p) => s + p.total_amount, 0);
 
-  const totalBudget = budgets.reduce((s, b) => s + b.allocated, 0);
-  const totalSpent = budgets.reduce((s, b) => s + b.spent, 0);
+  // 4. Fetch Equipment Cost
+  // We'll calculate the cost of equipment currently assigned to the project (simplification).
+  const equipment = await prisma.equipment.findMany({ where: { project_id: projectId } });
+  const totalEquipmentCost = equipment.reduce((s, e) => s + e.rental_cost + e.fuel_cost, 0);
+
+  // 5. Fetch Labour Cost
+  // We need to fetch sites for this project, then Labour Logs, and join with Labour Category
+  const sites = await prisma.site.findMany({ where: { project_id: projectId } });
+  const siteIds = sites.map(s => s.id);
+  
+  let totalLabourCost = 0;
+  if (siteIds.length > 0) {
+    const logs = await prisma.labourLog.findMany({
+      where: { site_id: { in: siteIds } },
+      include: { category: true }
+    });
+    totalLabourCost = logs.reduce((s, log) => {
+      const dailyWage = log.category?.daily_wage || 0;
+      const otMultiplier = log.category?.ot_multiplier || 1.5;
+      const halfMultiplier = log.category?.half_day_multiplier || 0.5;
+      
+      const regularCost = log.present_count * dailyWage;
+      const halfCost = log.half_day_count * (dailyWage * halfMultiplier);
+      const otCost = log.ot_hours * ((dailyWage / 8) * otMultiplier);
+      
+      return s + regularCost + halfCost + otCost;
+    }, 0);
+  }
+
+  // Calculate Total Spent (Accrued)
+  const totalSpent = totalExpenses + totalPurchases + totalEquipmentCost + totalLabourCost;
   const budgetVariance = totalBudget - totalSpent;
 
-  const revenue = invoices.filter(i => i.status === "PAID").reduce((s, i) => s + i.total, 0);
-  const profit = revenue - totalExpenses;
-  const cashFlow = totalPayments - totalExpenses;
+  // 6. Cashbook logic
+  const cashbook = await prisma.cashbook.findMany({ where: { project_id: projectId } });
+  let cashIn = 0;
+  let cashOut = 0;
+  cashbook.forEach(entry => {
+    if (entry.type === 'CREDIT') cashIn += entry.amount;
+    else if (entry.type === 'DEBIT') cashOut += entry.amount;
+  });
+  const cashFlow = cashIn - cashOut;
+
+  // 7. Payments and Invoices for counts
+  // Assuming invoices/payments are linked to company and not project directly, or they are via vendor.
+  // We'll leave them as 0 for project-scoped summary if they aren't linked.
+  const payments = await prisma.payment.count(); 
+  const invoices = await prisma.invoice.count();
 
   return ok({
     total_expenses: totalExpenses,
-    total_payments: totalPayments,
-    pending_payments: pendingPayments,
-    total_invoiced: totalInvoiced,
-    receivable,
-    payable,
+    total_payments: cashOut,
+    pending_payments: 0,
+    total_invoiced: 0,
+    receivable: 0,
+    payable: 0,
     total_budget: totalBudget,
     total_spent: totalSpent,
     budget_variance: budgetVariance,
-    revenue,
-    profit,
+    revenue: 0,
+    profit: 0,
     cash_flow: cashFlow,
     expense_count: expenses.length,
-    invoice_count: invoices.length,
-    payment_count: payments.length,
+    invoice_count: invoices,
+    payment_count: payments,
   });
 });

@@ -10,8 +10,8 @@ import {
   LogOut
 } from "lucide-react";
 
-type NavItem = { id: string; label: string; icon: React.ElementType; badge?: number };
-type NavGroup = { label: string; items: NavItem[] };
+type NavItem = { id: string; label: string; icon: React.ElementType; badge?: number; hideOnMobile?: boolean };
+type NavGroup = { label: string; items: NavItem[]; hideOnMobile?: boolean };
 
 export default function Sidebar({ onClose }: { onClose?: () => void }) {
   const { user, logout } = useAuth();
@@ -23,12 +23,12 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
   const navGroups: NavGroup[] = [
     {
       label: "", items: [
-        { id: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+        { id: "/dashboard", label: "Dashboard", icon: LayoutDashboard, hideOnMobile: true },
         { id: "/projects", label: "Projects", icon: Building2 },
       ]
     },
     {
-      label: "Daily Work", items: [
+      label: "Daily Work", hideOnMobile: true, items: [
         { id: "/purchase", label: "Purchase", icon: ShoppingCart },
         { id: "/finance", label: "Finance", icon: Wallet },
         { id: "/operations", label: "Operations", icon: Users },
@@ -92,7 +92,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
         {filteredGroups.map((group, idx) => (
           <React.Fragment key={idx}>
             {group.label && (
-              <div className="pt-3 pb-1 px-4">
+              <div className={`pt-3 pb-1 px-4 ${group.hideOnMobile ? 'hidden lg:block' : ''}`}>
                 <p className="text-[10px] font-bold text-white/50 uppercase tracking-widest">{group.label}</p>
               </div>
             )}
@@ -116,7 +116,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
               
               const isActive = pathWithSearch === targetPath || (item.id === '/dashboard' && location.pathname === '/');
               return (
-                <div key={item.id} className="px-2">
+                <div key={item.id} className={`px-2 ${item.hideOnMobile || group.hideOnMobile ? 'hidden lg:block' : ''}`}>
                   <NavLink
                     to={item.id}
                     onClick={() => onClose && onClose()}

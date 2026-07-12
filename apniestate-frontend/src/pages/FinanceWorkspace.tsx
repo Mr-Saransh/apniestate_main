@@ -16,7 +16,6 @@ export default function FinanceWorkspace() {
     { id: 'cashbook', label: 'Cashbook' },
     { id: 'expenses', label: 'Expenses' },
     { id: 'invoices', label: 'Invoices' },
-    { id: 'payments', label: 'Payments' },
     { id: 'budgets', label: 'Budgets' },
   ];
 
@@ -58,9 +57,6 @@ export default function FinanceWorkspace() {
         )}
         {tab === 'invoices' && (
           <div className="max-w-2xl mx-auto px-4 py-5"><InvoicesPage /></div>
-        )}
-        {tab === 'payments' && (
-          <div className="max-w-2xl mx-auto px-4 py-5"><PaymentsPage /></div>
         )}
         {tab === 'budgets' && (
           <div className="max-w-2xl mx-auto px-4 py-5"><BudgetsPage /></div>

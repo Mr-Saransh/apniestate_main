@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { NextRequest } from "next/server";
+// Force rebuild to clear turbopack cache
 import { withAuth } from "@/middleware/auth.middleware";
 import { prisma } from "@/lib/prisma";
 import { ok } from "@/lib/response";
@@ -57,6 +58,16 @@ export const GET = withAuth(async (req: NextRequest, user) => {
       }
     });
     const todayExpenseTotal = todayExpenses.reduce((sum, e) => sum + e.amount, 0);
+
+    // Today's POs
+    const todayPOs = await prisma.purchaseOrder.findMany({
+      where: {
+        project_id: projectId,
+        created_at: { gte: today, lt: tomorrow },
+        status: { in: ['APPROVED', 'SENT'] }
+      }
+    });
+    const todayPOCost = todayPOs.reduce((sum, po) => sum + po.total_amount, 0);
 
     // Pending material requests
     const pendingMaterialRequests = await prisma.materialRequest.count({
@@ -176,14 +187,43 @@ export const GET = withAuth(async (req: NextRequest, user) => {
       });
     }
 
+    // Calculate True Actual Cost (Total Spend)
+    const expenses = await prisma.expense.findMany({ where: { project_id: projectId } });
+    const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
+
+    const pos = await prisma.purchaseOrder.findMany({ 
+      where: { project_id: projectId, status: { in: ['APPROVED', 'SENT'] } } 
+    });
+    const totalPurchases = pos.reduce((s, p) => s + p.total_amount, 0);
+
+    const equipment = await prisma.equipment.findMany({ where: { project_id: projectId } });
+    const totalEquipmentCost = equipment.reduce((s, e) => s + e.rental_cost + e.fuel_cost, 0);
+
+    let totalLabourCost = 0;
+    if (siteIds.length > 0) {
+      const logs = await prisma.labourLog.findMany({
+        where: { site_id: { in: siteIds } },
+        include: { category: true }
+      });
+      totalLabourCost = logs.reduce((s, log) => {
+        const dailyWage = log.category?.daily_wage || 0;
+        const otMultiplier = log.category?.ot_multiplier || 1.5;
+        const halfMultiplier = log.category?.half_day_multiplier || 0.5;
+        const regularCost = log.present_count * dailyWage;
+        const halfCost = log.half_day_count * (dailyWage * halfMultiplier);
+        const otCost = log.ot_hours * ((dailyWage / 8) * otMultiplier);
+        return s + regularCost + halfCost + otCost;
+      }, 0);
+    }
+    const calculatedTotalSpent = totalExpenses + totalPurchases + totalEquipmentCost + totalLabourCost;
+
     // Budget nearing limit
     const totalBudget = project.budget || 0;
-    const totalSpent = project.actual_cost || 0;
-    if (totalBudget > 0 && totalSpent >= totalBudget * 0.85) {
-      const pct = Math.round((totalSpent / totalBudget) * 100);
+    if (totalBudget > 0 && calculatedTotalSpent >= totalBudget * 0.85) {
+      const pct = Math.round((calculatedTotalSpent / totalBudget) * 100);
       alerts.push({
         type: "BUDGET_LIMIT",
-        message: `Budget ${pct}% utilized (₹${totalSpent.toLocaleString('en-IN')} of ₹${totalBudget.toLocaleString('en-IN')})`,
+        message: `Budget ${pct}% utilized (₹${calculatedTotalSpent.toLocaleString('en-IN')} of ₹${totalBudget.toLocaleString('en-IN')})`,
         link: "/budgets",
         severity: pct >= 100 ? "error" : "warning"
       });
@@ -220,13 +260,15 @@ export const GET = withAuth(async (req: NextRequest, user) => {
       include: { user: { select: { name: true } } }
     });
 
+
+
     return ok({
       project: {
         id: project.id,
         name: project.name,
         status: project.status,
         budget: project.budget,
-        actual_cost: project.actual_cost,
+        actual_cost: calculatedTotalSpent,
         start_date: project.start_date,
         end_date: project.end_date,
         progress_percentage: project.progress_percentage || 0,
@@ -237,7 +279,7 @@ export const GET = withAuth(async (req: NextRequest, user) => {
       todaySummary: {
         labourCount,
         labourCost,
-        todayExpense: todayExpenseTotal,
+        todayExpense: todayExpenseTotal + labourCost + equipmentCost + todayPOCost,
         pendingMaterialRequests,
         pendingVendorPayments,
         materialsReceivedToday,

@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useProject } from '@/context/ProjectContext';
-import { Save, Plus, Minus, Calendar, AlertTriangle, Edit2, RotateCcw, Trash2 } from 'lucide-react';
+import { Save, Plus, Minus, Calendar, AlertTriangle, Edit2, RotateCcw, Trash2, Download } from 'lucide-react';
 import { apiClient } from '@/api/client';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface LabourCategory {
   id: string;
@@ -207,6 +209,41 @@ export default function LabourRegister() {
 
   const unaddedCategories = categories.filter(c => !entries[c.id] && c.status !== 'INACTIVE');
 
+  const handleDownloadPDF = () => {
+    const doc = new jsPDF();
+    doc.setFontSize(18);
+    doc.text("Labour Attendance Register", 14, 20);
+    doc.setFontSize(11);
+    doc.text(`Project: ${activeProject?.name || 'N/A'}`, 14, 30);
+    doc.text(`Date: ${new Date(date).toLocaleDateString('en-GB')}`, 14, 37);
+    doc.text(`Total Workers: ${totalMen}`, 14, 44);
+    doc.text(`Total Cost: Rs${totalCost.toLocaleString()}`, 14, 51);
+
+    const tableData = Object.values(entries).map(entry => {
+      const cat = categories.find(c => c.id === entry.category_id);
+      if (!cat) return null;
+      if (entry.present_count === 0 && entry.half_day_count === 0 && entry.ot_hours === 0) return null;
+      const cost = calculateRowTotal(cat.id);
+      return [
+        cat.name,
+        entry.present_count.toString(),
+        entry.half_day_count.toString(),
+        entry.ot_hours.toString(),
+        `Rs${cost.toLocaleString()}`
+      ];
+    }).filter(Boolean) as string[][];
+
+    if (tableData.length > 0) {
+      autoTable(doc, {
+        startY: 58,
+        head: [['Category', 'Present', 'Half Day', 'OT Hrs', 'Total Cost']],
+        body: tableData,
+      });
+    }
+
+    doc.save(`Labour_Register_${date}.pdf`);
+  };
+
   return (
     <div className="max-w-2xl mx-auto px-4 py-5 space-y-6 pb-24">
       <div className="flex items-center justify-between">
@@ -219,7 +256,12 @@ export default function LabourRegister() {
             className="text-sm font-bold text-foreground focus:outline-none bg-transparent"
           />
         </div>
-        <p className="text-xs font-bold text-muted-foreground">Total: {totalMen} workers</p>
+        <div className="flex items-center gap-3">
+          <p className="text-xs font-bold text-muted-foreground">Total: {totalMen} workers</p>
+          <button onClick={handleDownloadPDF} className="text-[#2648E7] hover:text-blue-800 flex items-center gap-1 text-xs font-semibold bg-[#2648E7]/10 px-2 py-1.5 rounded-lg transition-colors">
+            <Download size={14} /> PDF
+          </button>
+        </div>
       </div>
 
       <div className="space-y-3">

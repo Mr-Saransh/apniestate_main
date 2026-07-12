@@ -165,19 +165,19 @@ export default function ProjectsPage() {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 relative z-10">
+        <div className="grid grid-cols-3 gap-2 md:gap-4 relative z-10 mb-8">
           {[
-            { label: "Active Projects", value: `${active.length}`, bg: "bg-blue-50/80", text: "text-blue-700", icon: Building2, border: "border-blue-100/50" },
-            { label: "Pending Actions", value: `${pendingActions}`, bg: "bg-amber-50/80", text: "text-amber-700", icon: Activity, border: "border-amber-100/50" },
-            { label: "Total Spend", value: fmt(active.reduce((sum, p) => sum + (p.actual_cost || 0), 0)), bg: "bg-emerald-50/80", text: "text-emerald-700", icon: Target, border: "border-emerald-100/50" },
+            { label: "Active", value: `${active.length}`, bg: "bg-blue-50/80", text: "text-blue-700", icon: Building2, border: "border-blue-100/50" },
+            { label: "Pending", value: `${pendingActions}`, bg: "bg-amber-50/80", text: "text-amber-700", icon: Activity, border: "border-amber-100/50" },
+            { label: "Spend", value: fmt(active.reduce((sum, p) => sum + (p.actual_cost || 0), 0)), bg: "bg-emerald-50/80", text: "text-emerald-700", icon: Target, border: "border-emerald-100/50" },
           ].map((s, i) => (
-            <div key={s.label} className={`${s.bg} ${s.border} border rounded-2xl p-5 flex items-center gap-4 transition-transform duration-300 hover:scale-[1.02] cursor-default`}>
-              <div className={`w-12 h-12 rounded-full bg-white shadow-sm flex items-center justify-center ${s.text}`}>
-                <s.icon size={22} strokeWidth={2.5} />
+            <div key={s.label} className={`${s.bg} ${s.border} border rounded-xl md:rounded-2xl p-2 md:p-5 flex flex-col md:flex-row items-center md:items-start text-center md:text-left gap-1 md:gap-4 transition-transform duration-300 hover:scale-[1.02] cursor-default`}>
+              <div className={`w-8 h-8 md:w-12 md:h-12 rounded-full bg-white shadow-sm flex items-center justify-center shrink-0 ${s.text}`}>
+                <s.icon className="w-4 h-4 md:w-5 md:h-5" strokeWidth={2.5} />
               </div>
-              <div>
-                <p className={`text-2xl font-black ${s.text} tracking-tight`}>{s.value}</p>
-                <p className="text-sm font-semibold text-slate-600/80 mt-0.5">{s.label}</p>
+              <div className="flex-1 w-full truncate">
+                <p className={`text-base md:text-2xl font-black ${s.text} tracking-tight truncate`}>{s.value}</p>
+                <p className="text-[10px] md:text-sm font-semibold text-slate-600/80 mt-0.5 truncate">{s.label}</p>
               </div>
             </div>
           ))}
@@ -191,10 +191,10 @@ export default function ProjectsPage() {
           {active.map((p, i) => {
              const progress = p.progress_percentage || 0;
              return (
-               <button
+               <div
                  key={p.id}
                  onClick={() => onSelect(p)}
-                 className="group text-left w-full bg-white rounded-[1.5rem] p-6 border border-slate-100 shadow-lg shadow-slate-200/30 hover:shadow-xl hover:shadow-[#2648E7]/10 hover:-translate-y-1 transition-all duration-300 ease-out relative overflow-hidden"
+                 className="group cursor-pointer text-left w-full bg-white rounded-[1.5rem] p-6 border border-slate-100 shadow-lg shadow-slate-200/30 hover:shadow-xl hover:shadow-[#2648E7]/10 hover:-translate-y-1 transition-all duration-300 ease-out relative overflow-hidden"
                  style={{ animationDelay: `${i * 100}ms` }}
                >
                  <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-50 to-transparent rounded-full blur-2xl -translate-y-1/2 translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
@@ -246,7 +246,7 @@ export default function ProjectsPage() {
                      </div>
                    </div>
                  </div>
-               </button>
+               </div>
              );
           })}
           {active.length === 0 && (

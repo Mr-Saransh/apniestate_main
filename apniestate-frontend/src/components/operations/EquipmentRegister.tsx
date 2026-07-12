@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useProject } from '@/context/ProjectContext';
-import { Plus, Wrench, Fuel, Edit2, Trash2 } from 'lucide-react';
+import { Plus, Wrench, Fuel, Edit2, Trash2, Download } from 'lucide-react';
 import { apiClient } from '@/api/client';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 export interface Equipment {
   id: string;
@@ -131,10 +133,50 @@ export default function EquipmentRegister() {
     }
   };
 
+  const handleDownloadPDF = () => {
+    const doc = new jsPDF();
+    doc.setFontSize(18);
+    doc.text("Equipment Register", 14, 20);
+    doc.setFontSize(11);
+    doc.text(`Project: ${activeProject?.name || 'N/A'}`, 14, 30);
+    doc.text(`Date: ${new Date().toLocaleDateString('en-GB')}`, 14, 37);
+    
+    const running = equipmentList.filter(e => e.status === 'IN_USE').length;
+    const idle = equipmentList.filter(e => e.status === 'AVAILABLE').length;
+    const maintenance = equipmentList.filter(e => e.status === 'UNDER_MAINTENANCE').length;
+    
+    doc.text(`Status: ${running} Running | ${idle} Idle | ${maintenance} Maintenance`, 14, 44);
+
+    const tableData = equipmentList.map(eq => [
+      eq.name,
+      eq.type,
+      eq.status,
+      `Rs. ${eq.rental_cost.toLocaleString()}`,
+      `Rs. ${eq.fuel_cost.toLocaleString()}`
+    ]);
+
+    if (tableData.length > 0) {
+      autoTable(doc, {
+        startY: 51,
+        head: [['Equipment', 'Type', 'Status', 'Rental/Day', 'Fuel/Day']],
+        body: tableData,
+      });
+    }
+
+    doc.save(`Equipment_Register_${new Date().toISOString().split('T')[0]}.pdf`);
+  };
+
   return (
     <div className="flex-1 overflow-y-auto pb-24">
       <div className="max-w-2xl mx-auto px-4 py-5 space-y-4">
         
+        <div className="flex items-center justify-between">
+          <h3 className="font-bold text-foreground">Status Summary</h3>
+          <button onClick={handleDownloadPDF} className="text-[#2648E7] hover:text-blue-800 flex items-center gap-1 text-xs font-semibold bg-[#2648E7]/10 px-2 py-1.5 rounded-lg transition-colors">
+            <Download size={14} /> PDF
+          </button>
+        </div>
+
         {/* Status Summary */}
         <div className="grid grid-cols-3 gap-3">
           {[
