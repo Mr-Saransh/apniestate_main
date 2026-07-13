@@ -49,6 +49,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
         { id: "/dpr", label: "DPR", icon: BookOpen },
         { id: "/documents", label: "Documents", icon: FolderOpen },
         { id: "/reports", label: "Reports", icon: FileBarChart },
+        { id: "/milestone-report", label: "Milestone Prog. Report", icon: FileBarChart },
         { id: "/notifications", label: "Notifications", icon: Bell, badge: 3 },
       ]
     }

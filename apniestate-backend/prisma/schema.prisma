@@ -623,12 +623,14 @@ model Milestone {
   description String?
   target_date DateTime
   actual_date DateTime?
-  weight      Int?            @default(1)
-  status      MilestoneStatus @default(PENDING)
-  created_at  DateTime        @default(now())
-  updated_at  DateTime        @updatedAt
+  weight              Int?            @default(1)
+  progress_percentage Int?            @default(0)
+  status              MilestoneStatus @default(PENDING)
+  created_at          DateTime        @default(now())
+  updated_at          DateTime        @updatedAt
 
-  project Project @relation(fields: [project_id], references: [id])
+  project       Project       @relation(fields: [project_id], references: [id])
+  daily_reports DailyReport[]
 
   @@index([project_id], name: "idx_milestones_project_id")
   @@map("milestones")
@@ -1646,6 +1648,7 @@ model Notification {
 model DailyReport {
   id           String   @id @default(cuid())
   project_id   String?
+  milestone_id String?
   site_id      String
   submitted_by String
   report_date  DateTime @db.Date
@@ -1689,6 +1692,7 @@ model DailyReport {
 
   // Relations
   project               Project?              @relation(fields: [project_id], references: [id])
+  milestone             Milestone?            @relation(fields: [milestone_id], references: [id])
   site                  Site                  @relation(fields: [site_id], references: [id])
   submitter             User                  @relation(fields: [submitted_by], references: [id])
   company               Company?              @relation(fields: [company_id], references: [id])

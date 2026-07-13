@@ -25,6 +25,7 @@ import MaterialsPage from '@/pages/MaterialsPage';
 import VendorsPage from '@/pages/VendorsPage';
 import DocumentsPage from '@/pages/DocumentsPage';
 import ReportsPage from '@/pages/ReportsPage';
+import MilestoneReportPage from '@/pages/MilestoneReportPage';
 import FinancePage from '@/pages/FinancePage';
 import RouteGuard from '@/components/shared/RouteGuard';
 import CalendarPage from '@/pages/CalendarPage';
@@ -147,6 +148,7 @@ export default function App() {
                 </Route>
                 <Route element={<RouteGuard permission="reports.read" />}>
                   <Route path="/reports" element={<ReportsPage />} />
+                  <Route path="/milestone-report" element={<MilestoneReportPage />} />
                 </Route>
 
                 {/* Leftover routes that weren't assigned workspaces yet */}

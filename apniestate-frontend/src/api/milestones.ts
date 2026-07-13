@@ -8,6 +8,7 @@ export interface Milestone {
   target_date: string;
   actual_date: string | null;
   weight: number | null;
+  progress_percentage?: number;
   status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'DELAYED';
   created_at: string;
   updated_at: string;
@@ -19,6 +20,7 @@ export interface CreateMilestoneData {
   description?: string | null;
   target_date: string;
   weight?: number | null;
+  progress_percentage?: number;
   status?: Milestone['status'];
 }
 

@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const CreateDprSchema = z.object({
   project_id: z.string().optional().nullable(),
+  milestone_id: z.string().optional().nullable(),
   site_id: z.string().min(1, "Site is required"),
   date: z.string().optional().nullable(),
   

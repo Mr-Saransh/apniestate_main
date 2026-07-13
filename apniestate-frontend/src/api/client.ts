@@ -23,6 +23,9 @@ class ApiClient {
     const token = this.getToken();
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0',
       ...((options.headers as Record<string, string>) || {}),
     };
 
@@ -78,7 +81,9 @@ class ApiClient {
   }
 
   async get<T>(endpoint: string): Promise<ApiResponse<T>> {
-    return this.request<T>(endpoint, { method: 'GET' });
+    const separator = endpoint.includes('?') ? '&' : '?';
+    const cacheBustedEndpoint = `${endpoint}${separator}_t=${Date.now()}`;
+    return this.request<T>(cacheBustedEndpoint, { method: 'GET' });
   }
 
   async post<T>(endpoint: string, body?: unknown): Promise<ApiResponse<T>> {

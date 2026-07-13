@@ -114,10 +114,11 @@ export async function createDpr(data: CreateDprInput, userId: string, companyId?
   // Get project_id from site
   const site = await prisma.site.findUnique({ where: { id: data.site_id }, select: { project_id: true } });
 
-  return prisma.dailyReport.create({
+  const dpr = await prisma.dailyReport.create({
     data: {
       company_id: companyId,
       project_id: data.project_id || site?.project_id,
+      milestone_id: data.milestone_id,
       site_id: data.site_id,
       submitted_by: userId,
       report_date: reportDate,
@@ -143,6 +144,23 @@ export async function createDpr(data: CreateDprInput, userId: string, companyId?
       photos: data.photos,
     }
   });
+
+  if (data.milestone_id && data.completion_percentage && data.completion_percentage > 0) {
+    const milestone = await prisma.milestone.findUnique({ where: { id: data.milestone_id } });
+    if (milestone) {
+      const newProgress = Math.min((milestone.progress_percentage || 0) + data.completion_percentage, 100);
+      const isCompleted = newProgress === 100;
+      await prisma.milestone.update({
+        where: { id: milestone.id },
+        data: {
+          progress_percentage: newProgress,
+          ...(isCompleted ? { status: 'COMPLETED', actual_date: reportDate } : { status: 'IN_PROGRESS' })
+        }
+      });
+    }
+  }
+
+  return dpr;
 }
 
 export async function updateDpr(id: string, data: UpdateDprInput, companyId?: string) {
