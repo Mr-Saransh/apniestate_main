@@ -21,7 +21,12 @@ export default function AppLayout() {
     );
   }
 
-  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (!isAuthenticated) {
+    if (location.pathname === '/') {
+      return <Navigate to="/landing" replace />;
+    }
+    return <Navigate to="/login" replace />;
+  }
 
   const inProject = activeProject !== null && location.pathname !== '/projects';
 
