@@ -12,7 +12,7 @@ export function middleware(req: NextRequest) {
   res.headers.set("Access-Control-Allow-Origin", isAllowed ? origin : FRONTEND_URL);
   res.headers.set("Access-Control-Allow-Credentials", "true");
   res.headers.set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
-  res.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization, Cache-Control, Pragma, Expires");
 
   if (req.method === "OPTIONS") {
     return new NextResponse(null, { status: 204, headers: res.headers });
