@@ -91,7 +91,7 @@ export default function PurchaseWorkspace() {
       <div className="bg-white border-b border-border px-4 pt-4 pb-0 shrink-0 sticky top-0 z-10">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-base font-bold text-foreground" style={{ fontFamily: "var(--font-display)" }}>Purchase</h2>
-          <button 
+          <button
             onClick={() => setActiveModal(tab)}
             className="flex items-center gap-1.5 text-sm font-bold text-white px-3 py-1.5 rounded-xl transition-opacity hover:opacity-90" style={{ backgroundColor: "#2648E7" }}>
             <Plus size={14} />{getNewButtonLabel()}
@@ -102,9 +102,8 @@ export default function PurchaseWorkspace() {
             <button
               key={t.id}
               onClick={() => setSearchParams({ tab: t.id }, { replace: true })}
-              className={`flex items-center gap-1.5 px-3.5 py-2.5 text-sm font-semibold border-b-2 shrink-0 transition-colors whitespace-nowrap ${
-                tab === t.id ? "border-[#2648E7] text-[#2648E7]" : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
+              className={`flex items-center gap-1.5 px-3.5 py-2.5 text-sm font-semibold border-b-2 shrink-0 transition-colors whitespace-nowrap ${tab === t.id ? "border-[#2648E7] text-[#2648E7]" : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
             >
               {t.icon}{t.label}
             </button>
@@ -124,7 +123,7 @@ export default function PurchaseWorkspace() {
           {tab === 'vendors' && <VendorsTab vendors={data?.vendors || []} />}
         </div>
       </div>
-      
+
       <PurchaseModals activeModal={activeModal} onClose={() => setActiveModal(null)} onRefresh={refreshData} projectId={activeProjectId!} data={data} />
     </div>
   );
@@ -349,13 +348,13 @@ function ReceivedTab({ received }: { received: ReceivedSummary[] }) {
           img.onload = resolve;
           img.onerror = resolve; // Continue even if image fails
         });
-        
+
         // Basic scaling to fit page width (A4 is 210mm wide)
         const maxWidth = 180;
         const scale = maxWidth / img.width;
         const width = img.width * scale;
         const height = img.height * scale;
-        
+
         // Add new page if image doesn't fit
         if (finalY + 20 + height > 280) {
           doc.addPage();
@@ -367,7 +366,7 @@ function ReceivedTab({ received }: { received: ReceivedSummary[] }) {
         console.error("Failed to add image to PDF", err);
       }
     }
-    
+
     doc.save(`GRN_${r.id}.pdf`);
   };
 
@@ -403,14 +402,14 @@ function InventoryTab({ items, logs }: { items: any[], logs: ConsumptionLog[] })
   return (
     <div className="space-y-4">
       <div className="flex p-1 bg-muted rounded-xl">
-        <button 
-          onClick={() => setView('stock')} 
+        <button
+          onClick={() => setView('stock')}
           className={`flex-1 py-1.5 text-sm font-medium rounded-lg transition-colors ${view === 'stock' ? 'bg-background shadow text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
         >
           Current Stock
         </button>
-        <button 
-          onClick={() => setView('history')} 
+        <button
+          onClick={() => setView('history')}
           className={`flex-1 py-1.5 text-sm font-medium rounded-lg transition-colors ${view === 'history' ? 'bg-background shadow text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
         >
           Consumption History
@@ -419,36 +418,36 @@ function InventoryTab({ items, logs }: { items: any[], logs: ConsumptionLog[] })
 
       {view === 'stock' ? (
         items.length === 0 ? <div className="text-center text-muted-foreground py-10">No inventory found.</div> :
-        <div className="space-y-3">
-          {items.map((item) => (
-            <Card key={item.id} className="p-4">
-              <div className="flex items-center justify-between mb-2">
-                <p className="font-bold text-sm text-foreground">{item.material}</p>
-              </div>
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>Stock: <strong className="text-foreground">{item.stock}</strong></span>
-                <span>Reorder Level: {item.reorderLevel}</span>
-              </div>
-            </Card>
-          ))}
-        </div>
+          <div className="space-y-3">
+            {items.map((item) => (
+              <Card key={item.id} className="p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="font-bold text-sm text-foreground">{item.material}</p>
+                </div>
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Stock: <strong className="text-foreground">{item.stock}</strong></span>
+                  <span>Reorder Level: {item.reorderLevel}</span>
+                </div>
+              </Card>
+            ))}
+          </div>
       ) : (
         logs.length === 0 ? <div className="text-center text-muted-foreground py-10">No consumption logs found.</div> :
-        <div className="space-y-3">
-          {logs.map((log) => (
-            <Card key={log.id} className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-bold text-sm text-foreground">{log.material}</p>
-                  <p className="text-xs text-muted-foreground">{log.date} at {log.time}</p>
+          <div className="space-y-3">
+            {logs.map((log) => (
+              <Card key={log.id} className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-bold text-sm text-foreground">{log.material}</p>
+                    <p className="text-xs text-muted-foreground">{log.date} at {log.time}</p>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-sm font-bold text-red-600">-{log.qty}</span>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <span className="text-sm font-bold text-red-600">-{log.qty}</span>
-                </div>
-              </div>
-            </Card>
-          ))}
-        </div>
+              </Card>
+            ))}
+          </div>
       )}
     </div>
   );
@@ -521,13 +520,13 @@ function PurchaseModals({ activeModal, onClose, onRefresh, projectId, data }: { 
     if (activeModal === 'orders') action = 'CREATE_PO';
     if (activeModal === 'received') action = 'RECEIVE_GOODS';
     if (activeModal === 'inventory') action = 'CONSUME_MATERIAL';
-    
+
     try {
       let payload = { ...formData, projectId };
       if (activeModal === 'received' && formData.billFile) {
         const uploadData = new FormData();
         uploadData.append('file', formData.billFile);
-        
+
         // Use the backend's signed cloudinary upload endpoint and rely on proxy for CORS
         const token = localStorage.getItem('access_token') || localStorage.getItem('token');
         const API_BASE = import.meta.env.VITE_API_URL || '/api';
@@ -574,24 +573,24 @@ function PurchaseModals({ activeModal, onClose, onRefresh, projectId, data }: { 
             <X size={16} />
           </button>
         </div>
-        
+
         <div className="p-6 overflow-y-auto">
           <form id="purchase-form" onSubmit={handleSubmit} className="space-y-4">
-            
+
             {activeModal === 'requests' && (
               <>
                 <div className="space-y-1.5">
                   <label className="text-sm font-bold text-foreground">Material Name</label>
-                  <input required type="text" className="w-full bg-white border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900" placeholder="e.g. Cement OPC 53 Grade" value={formData.materialName || ''} onChange={e => setFormData({...formData, materialName: e.target.value})} />
+                  <input required type="text" className="w-full bg-white border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900" placeholder="e.g. Cement OPC 53 Grade" value={formData.materialName || ''} onChange={e => setFormData({ ...formData, materialName: e.target.value })} />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="text-sm font-bold text-foreground">Quantity</label>
-                    <input required type="number" className="w-full bg-white border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900" placeholder="0" value={formData.quantity || ''} onChange={e => setFormData({...formData, quantity: e.target.value})} />
+                    <input required type="number" className="w-full bg-white border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900" placeholder="0" value={formData.quantity || ''} onChange={e => setFormData({ ...formData, quantity: e.target.value })} />
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-sm font-bold text-foreground">Urgency</label>
-                    <select className="w-full bg-white border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900" value={formData.urgency || 'NORMAL'} onChange={e => setFormData({...formData, urgency: e.target.value})}>
+                    <select className="w-full bg-white border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900" value={formData.urgency || 'NORMAL'} onChange={e => setFormData({ ...formData, urgency: e.target.value })}>
                       <option value="NORMAL">Normal</option>
                       <option value="HIGH">High</option>
                       <option value="URGENT">Urgent</option>
@@ -609,7 +608,7 @@ function PurchaseModals({ activeModal, onClose, onRefresh, projectId, data }: { 
                     <Plus size={12} /> Add Item
                   </button>
                 </div>
-                
+
                 <div className="space-y-3">
                   {formData.items?.map((item: any, idx: number) => (
                     <div key={idx} className="p-3 bg-muted/50 border border-border rounded-xl relative group">
@@ -629,7 +628,7 @@ function PurchaseModals({ activeModal, onClose, onRefresh, projectId, data }: { 
                             <option value="cum">cum</option>
                             <option value="cft">cft</option>
                             <option value="m">m</option>
-                            <option value="nos">nos</option>
+                            <option value="nos">nos/pieces</option>
                             <option value="lumpsum">lumpsum</option>
                             <option value="sqft">sqft</option>
                           </select>
@@ -646,15 +645,15 @@ function PurchaseModals({ activeModal, onClose, onRefresh, projectId, data }: { 
               <>
                 <div className="space-y-1.5">
                   <label className="text-sm font-bold text-foreground">Vendor Name</label>
-                  <input required type="text" className="w-full bg-white border border-border rounded-xl px-4 py-3 text-sm focus:outline-none text-gray-900" placeholder="e.g. Shri Ram Traders" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} />
+                  <input required type="text" className="w-full bg-white border border-border rounded-xl px-4 py-3 text-sm focus:outline-none text-gray-900" placeholder="e.g. Shri Ram Traders" value={formData.name || ''} onChange={e => setFormData({ ...formData, name: e.target.value })} />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-sm font-bold text-foreground">Category</label>
-                  <input required type="text" className="w-full bg-white border border-border rounded-xl px-4 py-3 text-sm focus:outline-none text-gray-900" placeholder="e.g. Cement & Sand" value={formData.category || ''} onChange={e => setFormData({...formData, category: e.target.value})} />
+                  <input required type="text" className="w-full bg-white border border-border rounded-xl px-4 py-3 text-sm focus:outline-none text-gray-900" placeholder="e.g. Cement & Sand" value={formData.category || ''} onChange={e => setFormData({ ...formData, category: e.target.value })} />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-sm font-bold text-foreground">Contact Phone (Optional)</label>
-                  <input type="text" className="w-full bg-white border border-border rounded-xl px-4 py-3 text-sm focus:outline-none text-gray-900" placeholder="+91..." value={formData.phone || ''} onChange={e => setFormData({...formData, phone: e.target.value})} />
+                  <input type="text" className="w-full bg-white border border-border rounded-xl px-4 py-3 text-sm focus:outline-none text-gray-900" placeholder="+91..." value={formData.phone || ''} onChange={e => setFormData({ ...formData, phone: e.target.value })} />
                 </div>
               </>
             )}
@@ -663,7 +662,7 @@ function PurchaseModals({ activeModal, onClose, onRefresh, projectId, data }: { 
               <>
                 <div className="space-y-1.5">
                   <label className="text-sm font-bold text-foreground">Vendor</label>
-                  <select required className="w-full bg-white border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900" value={formData.vendorId || ''} onChange={e => setFormData({...formData, vendorId: e.target.value})}>
+                  <select required className="w-full bg-white border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900" value={formData.vendorId || ''} onChange={e => setFormData({ ...formData, vendorId: e.target.value })}>
                     <option value="" disabled>Select Vendor</option>
                     {data?.vendors?.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
                   </select>
@@ -671,22 +670,22 @@ function PurchaseModals({ activeModal, onClose, onRefresh, projectId, data }: { 
                 {activeModal === 'quotations' ? (
                   <div className="space-y-1.5">
                     <label className="text-sm font-bold text-foreground">Delivery Time (Days)</label>
-                    <input type="text" className="w-full bg-white border border-border rounded-xl px-4 py-3 text-sm focus:outline-none text-gray-900" placeholder="e.g. 7 Days" value={formData.deliveryTime || ''} onChange={e => setFormData({...formData, deliveryTime: e.target.value})} />
+                    <input type="text" className="w-full bg-white border border-border rounded-xl px-4 py-3 text-sm focus:outline-none text-gray-900" placeholder="e.g. 7 Days" value={formData.deliveryTime || ''} onChange={e => setFormData({ ...formData, deliveryTime: e.target.value })} />
                   </div>
                 ) : (
                   <div className="space-y-1.5">
                     <label className="text-sm font-bold text-foreground">ETA (Date)</label>
-                    <input type="date" className="w-full bg-white border border-border rounded-xl px-4 py-3 text-sm focus:outline-none text-gray-900" value={formData.eta || ''} onChange={e => setFormData({...formData, eta: e.target.value})} />
+                    <input type="date" className="w-full bg-white border border-border rounded-xl px-4 py-3 text-sm focus:outline-none text-gray-900" value={formData.eta || ''} onChange={e => setFormData({ ...formData, eta: e.target.value })} />
                   </div>
                 )}
-                
+
                 <div className="mt-4 mb-2 flex items-center justify-between">
                   <label className="text-sm font-bold text-foreground">Items</label>
                   <button type="button" onClick={addItemRow} className="text-xs font-bold text-[#2648E7] hover:underline flex items-center gap-1">
                     <Plus size={12} /> Add Item
                   </button>
                 </div>
-                
+
                 <div className="space-y-3">
                   {formData.items?.map((item: any, idx: number) => (
                     <div key={idx} className="p-3 bg-muted/50 border border-border rounded-xl relative group">
@@ -704,7 +703,7 @@ function PurchaseModals({ activeModal, onClose, onRefresh, projectId, data }: { 
                             <option value="cum">cum</option>
                             <option value="cft">cft</option>
                             <option value="m">m</option>
-                            <option value="nos">nos</option>
+                            <option value="nos">nos/pieces</option>
                             <option value="lumpsum">lumpsum</option>
                             <option value="sqft">sqft</option>
                           </select>
@@ -722,7 +721,7 @@ function PurchaseModals({ activeModal, onClose, onRefresh, projectId, data }: { 
                 <div className="space-y-1.5">
                   <label className="text-sm font-bold text-foreground">Purchase Order</label>
                   <select required className="w-full bg-white border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900" value={formData.poId || ''} onChange={e => {
-                    setFormData({...formData, poId: e.target.value, items: [{}] }); // Reset items when PO changes, in reality we should auto-populate
+                    setFormData({ ...formData, poId: e.target.value, items: [{}] }); // Reset items when PO changes, in reality we should auto-populate
                   }}>
                     <option value="" disabled>Select Purchase Order</option>
                     {data?.orders?.map(o => <option key={o.id} value={o.id}>{o.name} ({o.vendor})</option>)}
@@ -730,20 +729,20 @@ function PurchaseModals({ activeModal, onClose, onRefresh, projectId, data }: { 
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-sm font-bold text-foreground">Quality Status</label>
-                  <select className="w-full bg-white border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900" value={formData.quality || 'GOOD'} onChange={e => setFormData({...formData, quality: e.target.value})}>
+                  <select className="w-full bg-white border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900" value={formData.quality || 'GOOD'} onChange={e => setFormData({ ...formData, quality: e.target.value })}>
                     <option value="GOOD">Good / Accepted</option>
                     <option value="REJECTED">Rejected</option>
                     <option value="PARTIAL">Partial Damage</option>
                   </select>
                 </div>
-                
+
                 <div className="mt-4 mb-2 flex items-center justify-between">
                   <label className="text-sm font-bold text-foreground">Items Received</label>
                   <button type="button" onClick={addItemRow} className="text-xs font-bold text-[#2648E7] hover:underline flex items-center gap-1">
                     <Plus size={12} /> Add Item Row
                   </button>
                 </div>
-                
+
                 <div className="space-y-3">
                   {formData.items?.map((item: any, idx: number) => (
                     <div key={idx} className="p-3 bg-muted/50 border border-border rounded-xl relative group flex gap-3">
@@ -761,7 +760,7 @@ function PurchaseModals({ activeModal, onClose, onRefresh, projectId, data }: { 
 
                 <div className="space-y-1.5 mt-4">
                   <label className="text-sm font-bold text-foreground">Upload Bill (Optional)</label>
-                  <input type="file" accept="image/*,.pdf" className="w-full bg-white border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-bold file:bg-[#2648E7]/10 file:text-[#2648E7] hover:file:bg-[#2648E7]/20 transition-all cursor-pointer" onChange={e => setFormData({...formData, billFile: e.target.files?.[0]})} />
+                  <input type="file" accept="image/*,.pdf" className="w-full bg-white border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-bold file:bg-[#2648E7]/10 file:text-[#2648E7] hover:file:bg-[#2648E7]/20 transition-all cursor-pointer" onChange={e => setFormData({ ...formData, billFile: e.target.files?.[0] })} />
                 </div>
               </>
             )}
