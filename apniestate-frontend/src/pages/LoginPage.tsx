@@ -221,6 +221,12 @@ export default function LoginPage() {
             <p style={{ fontSize: '14px', color: '#64748B', marginBottom: '24px' }}>Jump straight into the app with a pre-configured role.</p>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ padding: '12px', background: '#F8FAFC', borderRadius: '8px', fontSize: '12px', color: '#475569', marginBottom: '8px', border: '1px solid #E2E8F0' }}>
+                <p style={{ marginBottom: '4px' }}><strong>Builder:</strong> admin@gmail.com / admin123</p>
+                <p style={{ marginBottom: '4px' }}><strong>Supervisor:</strong> sup1@apniestate.com / admin123</p>
+                <p style={{ marginBottom: '4px' }}><strong>Manager:</strong> pm1@apniestate.com / admin123</p>
+                <p style={{ margin: 0 }}><strong>Accountant:</strong> accounts@apniestate.com / admin123</p>
+              </div>
               <button 
                 onClick={() => handleDemoLogin('admin@gmail.com', 'Builder')}
                 disabled={loggingInRole !== null}

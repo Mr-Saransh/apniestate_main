@@ -22,5 +22,6 @@ export const invitationsApi = {
   create: (data: { email: string; role: Role; project_ids?: string[]; site_ids?: string[] }) => 
     apiClient.post('/invitations', data),
   action: (id: string, action: 'accept' | 'reject' | 'approve' | 'cancel' | 'resend') => 
-    apiClient.patch(`/invitations/${id}`, { action })
+    apiClient.patch(`/invitations/${id}`, { action }),
+  delete: (id: string) => apiClient.delete(`/invitations/${id}`)
 };

@@ -48,6 +48,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
       label: "More", items: [
         { id: "/dpr", label: "DPR", icon: BookOpen },
         { id: "/documents", label: "Documents", icon: FolderOpen },
+        { id: "/users", label: "Users", icon: Users },
         { id: "/reports", label: "Reports", icon: FileBarChart },
         { id: "/milestone-report", label: "Milestone Prog. Report", icon: FileBarChart },
         { id: "/notifications", label: "Notifications", icon: Bell, badge: 3 },
@@ -58,12 +59,16 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
   const filteredGroups = navGroups.map(group => {
     let items = group.items;
     if (role === 'SITE_SUPERVISOR') {
-      const allowed = ['/dashboard', '/progress', '/operations', '/dpr'];
+      const allowed = ['/dashboard', '/progress', '/operations', '/dpr', '/documents', '/notifications'];
       items = items.filter(item => allowed.includes(item.id));
     } else if (role === 'ACCOUNTANT') {
-      const allowed = ['/dashboard', '/finance', '/purchase', '/operations', '/reports', '/boq', '/purchase-orders', '/inventory', '/vendors'];
+      const allowed = ['/dashboard', '/finance', '/purchase', '/operations', '/reports', '/boq', '/purchase-orders', '/inventory', '/vendors', '/documents', '/notifications'];
+      items = items.filter(item => allowed.includes(item.id));
+    } else if (role === 'PROJECT_MANAGER') {
+      const allowed = ['/dashboard', '/projects', '/progress', '/purchase', '/finance', '/operations', '/boq', '/material-requests', '/purchase-orders', '/inventory', '/vendors', '/dpr', '/documents', '/reports', '/milestone-report', '/notifications'];
       items = items.filter(item => allowed.includes(item.id));
     }
+    // BUILDER / ADMIN see everything, no filter needed.
     return { ...group, items };
   }).filter(group => group.items.length > 0);
 

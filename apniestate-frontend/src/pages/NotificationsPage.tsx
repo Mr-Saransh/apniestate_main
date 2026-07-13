@@ -50,7 +50,7 @@ export default function NotificationsPage() {
     let type: "Approvals" | "Alerts" | "Mentions" | "Info" = "Info";
     let icon = Info;
     let color = "text-blue-500";
-    
+
     if (n.type === 'success' || n.title.toLowerCase().includes('approv')) {
       type = "Approvals";
       icon = CheckCircle;
@@ -64,7 +64,7 @@ export default function NotificationsPage() {
       icon = Bell;
       color = "text-primary";
     }
-    
+
     const time = new Date(n.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
     return { ...n, uiType: type, icon, color, time };
@@ -82,7 +82,7 @@ export default function NotificationsPage() {
 
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between mt-5 mr-5 ml-5">
         <PH title="Notifications" sub={`${unreadCount} unread alerts and approvals`} />
         {unreadCount > 0 && (
           <button onClick={handleMarkAllRead} className="text-xs text-primary font-semibold hover:underline">
@@ -91,11 +91,11 @@ export default function NotificationsPage() {
         )}
       </div>
 
-      <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+      <div className="flex gap-2 mr-5 ml-5 overflow-x-auto pb-1 no-scrollbar">
         {(["All", "Approvals", "Alerts", "Mentions"] as const).map(f => (
-          <button 
-            key={f} 
-            onClick={() => setFilter(f)} 
+          <button
+            key={f}
+            onClick={() => setFilter(f)}
             className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${filter === f ? "bg-primary text-white" : "bg-card border border-border text-muted-foreground hover:bg-muted"}`}
           >
             {f}
@@ -105,7 +105,7 @@ export default function NotificationsPage() {
 
       <Card noPad>
         {filtered.length === 0 ? (
-          <div className="p-8 text-center text-muted-foreground text-sm">No notifications found</div>
+          <div className="p-8 text-center mr-5 ml-5 text-muted-foreground text-sm">No notifications found</div>
         ) : (
           filtered.map((n, i) => (
             <div key={n.id || i} className={`flex gap-3 px-4 py-3 ${!n.is_read ? "bg-primary/5" : ""} ${i < filtered.length - 1 ? "border-b border-border" : ""}`}>

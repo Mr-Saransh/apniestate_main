@@ -385,7 +385,7 @@ export default function ProgressWorkspace() {
                   
                   <div className="space-y-4">
                     {/* Milestones Section */}
-                    {milestonesForSelectedDate.length > 0 ? (
+                    {milestonesForSelectedDate.length > 0 && (
                       <div className="space-y-3">
                         {milestonesForSelectedDate.map(m => (
                           <div key={m.id} className={`rounded-xl px-4 py-3 border ${m.status === 'COMPLETED' ? "bg-emerald-50/50 border-emerald-100" : "bg-amber-50/50 border-amber-100"}`}>
@@ -394,7 +394,12 @@ export default function ProgressWorkspace() {
                                 <span className={`size-2 rounded-full ${m.status === 'COMPLETED' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
                                 <p className="font-semibold text-sm text-foreground">{m.name}</p>
                               </div>
-                              <span className="text-[10px] font-bold tracking-wider uppercase text-muted-foreground bg-white px-2 py-1 rounded-md border border-border shadow-sm">Milestone</span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-bold tracking-wider uppercase text-muted-foreground bg-white px-2 py-1 rounded-md border border-border shadow-sm">Milestone</span>
+                                <button onClick={() => handleDeleteMilestone(m.id)} className="p-1 hover:bg-red-50 text-muted-foreground hover:text-red-500 rounded-lg transition-colors">
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
                             </div>
                             <div className="mt-3 flex items-center gap-3 pl-4">
                               <div className="flex-1 bg-black/5 rounded-full h-1.5 overflow-hidden">
@@ -405,22 +410,22 @@ export default function ProgressWorkspace() {
                           </div>
                         ))}
                       </div>
-                    ) : (
-                      <button 
-                        onClick={() => {
-                          // Adjust date for local timezone to ensure YYYY-MM-DD matches correctly
-                          const offsetDate = new Date(selectedDate.getTime() - (selectedDate.getTimezoneOffset() * 60000));
-                          setMTargetDate(offsetDate.toISOString().split('T')[0]);
-                          setShowAddMilestone(true);
-                        }}
-                        className="w-full border-2 border-dashed border-border rounded-xl p-4 flex flex-col items-center justify-center gap-2 text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors group"
-                      >
-                        <div className="bg-white p-2 rounded-full shadow-sm group-hover:scale-110 transition-transform">
-                          <Plus size={16} className="text-[#2648E7]" />
-                        </div>
-                        <span className="text-sm font-semibold">Add Milestone for this Date</span>
-                      </button>
                     )}
+
+                    <button 
+                      onClick={() => {
+                        // Adjust date for local timezone to ensure YYYY-MM-DD matches correctly
+                        const offsetDate = new Date(selectedDate.getTime() - (selectedDate.getTimezoneOffset() * 60000));
+                        setMTargetDate(offsetDate.toISOString().split('T')[0]);
+                        setShowAddMilestone(true);
+                      }}
+                      className="w-full border-2 border-dashed border-border rounded-xl p-4 flex flex-col items-center justify-center gap-2 text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors group"
+                    >
+                      <div className="bg-white p-2 rounded-full shadow-sm group-hover:scale-110 transition-transform">
+                        <Plus size={16} className="text-[#2648E7]" />
+                      </div>
+                      <span className="text-sm font-semibold">Add Milestone for this Date</span>
+                    </button>
 
                     {/* DPRs Section */}
                     {dprsForSelectedDate.length > 0 && (

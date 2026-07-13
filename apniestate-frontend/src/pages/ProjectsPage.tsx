@@ -140,13 +140,13 @@ export default function ProjectsPage() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto space-y-8 pb-12 animate-in fade-in duration-500">
+    <div className="max-w-3xl mt-5 mx-auto space-y-8 pb-12 px-4 lg:px-0 animate-in fade-in duration-500">
       {/* Header & Summary */}
       <div className="relative overflow-hidden rounded-[2rem] bg-white border border-slate-100 shadow-xl shadow-slate-200/40 p-6 md:p-8">
         {/* Decorative background blurs */}
         <div className="absolute top-0 right-0 w-64 h-64 bg-blue-100/50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 pointer-events-none" />
         <div className="absolute bottom-0 left-0 w-48 h-48 bg-emerald-50/50 rounded-full blur-3xl translate-y-1/3 -translate-x-1/4 pointer-events-none" />
-        
+
         <div className="relative z-10 flex flex-col md:flex-row gap-6 md:items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-black text-slate-900 tracking-tight" style={{ fontFamily: "var(--font-display)" }}>
@@ -189,65 +189,65 @@ export default function ProjectsPage() {
         <SectionLabel icon={Activity}>Active & Planning</SectionLabel>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {active.map((p, i) => {
-             const progress = p.progress_percentage || 0;
-             return (
-               <div
-                 key={p.id}
-                 onClick={() => onSelect(p)}
-                 className="group cursor-pointer text-left w-full bg-white rounded-[1.5rem] p-6 border border-slate-100 shadow-lg shadow-slate-200/30 hover:shadow-xl hover:shadow-[#2648E7]/10 hover:-translate-y-1 transition-all duration-300 ease-out relative overflow-hidden"
-                 style={{ animationDelay: `${i * 100}ms` }}
-               >
-                 <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-50 to-transparent rounded-full blur-2xl -translate-y-1/2 translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                 
-                 <div className="flex items-start justify-between mb-4 relative z-10">
-                   <div className="flex-1 min-w-0 pr-4">
-                     <h3 className="font-bold text-slate-900 text-lg leading-tight truncate group-hover:text-[#2648E7] transition-colors duration-300" style={{ fontFamily: "var(--font-display)" }}>
-                       {p.name}
-                     </h3>
-                     <p className="text-sm text-slate-500 mt-1.5 flex items-center gap-1.5 truncate font-medium">
-                       <MapPin size={14} className="shrink-0 text-slate-400" />
-                       {p.city || p.address || 'No location set'}
-                     </p>
-                   </div>
-                   <StatusBadge status={p.status} />
-                 </div>
-                 
-                 <p className="text-sm text-slate-600 mb-6 line-clamp-2 min-h-[2.5rem] relative z-10">{p.description || <span className="italic opacity-50">No description provided</span>}</p>
-                 
-                 <div className="relative z-10">
-                   <div className="flex justify-between text-xs font-bold text-slate-700 mb-2">
-                     <span>Progress</span>
-                     <span className="text-[#2648E7]">{progress}%</span>
-                   </div>
-                   <div className="h-2 rounded-full bg-slate-100 overflow-hidden mb-4 shadow-inner">
-                     <div className="h-full rounded-full transition-all duration-1000 ease-out relative" style={{ width: `${progress}%`, backgroundImage: "linear-gradient(90deg, #2648E7, #607CFF)" }}>
-                       <div className="absolute top-0 left-0 right-0 bottom-0 bg-white/20 animate-pulse" />
-                     </div>
-                   </div>
-                 </div>
+            const progress = p.progress_percentage || 0;
+            return (
+              <div
+                key={p.id}
+                onClick={() => onSelect(p)}
+                className="group cursor-pointer text-left w-full bg-white rounded-[1.5rem] p-6 border border-slate-100 shadow-lg shadow-slate-200/30 hover:shadow-xl hover:shadow-[#2648E7]/10 hover:-translate-y-1 transition-all duration-300 ease-out relative overflow-hidden"
+                style={{ animationDelay: `${i * 100}ms` }}
+              >
+                <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-50 to-transparent rounded-full blur-2xl -translate-y-1/2 translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
-                 <div className="flex items-center justify-between text-sm pt-4 border-t border-slate-100 relative z-10">
-                   <div className="flex flex-col gap-1 text-slate-500 font-medium">
-                     {p.end_date ? (
-                       <span className="flex items-center gap-1.5"><Calendar size={13} className="text-[#2648E7]" />
-                         Due {new Date(p.end_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
-                       </span>
-                     ) : (
-                       <span className="flex items-center gap-1.5 opacity-50"><Calendar size={13} />No deadline</span>
-                     )}
-                     <span className="text-xs">Budget: <span className="text-slate-800 font-bold">{fmt(p.actual_cost)}</span> / {fmt(p.budget)}</span>
-                   </div>
-                   <div className="flex gap-2">
-                     <button onClick={(e) => handleDelete(e, p.id)} className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center group-hover:bg-red-500 transition-colors duration-300 shadow-sm relative z-20">
-                       <Trash2 size={16} className="text-red-400 group-hover:text-white transition-colors duration-300" />
-                     </button>
-                     <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center group-hover:bg-[#2648E7] transition-colors duration-300 shadow-sm">
-                       <ChevronRight size={18} className="text-slate-400 group-hover:text-white transition-colors duration-300" />
-                     </div>
-                   </div>
-                 </div>
-               </div>
-             );
+                <div className="flex items-start justify-between mb-4 relative z-10">
+                  <div className="flex-1 min-w-0 pr-4">
+                    <h3 className="font-bold text-slate-900 text-lg leading-tight truncate group-hover:text-[#2648E7] transition-colors duration-300" style={{ fontFamily: "var(--font-display)" }}>
+                      {p.name}
+                    </h3>
+                    <p className="text-sm text-slate-500 mt-1.5 flex items-center gap-1.5 truncate font-medium">
+                      <MapPin size={14} className="shrink-0 text-slate-400" />
+                      {p.city || p.address || 'No location set'}
+                    </p>
+                  </div>
+                  <StatusBadge status={p.status} />
+                </div>
+
+                <p className="text-sm text-slate-600 mb-6 line-clamp-2 min-h-[2.5rem] relative z-10">{p.description || <span className="italic opacity-50">No description provided</span>}</p>
+
+                <div className="relative z-10">
+                  <div className="flex justify-between text-xs font-bold text-slate-700 mb-2">
+                    <span>Progress</span>
+                    <span className="text-[#2648E7]">{progress}%</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-slate-100 overflow-hidden mb-4 shadow-inner">
+                    <div className="h-full rounded-full transition-all duration-1000 ease-out relative" style={{ width: `${progress}%`, backgroundImage: "linear-gradient(90deg, #2648E7, #607CFF)" }}>
+                      <div className="absolute top-0 left-0 right-0 bottom-0 bg-white/20 animate-pulse" />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between text-sm pt-4 border-t border-slate-100 relative z-10">
+                  <div className="flex flex-col gap-1 text-slate-500 font-medium">
+                    {p.end_date ? (
+                      <span className="flex items-center gap-1.5"><Calendar size={13} className="text-[#2648E7]" />
+                        Due {new Date(p.end_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1.5 opacity-50"><Calendar size={13} />No deadline</span>
+                    )}
+                    <span className="text-xs">Budget: <span className="text-slate-800 font-bold">{fmt(p.actual_cost)}</span> / {fmt(p.budget)}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={(e) => handleDelete(e, p.id)} className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center group-hover:bg-red-500 transition-colors duration-300 shadow-sm relative z-20">
+                      <Trash2 size={16} className="text-red-400 group-hover:text-white transition-colors duration-300" />
+                    </button>
+                    <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center group-hover:bg-[#2648E7] transition-colors duration-300 shadow-sm">
+                      <ChevronRight size={18} className="text-slate-400 group-hover:text-white transition-colors duration-300" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
           })}
           {active.length === 0 && (
             <div className="col-span-full p-12 text-center flex flex-col items-center justify-center bg-gradient-to-b from-white to-slate-50/50 rounded-[2rem] border-2 border-slate-200 border-dashed shadow-sm">
@@ -256,7 +256,7 @@ export default function ProjectsPage() {
               </div>
               <h3 className="font-black text-slate-800 text-xl mb-2" style={{ fontFamily: "var(--font-display)" }}>No Active Projects</h3>
               <p className="text-slate-500 text-sm max-w-sm font-medium">You don't have any projects in progress. Create a new one to get started.</p>
-              
+
               <button
                 onClick={() => { resetForm(); setShowCreateModal(true); }}
                 className="mt-6 px-6 py-3 rounded-2xl font-bold text-white shadow-lg shadow-[#2648E7]/30 hover:shadow-xl hover:shadow-[#2648E7]/40 hover:-translate-y-0.5 transition-all duration-300"
@@ -283,7 +283,7 @@ export default function ProjectsPage() {
                 <div className="min-w-0 pr-3">
                   <p className="font-bold text-slate-800 truncate group-hover:text-[#2648E7] transition-colors">{p.name}</p>
                   <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-1 truncate font-medium">
-                     <MapPin size={12} className="shrink-0" />{p.city || p.address || 'No location set'}
+                    <MapPin size={12} className="shrink-0" />{p.city || p.address || 'No location set'}
                   </p>
                 </div>
                 <div className="flex items-center gap-3 shrink-0 relative z-20">
@@ -319,16 +319,16 @@ export default function ProjectsPage() {
                 <X size={20} />
               </button>
             </div>
-            
+
             <form onSubmit={handleCreate} className="p-6 md:p-8">
               {formError && <div className="p-4 mb-6 bg-red-50/80 border border-red-100 text-red-600 rounded-2xl text-sm font-semibold flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-red-500" />{formError}</div>}
-              
+
               <div className="space-y-6">
                 <div>
                   <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1 mb-2 block">Project Name <span className="text-red-500">*</span></label>
                   <input type="text" required placeholder="e.g. Hari Nagar Villa" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-medium text-slate-900 outline-none focus:bg-white focus:ring-4 focus:ring-[#2648E7]/10 focus:border-[#2648E7] transition-all placeholder:text-slate-400 shadow-sm" value={formName} onChange={e => setFormName(e.target.value)} />
                 </div>
-                
+
                 <div>
                   <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1 mb-2 block">Description</label>
                   <textarea placeholder="Brief description of the project..." rows={3} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-medium text-slate-900 outline-none focus:bg-white focus:ring-4 focus:ring-[#2648E7]/10 focus:border-[#2648E7] transition-all placeholder:text-slate-400 shadow-sm resize-none" value={formDesc} onChange={e => setFormDesc(e.target.value)} />
