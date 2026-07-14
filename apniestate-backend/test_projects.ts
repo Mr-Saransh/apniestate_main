@@ -15,7 +15,7 @@ async function main() {
   const role = user.role;
   const companyId = user.company_id;
   
-  const where = { company_id: companyId, OR: [] };
+  const where: any = { company_id: companyId, OR: [] };
   where.OR = [
       { builder_id: userId },
       { manager_id: userId },
