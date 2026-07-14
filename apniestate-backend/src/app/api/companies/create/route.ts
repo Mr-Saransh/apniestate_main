@@ -42,7 +42,7 @@ export const POST = withAuth(async (req: NextRequest, user) => {
   // Re-sign JWT with new company_id and BUILDER role
   const accessToken = signAccessToken({
     sub: updated.id,
-    email: updated.email,
+    email: updated.email || updated.username || "",
     role: updated.role as any,
     company_id: updated.company_id,
   });
@@ -51,7 +51,7 @@ export const POST = withAuth(async (req: NextRequest, user) => {
     user: {
       id: updated.id,
       name: updated.name,
-      email: updated.email,
+      email: updated.email || updated.username || "",
       role: updated.role,
       company_id: updated.company_id,
       onboarded: updated.onboarded

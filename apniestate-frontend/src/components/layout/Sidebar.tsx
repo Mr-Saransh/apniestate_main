@@ -9,30 +9,32 @@ import {
   Truck, BookOpen, FolderOpen, FileBarChart, Bell, Settings, X,
   LogOut
 } from "lucide-react";
+import { useTranslation } from 'react-i18next';
 
 type NavItem = { id: string; label: string; icon: React.ElementType; badge?: number; hideOnMobile?: boolean };
 type NavGroup = { label: string; items: NavItem[]; hideOnMobile?: boolean };
 
 export default function Sidebar({ onClose }: { onClose?: () => void }) {
+  const { t } = useTranslation();
   const { user, logout } = useAuth();
   const { activeProject } = useProject();
   const location = useLocation();
   const initials = user?.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : 'AR';
-  const role = user?.role || 'ADMIN';
+  const role = user?.role || 'BUILDER';
 
   const navGroups: NavGroup[] = [
     {
       label: "", items: [
-        { id: "/dashboard", label: "Dashboard", icon: LayoutDashboard, hideOnMobile: true },
-        { id: "/projects", label: "Projects", icon: Building2 },
+        { id: "/dashboard", label: t('sidebar.dashboard', 'Dashboard'), icon: LayoutDashboard, hideOnMobile: true },
+        { id: "/projects", label: t('sidebar.projects', 'Projects'), icon: Building2 },
       ]
     },
     {
       label: "Daily Work", hideOnMobile: true, items: [
-        { id: "/purchase", label: "Purchase", icon: ShoppingCart },
-        { id: "/finance", label: "Finance", icon: Wallet },
-        { id: "/operations", label: "Operations", icon: Users },
-        { id: "/progress", label: "Progress", icon: BarChart2 },
+        { id: "/purchase", label: t('sidebar.procurement', 'Purchase'), icon: ShoppingCart },
+        { id: "/finance", label: t('sidebar.finance', 'Finance'), icon: Wallet },
+        { id: "/operations", label: t('sidebar.operations', 'Operations'), icon: Users },
+        { id: "/progress", label: t('sidebar.progress', 'Progress'), icon: BarChart2 },
       ]
     },
     {
@@ -58,17 +60,20 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
 
   const filteredGroups = navGroups.map(group => {
     let items = group.items;
-    if (role === 'SITE_SUPERVISOR') {
-      const allowed = ['/dashboard', '/progress', '/operations', '/dpr', '/documents', '/notifications'];
-      items = items.filter(item => allowed.includes(item.id));
-    } else if (role === 'ACCOUNTANT') {
+    if (role === 'ACCOUNTANT') {
       const allowed = ['/dashboard', '/finance', '/purchase', '/operations', '/reports', '/boq', '/purchase-orders', '/inventory', '/vendors', '/documents', '/notifications'];
       items = items.filter(item => allowed.includes(item.id));
     } else if (role === 'PROJECT_MANAGER') {
       const allowed = ['/dashboard', '/projects', '/progress', '/purchase', '/finance', '/operations', '/boq', '/material-requests', '/purchase-orders', '/inventory', '/vendors', '/dpr', '/documents', '/reports', '/milestone-report', '/notifications'];
       items = items.filter(item => allowed.includes(item.id));
     }
-    // BUILDER / ADMIN see everything, no filter needed.
+    
+    // Only BUILDER can see the Users page
+    if (role !== 'BUILDER') {
+      items = items.filter(item => item.id !== '/users');
+    }
+    
+    // BUILDER see everything, no filter needed.
     return { ...group, items };
   }).filter(group => group.items.length > 0);
 
@@ -157,7 +162,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-bold text-white truncate leading-tight">{user?.name || 'Asim Raza'}</p>
-            <p className="text-[10px] text-white/60 truncate leading-tight">{user?.role ? user.role.replace(/_/g, ' ') : 'Super Admin'}</p>
+            <p className="text-[10px] text-white/60 truncate leading-tight">{user?.role ? user.role.replace(/_/g, ' ') : 'Builder'}</p>
           </div>
           <button onClick={logout} className="text-white/50 hover:text-white transition-colors p-1">
             <LogOut size={15} />

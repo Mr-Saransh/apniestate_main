@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useProject } from '@/context/ProjectContext';
+import { useAuth } from '@/context/AuthContext';
 import { ShoppingCart, Plus, FileSpreadsheet, Package, ClipboardList, CheckCircle2, Archive, Truck, X, Trash2, Download } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { purchaseApi, type PurchaseSummaryResponse, type BOQItemSummary, type MaterialRequestSummary, type OrderSummary, type ReceivedSummary, type VendorSummary, type ConsumptionLog } from '@/api/purchase';
@@ -182,6 +183,9 @@ function BOQTab({ items, projectName, onRefresh }: { items: BOQItemSummary[], pr
 }
 
 function RequestsTab({ requests, onRefresh }: { requests: MaterialRequestSummary[], onRefresh: () => void }) {
+  const { user } = useAuth();
+  const role = user?.role || 'BUILDER';
+  
   const handleApprove = async (id: string, approve: boolean) => {
     try {
       await purchaseApi.performAction('UPDATE_REQUEST_STATUS', { requestId: id, status: approve ? 'APPROVED' : 'REJECTED' });
@@ -232,7 +236,7 @@ function RequestsTab({ requests, onRefresh }: { requests: MaterialRequestSummary
             </div>
           </div>
           <div className="mt-3 pt-3 border-t border-border flex gap-2">
-            {m.stage === "PENDING_APPROVAL" && (
+            {m.stage === "PENDING_APPROVAL" && role !== "SITE_SUPERVISOR" && (
               <>
                 <button onClick={() => handleApprove(m.id, true)} className="flex-1 py-2 rounded-xl text-sm font-bold text-white transition-opacity hover:opacity-90" style={{ backgroundColor: "#2648E7" }}>Approve</button>
                 <button onClick={() => handleApprove(m.id, false)} className="flex-1 py-2 rounded-xl text-sm font-bold text-red-600 bg-red-50 hover:bg-red-100 transition-colors">Reject</button>
@@ -483,8 +487,10 @@ function PurchaseModals({ activeModal, onClose, onRefresh, projectId, data }: { 
   const [formData, setFormData] = useState<any>({});
 
   useEffect(() => {
-    if (activeModal && ['boq', 'quotations', 'orders', 'received', 'inventory'].includes(activeModal)) {
+    if (activeModal && ['boq', 'quotations', 'orders', 'received'].includes(activeModal)) {
       setFormData({ items: [{}] });
+    } else if (activeModal === 'inventory') {
+      setFormData({ items: [] });
     } else {
       setFormData({});
     }
@@ -496,6 +502,27 @@ function PurchaseModals({ activeModal, onClose, onRefresh, projectId, data }: { 
     const newItems = [...(formData.items || [])];
     newItems[index] = { ...newItems[index], [field]: value };
     setFormData({ ...formData, items: newItems });
+  };
+
+  const handleInventoryConsumeChange = (materialName: string, quantity: string) => {
+    const qty = parseInt(quantity, 10);
+    const existingItems = formData.items || [];
+    
+    if (!quantity || isNaN(qty) || qty <= 0) {
+      setFormData({
+        ...formData,
+        items: existingItems.filter((i: any) => i.materialName !== materialName)
+      });
+    } else {
+      const idx = existingItems.findIndex((i: any) => i.materialName === materialName);
+      if (idx >= 0) {
+        const newItems = [...existingItems];
+        newItems[idx].quantity = qty;
+        setFormData({ ...formData, items: newItems });
+      } else {
+        setFormData({ ...formData, items: [...existingItems, { materialName, quantity: qty }] });
+      }
+    }
   };
 
   const addItemRow = () => {
@@ -767,26 +794,37 @@ function PurchaseModals({ activeModal, onClose, onRefresh, projectId, data }: { 
 
             {activeModal === 'inventory' && (
               <>
-                <div className="mt-4 mb-2 flex items-center justify-between">
+                <div className="mt-4 mb-2">
                   <label className="text-sm font-bold text-foreground">Materials Consumed</label>
-                  <button type="button" onClick={addItemRow} className="text-xs font-bold text-[#2648E7] hover:underline flex items-center gap-1">
-                    <Plus size={12} /> Add Item
-                  </button>
+                  <p className="text-xs text-muted-foreground mt-1">Specify what you have consumed and how much. Only items with quantity &gt; 0 will be logged.</p>
                 </div>
-                <div className="space-y-3">
-                  {formData.items?.map((item: any, idx: number) => (
-                    <div key={idx} className="p-3 bg-muted/50 border border-border rounded-xl relative group flex gap-3">
-                      <button type="button" onClick={() => removeItemRow(idx)} className="absolute -top-2 -right-2 bg-red-100 text-red-600 rounded-full p-1 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity">
-                        <X size={14} />
-                      </button>
-                      <select required className="w-full bg-white border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900" value={item.materialName || ''} onChange={e => handleItemChange(idx, 'materialName', e.target.value)}>
-                        <option value="" disabled>Select Material</option>
-                        {data?.inventory?.map(i => <option key={i.id} value={i.material}>{i.material} (Stock: {i.stock})</option>)}
-                      </select>
-                      <input required type="number" min="1" className="w-32 shrink-0 bg-white border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900" placeholder="Qty" value={item.quantity || ''} onChange={e => handleItemChange(idx, 'quantity', e.target.value)} />
-                    </div>
-                  ))}
-                  <p className="text-xs text-muted-foreground mt-1">This will deduct stock and update BOQ usage for all listed items.</p>
+                <div className="space-y-2 mt-4 max-h-[350px] overflow-y-auto pr-2">
+                  {data?.inventory?.length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-4">No inventory available to consume.</p>
+                  ) : (
+                    data?.inventory?.map(i => {
+                      const selected = formData.items?.find((item: any) => item.materialName === i.material) || {};
+                      return (
+                        <div key={i.id} className="flex items-center justify-between p-3 bg-muted/50 border border-border rounded-xl">
+                          <div>
+                            <p className="text-sm font-bold text-foreground">{i.material}</p>
+                            <p className="text-xs text-muted-foreground">Available Stock: {i.stock}</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <input 
+                              type="number" 
+                              min="0" 
+                              max={i.stock}
+                              placeholder="Qty Consumed"
+                              className="w-32 bg-white border border-border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900" 
+                              value={selected.quantity || ''}
+                              onChange={e => handleInventoryConsumeChange(i.material, e.target.value)}
+                            />
+                          </div>
+                        </div>
+                      )
+                    })
+                  )}
                 </div>
               </>
             )}

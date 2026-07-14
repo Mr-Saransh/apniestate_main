@@ -21,8 +21,8 @@ export default function LabourCategoryConfig() {
   // Form State
   const [name, setName] = useState('');
   const [dailyWage, setDailyWage] = useState('');
-  const [halfDay, setHalfDay] = useState('0.5');
-  const [ot, setOt] = useState('1.5');
+  const [halfDayWage, setHalfDayWage] = useState('');
+  const [otWage, setOtWage] = useState('');
   const [status, setStatus] = useState('ACTIVE');
 
   useEffect(() => {
@@ -47,8 +47,8 @@ export default function LabourCategoryConfig() {
     setEditingId(cat.id);
     setName(cat.name);
     setDailyWage(cat.daily_wage.toString());
-    setHalfDay(cat.half_day_multiplier.toString());
-    setOt(cat.ot_multiplier.toString());
+    setHalfDayWage((cat.daily_wage * cat.half_day_multiplier).toString());
+    setOtWage(((cat.daily_wage / 8) * cat.ot_multiplier).toString());
     setStatus(cat.status);
     setShowModal(true);
   };
@@ -57,8 +57,8 @@ export default function LabourCategoryConfig() {
     setEditingId(null);
     setName('');
     setDailyWage('');
-    setHalfDay('0.5');
-    setOt('1.5');
+    setHalfDayWage('');
+    setOtWage('');
     setStatus('ACTIVE');
     setShowModal(true);
   };
@@ -66,11 +66,14 @@ export default function LabourCategoryConfig() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const dw = Number(dailyWage);
+      const hw = Number(halfDayWage);
+      const ow = Number(otWage);
       const payload = {
         name,
-        daily_wage: Number(dailyWage),
-        half_day_multiplier: Number(halfDay),
-        ot_multiplier: Number(ot),
+        daily_wage: dw,
+        half_day_multiplier: dw > 0 ? (hw / dw) : 0,
+        ot_multiplier: dw > 0 ? (ow / (dw / 8)) : 0,
         status
       };
 
@@ -114,8 +117,8 @@ export default function LabourCategoryConfig() {
                 <tr className="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
                   <th className="p-4">Category Name</th>
                   <th className="p-4">Daily Wage</th>
-                  <th className="p-4">Half Day Multiplier</th>
-                  <th className="p-4">OT Multiplier</th>
+                  <th className="p-4">Half Day Wage</th>
+                  <th className="p-4">OT Wage/hr</th>
                   <th className="p-4">Status</th>
                   <th className="p-4 text-right">Actions</th>
                 </tr>
@@ -124,9 +127,9 @@ export default function LabourCategoryConfig() {
                 {categories.map(cat => (
                   <tr key={cat.id} className="hover:bg-slate-50/50">
                     <td className="p-4 font-medium text-slate-800">{cat.name}</td>
-                    <td className="p-4 text-slate-600">PKR {cat.daily_wage.toLocaleString()}</td>
-                    <td className="p-4 text-slate-600">{cat.half_day_multiplier}x</td>
-                    <td className="p-4 text-slate-600">{cat.ot_multiplier}x</td>
+                    <td className="p-4 text-slate-600">{(cat.daily_wage || 0).toLocaleString()}</td>
+                    <td className="p-4 text-slate-600">{(cat.daily_wage * cat.half_day_multiplier).toLocaleString()}</td>
+                    <td className="p-4 text-slate-600">{((cat.daily_wage / 8) * cat.ot_multiplier).toLocaleString()}</td>
                     <td className="p-4">
                       {cat.status === 'ACTIVE' ? (
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
@@ -168,18 +171,18 @@ export default function LabourCategoryConfig() {
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Daily Wage (PKR)</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Daily Wage</label>
                 <input required type="number" value={dailyWage} onChange={(e: any) => setDailyWage(e.target.value)} placeholder="e.g. 1500" className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Half Day Multiplier</label>
-                  <input required type="number" step="0.1" value={halfDay} onChange={(e: any) => setHalfDay(e.target.value)} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Half Day Wage</label>
+                  <input required type="number" value={halfDayWage} onChange={(e: any) => setHalfDayWage(e.target.value)} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">OT Multiplier</label>
-                  <input required type="number" step="0.1" value={ot} onChange={(e: any) => setOt(e.target.value)} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
+                  <label className="block text-sm font-medium text-slate-700 mb-1">OT Wage / Hr</label>
+                  <input required type="number" value={otWage} onChange={(e: any) => setOtWage(e.target.value)} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
                 </div>
               </div>
 

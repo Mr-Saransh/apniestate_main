@@ -106,7 +106,9 @@ export const GET = withAuth(async (req: NextRequest, user) => {
     totalSpent += e.amount;
   }
 
-  const budgetUtilization = totalAllocated > 0 ? Math.round((totalSpent / totalAllocated) * 100) : 0;
+  // Better budget utilization calculation for small percentages (e.g. 68k of 10cr)
+  const rawPct = totalAllocated > 0 ? (totalSpent / totalAllocated) * 100 : 0;
+  const budgetUtilization = rawPct > 0 && rawPct < 1 ? parseFloat(rawPct.toFixed(2)) : Math.round(rawPct);
 
   // 3. Cashbook Float Balance
   const cashbookEntries = await prisma.cashbook.findMany({

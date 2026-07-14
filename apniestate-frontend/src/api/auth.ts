@@ -1,6 +1,11 @@
 import { apiClient } from './client';
 
 export interface LoginCredentials {
+  identifier: string;
+  password: string;
+}
+
+export interface SignupCredentials {
   email: string;
   password: string;
 }
@@ -45,7 +50,7 @@ export const authApi = {
   login: (credentials: LoginCredentials) =>
     apiClient.post<AuthResponse>('/auth/login', credentials),
 
-  signup: (credentials: LoginCredentials) =>
+  signup: (credentials: SignupCredentials) =>
     apiClient.post<AuthResponse>('/auth/signup', credentials),
 
   switchWorkspace: (companyId: string, role: string) =>

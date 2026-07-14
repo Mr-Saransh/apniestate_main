@@ -1,7 +1,8 @@
 import { Home, ShoppingCart, Wallet, Users, BarChart2 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '@/context/AuthContext';
 
-const BOTTOM_NAV = [
+const ALL_BOTTOM_NAV = [
   { id: "dashboard", path: "/dashboard", Icon: Home, label: "Home" },
   { id: "purchase", path: "/purchase", Icon: ShoppingCart, label: "Purchase" },
   { id: "finance", path: "/finance", Icon: Wallet, label: "Finance" },
@@ -12,10 +13,23 @@ const BOTTOM_NAV = [
 export default function BottomNav() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const role = user?.role || 'BUILDER';
+
+  let navItems = [...ALL_BOTTOM_NAV];
+
+  if (role === 'ACCOUNTANT') {
+    const allowed = ['dashboard', 'finance', 'purchase', 'operations'];
+    navItems = navItems.filter(item => allowed.includes(item.id));
+  } else if (role === 'PROJECT_MANAGER') {
+    const allowed = ['dashboard', 'progress', 'purchase', 'finance', 'operations'];
+    navItems = navItems.filter(item => allowed.includes(item.id));
+  }
+  // BUILDER gets all of them.
 
   return (
     <nav className="lg:hidden shrink-0 flex items-center bg-white border-t border-border pb-safe">
-      {BOTTOM_NAV.map(({ id, path, Icon, label }) => {
+      {navItems.map(({ id, path, Icon, label }) => {
         const isActive = location.pathname.startsWith(path) || (id === "dashboard" && location.pathname === "/");
         return (
           <button

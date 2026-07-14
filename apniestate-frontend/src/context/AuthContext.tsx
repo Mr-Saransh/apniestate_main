@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
-import { authApi, type AuthUser, type LoginCredentials, type Membership, type AuthResponse } from '@/api/auth';
+import { authApi, type AuthUser, type LoginCredentials, type SignupCredentials, type Membership, type AuthResponse } from '@/api/auth';
 import { permissionsApi } from '@/api/permissions';
 
 interface AuthContextType {
@@ -10,7 +10,7 @@ interface AuthContextType {
   permissions: string[];
   hasPermission: (permission: string) => boolean;
   login: (credentials: LoginCredentials) => Promise<AuthResponse>;
-  signup: (credentials: LoginCredentials) => Promise<AuthResponse>;
+  signup: (credentials: SignupCredentials) => Promise<AuthResponse>;
   logout: () => Promise<void>;
   setAuthSession: (token: string, user: AuthUser) => void;
   updateUser: (userData: AuthUser) => void;
@@ -19,28 +19,34 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [token, setToken] = useState<string | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(() => {
+    const savedUser = localStorage.getItem('user');
+    if (savedUser) {
+      try {
+        return JSON.parse(savedUser);
+      } catch {
+        localStorage.removeItem('user');
+      }
+    }
+    return null;
+  });
+  const [token, setToken] = useState<string | null>(() => {
+    const savedToken = localStorage.getItem('access_token');
+    if (!savedToken) localStorage.removeItem('access_token');
+    return savedToken || null;
+  });
   const [permissions, setPermissions] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const savedToken = localStorage.getItem('access_token');
-    const savedUser = localStorage.getItem('user');
-    const savedMemberships = localStorage.getItem('memberships');
-
-    if (savedToken && savedUser) {
-      try {
-        setToken(savedToken);
-        const parsedUser = JSON.parse(savedUser);
-        setUser(parsedUser);
-      } catch {
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('user');
-      }
+    if (!token || !user) {
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('user');
+      setToken(null);
+      setUser(null);
     }
     setIsLoading(false);
-  }, []);
+  }, [token, user]);
 
   useEffect(() => {
     if (token) {
@@ -82,7 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return response.data as AuthResponse;
   }, []);
 
-  const signup = useCallback(async (credentials: LoginCredentials) => {
+  const signup = useCallback(async (credentials: SignupCredentials) => {
     const response = await authApi.signup(credentials);
     if (response.success && response.data) {
       const { accessToken, user: userData } = response.data;

@@ -6,7 +6,6 @@ import AppLayout from '@/components/layout/AppLayout';
 import LoginPage from '@/pages/LoginPage';
 import LandingPage from '@/pages/LandingPage';
 import SignupPage from '@/pages/SignupPage';
-import OnboardingPage from '@/pages/OnboardingPage';
 import MyInvitationsPage from '@/pages/MyInvitationsPage';
 import CompanyInvitationsPage from '@/pages/CompanyInvitationsPage';
 import CompanyResignationsPage from '@/pages/CompanyResignationsPage';
@@ -73,7 +72,6 @@ export default function App() {
               <Route path="/landing" element={<LandingPage />} />
               
               {/* Guarded onboarding/invitations */}
-              <Route path="/onboarding" element={<OnboardingPage />} />
               <Route path="/my-invitations" element={<MyInvitationsPage />} />
 
               {/* Main App */}

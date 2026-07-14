@@ -19,7 +19,11 @@ export const GET = withAuth(async (req: NextRequest, user) => {
       where: { id: projectId },
       include: {
         manager: { select: { name: true } },
-        sites: { select: { id: true, name: true, status: true, supervisor_id: true } },
+        sites: { include: { supervisor: { select: { name: true } } } },
+        project_assignments: {
+          where: { role: { in: ['SITE_SUPERVISOR', 'PROJECT_MANAGER'] } },
+          include: { user: { select: { name: true } } }
+        }
       }
     });
 
@@ -219,14 +223,17 @@ export const GET = withAuth(async (req: NextRequest, user) => {
 
     // Budget nearing limit
     const totalBudget = project.budget || 0;
-    if (totalBudget > 0 && calculatedTotalSpent >= totalBudget * 0.85) {
-      const pct = Math.round((calculatedTotalSpent / totalBudget) * 100);
-      alerts.push({
-        type: "BUDGET_LIMIT",
-        message: `Budget ${pct}% utilized (₹${calculatedTotalSpent.toLocaleString('en-IN')} of ₹${totalBudget.toLocaleString('en-IN')})`,
-        link: "/budgets",
-        severity: pct >= 100 ? "error" : "warning"
-      });
+    if (totalBudget > 0) {
+      const rawPct = (calculatedTotalSpent / totalBudget) * 100;
+      const pct = rawPct > 0 && rawPct < 1 ? parseFloat(rawPct.toFixed(2)) : Math.round(rawPct);
+      if (pct >= 85) {
+        alerts.push({
+          type: "BUDGET_LIMIT",
+          message: `Budget ${pct}% utilized (₹${calculatedTotalSpent.toLocaleString('en-IN')} of ₹${totalBudget.toLocaleString('en-IN')})`,
+          link: "/budgets",
+          severity: pct >= 100 ? "error" : "warning"
+        });
+      }
     }
 
     // === PROJECT PROGRESS ===
@@ -272,7 +279,8 @@ export const GET = withAuth(async (req: NextRequest, user) => {
         start_date: project.start_date,
         end_date: project.end_date,
         progress_percentage: project.progress_percentage || 0,
-        manager: project.manager?.name || "Unassigned",
+        manager: project.manager?.name || project.project_assignments?.find(a => a.role === 'PROJECT_MANAGER')?.user?.name || "Unassigned",
+        supervisor: project.project_assignments?.find(a => a.role === 'SITE_SUPERVISOR')?.user?.name || project.sites[0]?.supervisor?.name || "Unassigned",
         sitesCount: project.sites.length,
         activeSitesCount: activeSites.length,
       },

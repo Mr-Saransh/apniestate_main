@@ -1,0 +1,24 @@
+{
+  "sidebar": {
+    "dashboard": "Dashboard",
+    "operations": "Operations",
+    "progress": "Progress",
+    "procurement": "Procurement",
+    "finance": "Finance",
+    "settings": "Settings"
+  },
+  "profile": {
+    "title": "Profile Settings",
+    "language": "Language",
+    "selectLanguage": "Select Language",
+    "english": "English",
+    "hindi": "Hindi (हिंदी)",
+    "personalInfo": "Personal Information",
+    "name": "Name",
+    "email": "Email Address",
+    "phone": "Phone Number",
+    "role": "Role",
+    "saveChanges": "Save Changes",
+    "logout": "Log Out"
+  }
+}

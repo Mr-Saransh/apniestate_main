@@ -35,18 +35,20 @@ const EMOJI_MAP: Record<string, string> = {
 export default function LabourRegister() {
   const { activeProject } = useProject();
   const activeSiteId = activeProject?.sites?.[0]?.id;
-  
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [categories, setCategories] = useState<LabourCategory[]>([]);
   const [entries, setEntries] = useState<Record<string, AttendanceEntry>>({});
-  
+
   // Modal State
   const [showModal, setShowModal] = useState(false);
   const [editingCat, setEditingCat] = useState<LabourCategory | null>(null);
   const [catName, setCatName] = useState('');
   const [catWage, setCatWage] = useState('');
+  const [catHalfDayWage, setCatHalfDayWage] = useState('');
+  const [catOtWage, setCatOtWage] = useState('');
 
   useEffect(() => {
     if (activeSiteId) fetchCategoriesAndLogs();
@@ -61,7 +63,7 @@ export default function LabourRegister() {
 
       const logRes = await apiClient.get<any[]>(`/labour-logs?site_id=${activeSiteId}&date=${date}`);
       const newEntries: Record<string, AttendanceEntry> = {};
-      
+
       if (logRes.data && logRes.data.length > 0) {
         logRes.data.forEach((log: any) => {
           newEntries[log.category_id] = {
@@ -129,9 +131,13 @@ export default function LabourRegister() {
     if (cat) {
       setCatName(cat.name);
       setCatWage(cat.daily_wage.toString());
+      setCatHalfDayWage((cat.daily_wage * cat.half_day_multiplier).toString());
+      setCatOtWage(((cat.daily_wage / 8) * cat.ot_multiplier).toString());
     } else {
       setCatName('');
       setCatWage('');
+      setCatHalfDayWage('');
+      setCatOtWage('');
     }
     setShowModal(true);
   };
@@ -139,11 +145,15 @@ export default function LabourRegister() {
   const handleSaveCat = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const dailyWageNum = Number(catWage);
+      const halfDayWageNum = Number(catHalfDayWage);
+      const otWageNum = Number(catOtWage);
+
       const payload = {
         name: catName,
-        daily_wage: Number(catWage),
-        half_day_multiplier: 0.5,
-        ot_multiplier: 1.5,
+        daily_wage: dailyWageNum,
+        half_day_multiplier: dailyWageNum > 0 ? (halfDayWageNum / dailyWageNum) : 0,
+        ot_multiplier: dailyWageNum > 0 ? (otWageNum / (dailyWageNum / 8)) : 0,
         status: 'ACTIVE'
       };
       if (editingCat) {
@@ -183,7 +193,7 @@ export default function LabourRegister() {
         <AlertTriangle size={48} className="text-muted-foreground opacity-40 mb-4" />
         <h2 className="text-base font-bold text-foreground">No Site Selected</h2>
         <p className="text-xs text-muted-foreground mt-1 max-w-xs mb-6">You need to add a site to this project before you can manage labour.</p>
-        <button 
+        <button
           onClick={handleCreateSite}
           disabled={isSubmitting}
           className="px-6 py-2.5 bg-[#2648E7] hover:bg-[#2648E7]/90 text-white text-sm font-bold rounded-xl transition-colors shadow-sm disabled:opacity-70 flex items-center justify-center gap-2"
@@ -249,8 +259,8 @@ export default function LabourRegister() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border border-border shadow-sm">
           <Calendar size={15} className="text-[#2648E7]" />
-          <input 
-            type="date" 
+          <input
+            type="date"
             value={date}
             onChange={e => setDate(e.target.value)}
             className="text-sm font-bold text-foreground focus:outline-none bg-transparent"
@@ -298,7 +308,7 @@ export default function LabourRegister() {
                       <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mt-0.5">Cost</p>
                     </div>
                   )}
-                  <button 
+                  <button
                     onClick={() => {
                       setEntries(prev => ({ ...prev, [cat.id]: { category_id: cat.id, present_count: 0, half_day_count: 0, ot_hours: 0 } }));
                     }}
@@ -348,7 +358,7 @@ export default function LabourRegister() {
           <div className="pt-2">
             <div className="flex items-center justify-between mb-3">
               <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Add more categories</p>
-              <button onClick={() => handleOpenCatModal(null)} className="text-[10px] font-bold text-[#2648E7] uppercase tracking-widest flex items-center gap-1"><Plus size={12}/> New Type</button>
+              <button onClick={() => handleOpenCatModal(null)} className="text-[10px] font-bold text-[#2648E7] uppercase tracking-widest flex items-center gap-1"><Plus size={12} /> New Type</button>
             </div>
             <div className="flex flex-wrap gap-2">
               {unaddedCategories.map(cat => (
@@ -367,7 +377,7 @@ export default function LabourRegister() {
           </div>
         ) : (
           <div className="pt-2 flex justify-end">
-            <button onClick={() => handleOpenCatModal(null)} className="text-[10px] font-bold text-[#2648E7] uppercase tracking-widest flex items-center gap-1"><Plus size={12}/> New Type</button>
+            <button onClick={() => handleOpenCatModal(null)} className="text-[10px] font-bold text-[#2648E7] uppercase tracking-widest flex items-center gap-1"><Plus size={12} /> New Type</button>
           </div>
         )}
       </div>
@@ -378,7 +388,7 @@ export default function LabourRegister() {
             <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Est. Today Cost</p>
             <p className="text-lg font-black text-foreground">₨{Math.round(totalCost).toLocaleString()}</p>
           </div>
-          <button 
+          <button
             onClick={handleSubmit}
             disabled={isSubmitting}
             className="flex-1 py-3.5 bg-[#2648E7] hover:bg-[#2648E7]/90 text-white text-sm font-bold rounded-xl transition-colors shadow-sm disabled:opacity-70 flex items-center justify-center gap-2"
@@ -402,18 +412,18 @@ export default function LabourRegister() {
                 <Minus size={16} />
               </button>
             </div>
-            
+
             <div className="p-6 overflow-y-auto">
               <form id="cat-form" onSubmit={handleSaveCat} className="space-y-4">
                 <div className="space-y-1.5 relative">
                   <label className="text-sm font-bold text-foreground">Labour Name</label>
-                  <input 
-                    required 
-                    type="text" 
-                    className="w-full bg-white border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#2648E7]/20 focus:border-[#2648E7] transition-all text-gray-900" 
-                    placeholder="e.g. Mason, Welder" 
-                    value={catName} 
-                    onChange={e => setCatName(e.target.value)} 
+                  <input
+                    required
+                    type="text"
+                    className="w-full bg-white border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#2648E7]/20 focus:border-[#2648E7] transition-all text-gray-900"
+                    placeholder="e.g. Mason, Welder"
+                    value={catName}
+                    onChange={e => setCatName(e.target.value)}
                     onFocus={(e) => {
                       const div = e.target.nextElementSibling as HTMLElement;
                       if (div) div.style.display = 'block';
@@ -427,27 +437,37 @@ export default function LabourRegister() {
                     {["Mistri", "Carpenter", "Helper", "Electrician", "Painter", "Plumber", "Welder", "Steel Fixer", "Mason"]
                       .filter(s => s.toLowerCase().includes(catName.toLowerCase()))
                       .map(s => (
-                        <div 
-                          key={s} 
+                        <div
+                          key={s}
                           className="px-4 py-2 hover:bg-gray-50 cursor-pointer text-sm text-foreground border-b border-border last:border-0"
                           onClick={() => setCatName(s)}
                         >
                           {s}
                         </div>
-                    ))}
+                      ))}
                   </div>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-sm font-bold text-foreground">Daily Wage (PKR)</label>
+                  <label className="text-sm font-bold text-foreground">Daily Wage</label>
                   <input required type="number" className="w-full bg-white border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#2648E7]/20 focus:border-[#2648E7] text-gray-900" placeholder="0" value={catWage} onChange={e => setCatWage(e.target.value)} />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-bold text-foreground">Half-Day Wage</label>
+                    <input required type="number" className="w-full bg-white border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#2648E7]/20 focus:border-[#2648E7] text-gray-900" placeholder="0" value={catHalfDayWage} onChange={e => setCatHalfDayWage(e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-bold text-foreground">OT Wage</label>
+                    <input required type="number" className="w-full bg-white border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#2648E7]/20 focus:border-[#2648E7] text-gray-900" placeholder="0" value={catOtWage} onChange={e => setCatOtWage(e.target.value)} />
+                  </div>
                 </div>
               </form>
             </div>
 
             <div className="px-6 py-4 border-t border-border bg-gray-50 flex gap-3">
               {editingCat && (
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   onClick={async () => {
                     if (confirm('Are you sure you want to delete this category?')) {
                       try {

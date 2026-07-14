@@ -11,7 +11,7 @@ interface ProjectSummary {
   project: {
     id: string; name: string; status: string; budget: number | null;
     actual_cost: number | null; start_date: string; end_date: string | null;
-    progress_percentage: number; manager: string; sitesCount: number; activeSitesCount: number;
+    progress_percentage: number; manager: string; supervisor: string; sitesCount: number; activeSitesCount: number;
   };
   todaySummary: {
     labourCount: number; labourCost: number; todayExpense: number;
@@ -211,7 +211,7 @@ export default function ProjectCommandCenter() {
         </div>
         <div>
           <p className="text-xs text-muted-foreground">Site Supervisor</p>
-          <p className="font-bold text-sm text-foreground">{project?.manager || 'Not Assigned'}</p>
+          <p className="font-bold text-sm text-foreground">{project?.supervisor || 'Not Assigned'}</p>
         </div>
         <span className="ml-auto text-xs bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-full font-bold">On Site</span>
       </Card>

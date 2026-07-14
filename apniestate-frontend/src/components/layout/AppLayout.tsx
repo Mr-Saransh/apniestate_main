@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Outlet, Navigate, useLocation } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Outlet, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useProject } from '@/context/ProjectContext';
 import Sidebar from './Sidebar';
@@ -9,9 +9,21 @@ import { X } from 'lucide-react';
 
 export default function AppLayout() {
   const { isAuthenticated, isLoading } = useAuth();
-  const { activeProject } = useProject();
+  const { activeProject, projects, loading: projectLoading } = useProject();
   const location = useLocation();
+  const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (!projectLoading && projects.length === 0 && location.pathname !== '/projects' && location.pathname !== '/login' && location.pathname !== '/signup' && location.pathname !== '/landing') {
+      if (user?.role === 'BUILDER') {
+        navigate('/projects?create=true');
+      } else {
+        navigate('/projects');
+      }
+    }
+  }, [projectLoading, projects.length, location.pathname, user?.role, navigate]);
 
   if (isLoading) {
     return (

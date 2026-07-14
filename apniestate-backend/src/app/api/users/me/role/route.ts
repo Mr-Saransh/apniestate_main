@@ -23,7 +23,7 @@ export const PATCH = withAuth(async (req: NextRequest, user) => {
   const { signAccessToken } = await import("@/lib/jwt");
   const newToken = signAccessToken({
     sub: updated.id,
-    email: updated.email,
+    email: updated.email || updated.username || "",
     role: updated.role as any,
     company_id: updated.company_id,
   });

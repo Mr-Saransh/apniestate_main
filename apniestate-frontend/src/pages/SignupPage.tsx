@@ -32,8 +32,8 @@ export default function SignupPage() {
 
     try {
       await signup({ email, password });
-      // New signups never have active workspaces yet. Must go to onboarding.
-      navigate('/onboarding', { replace: true });
+      // New signups are auto-provisioned a workspace now
+      navigate('/dashboard', { replace: true });
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message);

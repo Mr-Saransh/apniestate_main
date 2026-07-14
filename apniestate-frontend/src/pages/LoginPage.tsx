@@ -9,19 +9,20 @@ import '@/styles/login.css';
 export default function LoginPage() {
   const { login, isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [showDemoModal, setShowDemoModal] = useState(false);
   const [loggingInRole, setLoggingInRole] = useState<string | null>(null);
 
-  const handleDemoLogin = async (demoEmail: string, roleName: string) => {
+  const handleDemoLogin = async (demoIdentifier: string, roleName: string) => {
     setLoggingInRole(roleName);
+    setError('');
     try {
-      const response = await login({ email: demoEmail, password: 'admin123' });
+      const response = await login({ identifier: demoIdentifier, password: 'admin123' });
       if (!response.memberships || response.memberships.length === 0) {
         navigate('/onboarding', { replace: true });
         return;
@@ -48,10 +49,10 @@ export default function LoginPage() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
-    setSubmitting(true);
+    setLoading(true);
 
     try {
-      const response = await login({ email, password });
+      const response = await login({ identifier, password });
       
       if (!response.memberships || response.memberships.length === 0) {
         // No memberships -> Must create a company
@@ -69,7 +70,7 @@ export default function LoginPage() {
         setError('Unable to connect to server. Please try again.');
       }
     } finally {
-      setSubmitting(false);
+      setLoading(false);
     }
   };
 
@@ -98,16 +99,16 @@ export default function LoginPage() {
 
               <form onSubmit={handleSubmit}>
                 <div className="form-group">
-                  <label className="form-label" htmlFor="login-email">Email</label>
+                  <label className="form-label" htmlFor="login-identifier">Email or Username</label>
                   <input
-                    id="login-email"
-                    type="email"
+                    id="login-identifier"
+                    type="text"
                     className="form-input"
-                    placeholder="Enter your email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Enter your email or username"
+                    value={identifier}
+                    onChange={(e) => setIdentifier(e.target.value)}
                     required
-                    autoComplete="email"
+                    autoComplete="username"
                     autoFocus
                   />
                 </div>
@@ -150,9 +151,9 @@ export default function LoginPage() {
                 <button
                   type="submit"
                   className="btn btn-primary btn-full login-btn"
-                  disabled={submitting}
+                  disabled={loading}
                 >
-                  {submitting ? 'Authenticating...' : 'Login'}
+                  {loading ? 'Authenticating...' : 'Login'}
                 </button>
               </form>
 

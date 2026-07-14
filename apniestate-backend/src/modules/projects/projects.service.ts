@@ -49,6 +49,13 @@ export const getProjects = async (userId: string, role: string, companyId?: stri
             supervisor_id: userId
           }
         }
+      },
+      {
+        project_assignments: {
+          some: {
+            user_id: userId
+          }
+        }
       }
     ];
   }
