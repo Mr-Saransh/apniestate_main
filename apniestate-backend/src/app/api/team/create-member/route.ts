@@ -6,7 +6,7 @@ import bcrypt from "bcryptjs";
 export const POST = withAuth(async (req: NextRequest, user) => {
   try {
     const data = await req.json();
-    const { email, username, password, name, role, project_id } = data;
+    const { email, username, password, name, role, project_ids } = data;
 
     if ((!email && !username) || !password || !name || !role) {
       return NextResponse.json({ success: false, error: "Missing required fields (email or username, password, name, role)" }, { status: 400 });
@@ -56,16 +56,16 @@ export const POST = withAuth(async (req: NextRequest, user) => {
         },
       });
 
-      // 3. Optional: Create ProjectAssignment if project_id is provided and role is not BUILDER/ADMIN
-      if (project_id && role !== "BUILDER" && role !== "ADMIN") {
-        await tx.projectAssignment.create({
-          data: {
+      // 3. Optional: Create ProjectAssignments if project_ids is provided and role is not BUILDER/ADMIN
+      if (project_ids && Array.isArray(project_ids) && project_ids.length > 0 && role !== "BUILDER" && role !== "ADMIN") {
+        await tx.projectAssignment.createMany({
+          data: project_ids.map((pid: string) => ({
             user_id: newUser.id,
-            project_id,
+            project_id: pid,
             company_id: user.company_id,
             role,
             assigned_by: user.sub,
-          },
+          })),
         });
       }
 

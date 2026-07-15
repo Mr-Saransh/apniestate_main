@@ -9,6 +9,7 @@ const BaseUserSchema = z.object({
   phone: z.string().optional(),
   city: z.string().optional(),
   state: z.string().optional(),
+  project_ids: z.array(z.string()).optional(),
 });
 
 export const CreateUserSchema = BaseUserSchema.refine((data) => data.email || data.username, {

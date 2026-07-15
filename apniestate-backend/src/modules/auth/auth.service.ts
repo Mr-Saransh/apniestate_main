@@ -38,6 +38,25 @@ export async function loginUser(input: LoginInput) {
     },
   });
 
+  let effectiveSubscriptionStatus = user.subscription_status;
+  
+  const identifier = user.email || user.username || "";
+  const demoAccounts = ["admin@gmail.com", "sup1@apniestate.com", "pm1@apniestate.com", "accounts@apniestate.com"];
+  
+  if (demoAccounts.includes(identifier)) {
+    effectiveSubscriptionStatus = "ACTIVE" as any;
+  } else if (user.role !== "BUILDER" && user.company_id) {
+    const builder = await prisma.user.findFirst({
+      where: {
+        company_id: user.company_id,
+        role: "BUILDER"
+      }
+    });
+    if (builder) {
+      effectiveSubscriptionStatus = builder.subscription_status;
+    }
+  }
+
   return {
     accessToken,
     refreshToken,
@@ -50,7 +69,7 @@ export async function loginUser(input: LoginInput) {
       onboarded: user.onboarded,
       last_workspace_id: user.last_workspace_id,
       profile_completed: user.profile_completed,
-      subscription_status: user.subscription_status,
+      subscription_status: effectiveSubscriptionStatus,
       phone: user.phone,
       city: user.city,
       state: user.state,

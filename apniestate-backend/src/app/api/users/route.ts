@@ -14,7 +14,7 @@ export const POST = withPermission("users", "create")(async (req: NextRequest, u
   const parsed = await validateBody(req, CreateUserSchema);
   if ("error" in parsed) return parsed.error;
 
-  const newUser = await createUser(parsed.data, user.company_id);
+  const newUser = await createUser(parsed.data, user.company_id, user.sub);
   if (!newUser) return conflict("Email already in use");
 
   return created(newUser, "User created");

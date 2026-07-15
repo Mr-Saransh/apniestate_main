@@ -11,6 +11,7 @@ export interface User {
   state?: string | null;
   is_active: boolean;
   created_at: string;
+  project_assignments?: { project_id: string; project: { name: string } }[];
 }
 
 export interface CreateUserData {
@@ -20,7 +21,7 @@ export interface CreateUserData {
   password: string;
   role?: User['role'];
   phone?: string;
-  project_id?: string;
+  project_ids?: string[];
 }
 
 export interface UpdateUserData {
@@ -42,6 +43,9 @@ export const usersApi = {
 
   update: (id: string, data: UpdateUserData) =>
     apiClient.patch<User>(`/users/${id}`, data),
+
+  updateAssignments: (id: string, projectIds: string[]) =>
+    apiClient.put(`/users/${id}/assignments`, { project_ids: projectIds }),
 
   delete: (id: string) => apiClient.delete(`/users/${id}`),
 };

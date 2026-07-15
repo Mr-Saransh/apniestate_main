@@ -3,6 +3,7 @@ import { User, Mail, Building, Phone, Save, X, Edit2, Globe, MapPin, CreditCard 
 import { PH, Card } from '@/components/shared/FigmaComponents';
 import { useAuth } from '@/context/AuthContext';
 import { usersApi } from '@/api/users';
+import { apiClient } from '@/api/client';
 import { useTranslation } from 'react-i18next';
 
 export default function ProfilePage() {
@@ -23,16 +24,14 @@ export default function ProfilePage() {
 
   React.useEffect(() => {
     if (user?.company_id) {
-      import('@/api/client').then(({ apiClient }) => {
-        apiClient.get<any>('/companies/me').then(res => {
-          if (res.success && res.data) {
-            setCompanyName(res.data.name);
-            setEditCompanyName(res.data.name);
-          } else {
-            setCompanyName('Not found');
-          }
-        }).catch(() => setCompanyName('Error loading'));
-      });
+      apiClient.get<any>('/companies/me').then(res => {
+        if (res.success && res.data) {
+          setCompanyName(res.data.name);
+          setEditCompanyName(res.data.name);
+        } else {
+          setCompanyName('Not found');
+        }
+      }).catch(() => setCompanyName('Error loading'));
     } else {
       setCompanyName('No active workspace');
     }
@@ -43,8 +42,6 @@ export default function ProfilePage() {
     setSaving(true);
     setError('');
     try {
-      const { apiClient } = await import('@/api/client');
-      
       const [userRes, compRes] = await Promise.all([
         usersApi.update(user.id, { name: editName, phone: editPhone, city: editCity, state: editState }),
         user.role === 'BUILDER' ? apiClient.patch<any>('/companies/me', { name: editCompanyName }) : Promise.resolve({ success: true, data: { name: companyName } })

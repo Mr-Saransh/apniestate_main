@@ -91,8 +91,8 @@ function DashboardVisual() {
           <TrendingUp size={16} className="text-[#0B1F4D]" />
         </div>
         <div>
-          <div className="text-[8px] font-bold text-[#6B7BA8] uppercase">Cost Saved</div>
-          <div className="text-xs font-black text-[#0B1F4D]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>₹12L this month</div>
+          <div className="text-[8px] font-bold text-[#6B7BA8] uppercase">Budget Tracking</div>
+          <div className="text-xs font-black text-[#0B1F4D]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Real-time Costing</div>
         </div>
       </motion.div>
 
@@ -105,8 +105,8 @@ function DashboardVisual() {
           <Users size={16} className="text-white" />
         </div>
         <div>
-          <div className="text-[8px] font-bold text-[#6B7BA8] uppercase">Team Online</div>
-          <div className="text-xs font-black text-[#0B1F4D]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>1,240 Members</div>
+          <div className="text-[8px] font-bold text-[#6B7BA8] uppercase">Team Collaboration</div>
+          <div className="text-xs font-black text-[#0B1F4D]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>All synced up</div>
         </div>
       </motion.div>
     </div>
@@ -157,17 +157,17 @@ export default function ConstructionHero() {
               </button>
             </div>
 
-            {/* Real stats from screenshot */}
-            <div className="flex flex-wrap gap-6 items-center border-t border-[#0B1F4D]/6 pt-8">
+            {/* Value Pillars for Startup */}
+            <div className="grid grid-cols-2 gap-6 items-center border-t border-[#0B1F4D]/6 pt-8">
               {[
-                { val: '62%', label: 'Revenue Analyzed' },
-                { val: '10 Cr+', label: 'Projects Managed' },
-                { val: '1,240', label: 'Active Members' },
-                { val: '30+', label: 'Cities Covered' },
+                { title: 'Zero Setup', desc: 'Start instantly' },
+                { title: '100% Cloud', desc: 'Access anywhere' },
+                { title: 'Made for India', desc: 'Local workflows' },
+                { title: 'All-in-One', desc: 'End-to-end ERP' },
               ].map((s, i) => (
                 <div key={i} className="flex flex-col">
-                  <span className="text-xl font-black text-[#0B1F4D]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{s.val}</span>
-                  <span className="text-[10px] font-bold text-[#6B7BA8] uppercase tracking-wide">{s.label}</span>
+                  <span className="text-lg font-black text-[#0B1F4D]" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{s.title}</span>
+                  <span className="text-[10px] font-bold text-[#6B7BA8] uppercase tracking-wide">{s.desc}</span>
                 </div>
               ))}
             </div>
