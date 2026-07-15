@@ -13,7 +13,7 @@ export const PUT = withAuth(async (req: NextRequest, user, { params }) => {
     return badRequest("Only builders and admins can assign projects");
   }
 
-  const { id } = params;
+  const { id } = await params;
   if (!id) return badRequest("User ID is required");
 
   let body;
