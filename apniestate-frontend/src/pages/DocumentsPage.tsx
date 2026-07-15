@@ -96,8 +96,8 @@ export default function DocumentsPage() {
         formData.append('file', file);
         const uploadRes = await apiClient.upload<any>('/cloudinary/upload', formData);
         
-        if (uploadRes.success && uploadRes.result?.secure_url) {
-          finalUrl = uploadRes.result.secure_url;
+        if (uploadRes.success && (uploadRes as any).result?.secure_url) {
+          finalUrl = (uploadRes as any).result.secure_url;
         } else {
           throw new Error('Image upload failed');
         }
