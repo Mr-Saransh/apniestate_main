@@ -312,21 +312,35 @@ enum MembershipStatus {
   RESIGNED
 }
 
+enum SubscriptionStatus {
+  NONE
+  PENDING_TRIAL
+  TRIAL_ACTIVE
+  TRIAL_EXPIRED
+  ACTIVE
+  EXPIRING_SOON
+  EXPIRED
+}
+
 // ─── Core Models ─────────────────────────────────────────
 
 model User {
-  id                String   @id @default(cuid())
-  name              String
-  email             String?  @unique
-  username          String?  @unique
-  password_hash     String
-  role              Role     @default(SITE_SUPERVISOR)
-  phone             String?
-  is_active         Boolean  @default(true)
-  onboarded         Boolean  @default(false)
-  last_workspace_id String?
-  created_at        DateTime @default(now())
-  updated_at        DateTime @updatedAt
+  id                  String             @id @default(cuid())
+  name                String
+  email               String?            @unique
+  username            String?            @unique
+  password_hash       String
+  role                Role               @default(SITE_SUPERVISOR)
+  phone               String?
+  city                String?
+  state               String?
+  is_active           Boolean            @default(true)
+  onboarded           Boolean            @default(false)
+  profile_completed   Boolean            @default(false)
+  subscription_status SubscriptionStatus @default(NONE)
+  last_workspace_id   String?
+  created_at          DateTime           @default(now())
+  updated_at          DateTime           @updatedAt
 
   projects          Project[]              @relation("BuilderProjects")
   managed_projects  Project[]              @relation("ManagerProjects")
@@ -354,6 +368,7 @@ model User {
   attachments       Attachment[]
   approval_logs     ApprovalLog[]
   weekly_reports    WeeklyReport[]
+  subscriptions     Subscription[]
 
   // Enterprise membership relations
   invitations_sent       Invitation[]        @relation("InvitationSender")
@@ -2170,4 +2185,31 @@ model BOQItem {
 
   @@index([category_id])
   @@map("boq_items")
+}
+
+// ─── Subscriptions ───────────────────────────────────────
+
+model Subscription {
+  id                String             @id @default(cuid())
+  user_id           String
+  type              String             // "PAID" or "TRIAL"
+  status            SubscriptionStatus
+  amount            Float?
+  starts_at         DateTime
+  expires_at        DateTime
+  payment_id        String?
+  razorpay_order_id String?
+  razorpay_signature String?
+  approved_by       String?
+  notification_7day Boolean            @default(false)
+  notification_3day Boolean            @default(false)
+  created_at        DateTime           @default(now())
+  updated_at        DateTime           @updatedAt
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id], name: "idx_subscription_user_id")
+  @@index([status], name: "idx_subscription_status")
+  @@index([expires_at], name: "idx_subscription_expires")
+  @@map("subscriptions")
 }

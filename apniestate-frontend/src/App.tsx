@@ -46,6 +46,14 @@ import PurchaseWorkspace from '@/pages/PurchaseWorkspace';
 import FinanceWorkspace from '@/pages/FinanceWorkspace';
 import OperationsWorkspace from '@/pages/OperationsWorkspace';
 
+import AdminLoginPage from '@/pages/admin/AdminLoginPage';
+import AdminDashboardPage from '@/pages/admin/AdminDashboardPage';
+import CompleteProfilePage from '@/pages/CompleteProfilePage';
+import SubscriptionPage from '@/pages/SubscriptionPage';
+import PendingApprovalPage from '@/pages/PendingApprovalPage';
+import RenewSubscriptionPage from '@/pages/RenewSubscriptionPage';
+import SubscriptionBanner from '@/components/shared/SubscriptionBanner';
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -65,12 +73,24 @@ export default function App() {
         <AuthProvider>
           <ProjectProvider>
             <BrowserRouter>
+              <SubscriptionBanner />
               <Routes>
               {/* Public routes */}
               <Route path="/login" element={<LoginPage />} />
               <Route path="/signup" element={<SignupPage />} />
               <Route path="/landing" element={<LandingPage />} />
               
+              {/* Subscription & Profile Flow */}
+              <Route path="/complete-profile" element={<CompleteProfilePage />} />
+              <Route path="/subscription" element={<SubscriptionPage />} />
+              <Route path="/pending-approval" element={<PendingApprovalPage />} />
+              <Route path="/renew" element={<RenewSubscriptionPage />} />
+
+              {/* Admin Panel */}
+              <Route path="/apni-admin" element={<Navigate to="/apni-admin/login" replace />} />
+              <Route path="/apni-admin/login" element={<AdminLoginPage />} />
+              <Route path="/apni-admin/dashboard" element={<AdminDashboardPage />} />
+
               {/* Guarded onboarding/invitations */}
               <Route path="/my-invitations" element={<MyInvitationsPage />} />
 

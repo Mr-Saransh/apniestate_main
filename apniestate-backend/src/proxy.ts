@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 
 const FRONTEND_URL = process.env.FRONTEND_URL ?? "http://localhost:3000";
 
-export function middleware(req: NextRequest) {
+export function proxy(req: NextRequest) {
   const res = NextResponse.next();
   const origin = req.headers.get("origin");
   const allowedOrigins = [FRONTEND_URL, "http://localhost:5173", "http://localhost:3000"];

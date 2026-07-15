@@ -16,14 +16,47 @@ export default function AppLayout() {
   const { user } = useAuth();
 
   useEffect(() => {
-    if (!projectLoading && projects.length === 0 && location.pathname !== '/projects' && location.pathname !== '/login' && location.pathname !== '/signup' && location.pathname !== '/landing') {
-      if (user?.role === 'BUILDER') {
-        navigate('/projects?create=true');
-      } else {
-        navigate('/projects');
+    const allowedPaths = ['/projects', '/login', '/signup', '/landing', '/complete-profile', '/subscription', '/pending-approval', '/renew', '/profile', '/notifications'];
+    const currentPath = location.pathname;
+
+    // Admin panel paths are handled in App.tsx directly without AppLayout
+    if (currentPath.startsWith('/apni-admin')) return;
+
+    if (user) {
+      // 1. Profile must be completed
+      if (!user.profile_completed && currentPath !== '/complete-profile') {
+        navigate('/complete-profile', { replace: true });
+        return;
+      }
+      
+      // 2. Must have some subscription interaction
+      if (user.profile_completed) {
+        if (user.subscription_status === 'NONE' && currentPath !== '/subscription') {
+          navigate('/subscription', { replace: true });
+          return;
+        }
+
+        if (user.subscription_status === 'PENDING_TRIAL' && currentPath !== '/pending-approval') {
+          navigate('/pending-approval', { replace: true });
+          return;
+        }
+
+        if ((user.subscription_status === 'EXPIRED' || user.subscription_status === 'TRIAL_EXPIRED') && currentPath !== '/renew') {
+          navigate('/renew', { replace: true });
+          return;
+        }
+      }
+
+      // 3. Normal workspace redirect if everything is good
+      if (!projectLoading && projects.length === 0 && !allowedPaths.includes(currentPath)) {
+        if (user?.role === 'BUILDER') {
+          navigate('/projects?create=true');
+        } else {
+          navigate('/projects');
+        }
       }
     }
-  }, [projectLoading, projects.length, location.pathname, user?.role, navigate]);
+  }, [projectLoading, projects.length, location.pathname, user, navigate]);
 
   if (isLoading) {
     return (

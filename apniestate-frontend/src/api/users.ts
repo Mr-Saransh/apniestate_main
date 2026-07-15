@@ -7,6 +7,8 @@ export interface User {
   username?: string | null;
   role: 'ADMIN' | 'BUILDER' | 'SITE_SUPERVISOR' | 'ACCOUNTANT' | 'INVENTORY_MANAGER' | 'PROJECT_MANAGER';
   phone: string | null;
+  city?: string | null;
+  state?: string | null;
   is_active: boolean;
   created_at: string;
 }
@@ -26,6 +28,8 @@ export interface UpdateUserData {
   email?: string;
   role?: User['role'];
   phone?: string;
+  city?: string;
+  state?: string;
 }
 
 export const usersApi = {

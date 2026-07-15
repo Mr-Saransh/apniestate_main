@@ -12,7 +12,7 @@ export const getUsers = (companyId?: string | null) => {
         { memberships: { some: { company_id: companyId } } }
       ]
     },
-    select: { id: true, name: true, email: true, role: true, phone: true, is_active: true, created_at: true },
+    select: { id: true, name: true, email: true, role: true, phone: true, city: true, state: true, is_active: true, created_at: true },
     orderBy: { created_at: "desc" },
   });
 };
@@ -27,7 +27,7 @@ export const getUserById = (id: string, companyId?: string | null) => {
         { memberships: { some: { company_id: companyId } } }
       ]
     },
-    select: { id: true, name: true, email: true, role: true, phone: true, is_active: true, created_at: true },
+    select: { id: true, name: true, email: true, role: true, phone: true, city: true, state: true, is_active: true, created_at: true },
   });
 };
 
@@ -38,8 +38,8 @@ export async function createUser(input: CreateUserInput, companyId?: string | nu
 
   const password_hash = await bcrypt.hash(input.password, 12);
   return prisma.user.create({
-    data: { name: input.name, email: input.email || null, username: input.username || null, password_hash, role: input.role, phone: input.phone, company_id: companyId || null },
-    select: { id: true, name: true, email: true, username: true, role: true, created_at: true },
+    data: { name: input.name, email: input.email || null, username: input.username || null, password_hash, role: input.role, phone: input.phone, city: input.city, state: input.state, company_id: companyId || null },
+    select: { id: true, name: true, email: true, username: true, role: true, city: true, state: true, created_at: true },
   });
 }
 
@@ -55,7 +55,7 @@ export const updateUser = async (id: string, data: UpdateUserInput, companyId?: 
     } 
   });
   if (!existing) return null;
-  return prisma.user.update({ where: { id }, data, select: { id: true, name: true, email: true, role: true, phone: true } });
+  return prisma.user.update({ where: { id }, data, select: { id: true, name: true, email: true, role: true, phone: true, city: true, state: true } });
 };
 
 export const deleteUser = async (id: string, companyId?: string | null) => {

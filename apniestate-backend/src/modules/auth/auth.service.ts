@@ -49,6 +49,11 @@ export async function loginUser(input: LoginInput) {
       company_id: user.company_id,
       onboarded: user.onboarded,
       last_workspace_id: user.last_workspace_id,
+      profile_completed: user.profile_completed,
+      subscription_status: user.subscription_status,
+      phone: user.phone,
+      city: user.city,
+      state: user.state,
     },
     memberships: memberships.map(m => ({
       id: m.id,
@@ -80,43 +85,21 @@ export async function signupUser(input: import("./auth.schema").SignupInput) {
   const passwordHash = await bcrypt.hash(input.password, 10);
   const name = input.email.split("@")[0];
 
-  // Run in a transaction to create User, Company, and Membership atomically
-  const { user, company, membership } = await prisma.$transaction(async (tx) => {
-    const newUser = await tx.user.create({
-      data: {
-        email: input.email,
-        password_hash: passwordHash,
-        name,
-        role: "BUILDER", // Default to builder on sign up
-        onboarded: true, // Skip onboarding
-      },
-    });
-
-    const newCompany = await tx.company.create({
-      data: {
-        name: `${name}'s Workspace`,
-      },
-    });
-
-    const newMembership = await tx.companyMembership.create({
-      data: {
-        user_id: newUser.id,
-        company_id: newCompany.id,
-        roles: ["BUILDER"],
-        status: "ACTIVE",
-      },
-    });
-
-    // Update user's last workspace
-    await tx.user.update({
-      where: { id: newUser.id },
-      data: { last_workspace_id: newCompany.id },
-    });
-
-    return { user: newUser, company: newCompany, membership: newMembership };
+  // Create user only — NO company/workspace yet.
+  // User must complete profile + subscribe before getting a workspace.
+  const user = await prisma.user.create({
+    data: {
+      email: input.email,
+      password_hash: passwordHash,
+      name,
+      role: "BUILDER",
+      onboarded: false,
+      profile_completed: false,
+      subscription_status: "NONE",
+    },
   });
 
-  const accessToken = signAccessToken({ sub: user.id, email: user.email || user.username || "", role: user.role as Role, company_id: company.id });
+  const accessToken = signAccessToken({ sub: user.id, email: user.email || "", role: user.role as Role, company_id: null });
   const refreshToken = signRefreshToken(user.id);
 
   const tokenHash = await hashToken(refreshToken);
@@ -134,25 +117,17 @@ export async function signupUser(input: import("./auth.schema").SignupInput) {
     user: {
       id: user.id,
       name: user.name,
-      email: user.email || user.username || "",
+      email: user.email || "",
       role: user.role as Role,
-      company_id: company.id,
-      onboarded: true,
-      last_workspace_id: company.id,
+      company_id: null,
+      onboarded: false,
+      last_workspace_id: null,
+      profile_completed: false,
+      subscription_status: "NONE" as const,
+      phone: null,
+      city: null,
+      state: null,
     },
-    memberships: [
-      {
-        id: membership.id,
-        user_id: membership.user_id,
-        company_id: membership.company_id,
-        roles: membership.roles,
-        status: membership.status,
-        last_active_at: membership.last_active_at,
-        company: {
-          id: company.id,
-          name: company.name,
-        },
-      },
-    ],
+    memberships: [],
   };
 }

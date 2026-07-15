@@ -69,7 +69,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setToken(null);
       setUser(null);
       setPermissions([]);
-      window.location.href = '/login';
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
     };
 
     window.addEventListener('auth:unauthorized', handleUnauthorized);

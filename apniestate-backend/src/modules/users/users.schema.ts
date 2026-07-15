@@ -7,6 +7,8 @@ const BaseUserSchema = z.object({
   password: z.string().min(8),
   role: z.enum(["ADMIN", "BUILDER", "SITE_SUPERVISOR", "ACCOUNTANT", "INVENTORY_MANAGER", "PROJECT_MANAGER"]).optional(),
   phone: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
 });
 
 export const CreateUserSchema = BaseUserSchema.refine((data) => data.email || data.username, {

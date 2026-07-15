@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, Mail, Building, Phone, Save, X, Edit2, Globe } from 'lucide-react';
+import { User, Mail, Building, Phone, Save, X, Edit2, Globe, MapPin, CreditCard } from 'lucide-react';
 import { PH, Card } from '@/components/shared/FigmaComponents';
 import { useAuth } from '@/context/AuthContext';
 import { usersApi } from '@/api/users';
@@ -12,6 +12,8 @@ export default function ProfilePage() {
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(user?.name || '');
   const [editPhone, setEditPhone] = useState(user?.phone || '');
+  const [editCity, setEditCity] = useState(user?.city || '');
+  const [editState, setEditState] = useState(user?.state || '');
   
   const [companyName, setCompanyName] = useState('Loading...');
   const [editCompanyName, setEditCompanyName] = useState('');
@@ -44,12 +46,12 @@ export default function ProfilePage() {
       const { apiClient } = await import('@/api/client');
       
       const [userRes, compRes] = await Promise.all([
-        usersApi.update(user.id, { name: editName, phone: editPhone }),
+        usersApi.update(user.id, { name: editName, phone: editPhone, city: editCity, state: editState }),
         user.role === 'BUILDER' ? apiClient.patch<any>('/companies/me', { name: editCompanyName }) : Promise.resolve({ success: true, data: { name: companyName } })
       ]);
 
       if (userRes.success) {
-        updateUser({ ...user, name: editName, phone: editPhone });
+        updateUser({ ...user, name: editName, phone: editPhone, city: editCity, state: editState });
       }
       
       if (compRes.success && compRes.data?.name) {
@@ -148,6 +150,34 @@ export default function ProfilePage() {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0"><MapPin size={16} className="text-muted-foreground" /></div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase">Location</p>
+              {isEditing ? (
+                <div className="flex gap-2 mt-1">
+                  <input
+                    type="text"
+                    value={editCity}
+                    onChange={e => setEditCity(e.target.value)}
+                    className="w-1/2 text-sm font-semibold border-b-2 border-primary focus:outline-none bg-transparent py-1 px-2"
+                    placeholder="City"
+                  />
+                  <input
+                    type="text"
+                    value={editState}
+                    onChange={e => setEditState(e.target.value)}
+                    className="w-1/2 text-sm font-semibold border-b-2 border-primary focus:outline-none bg-transparent py-1 px-2"
+                    placeholder="State"
+                  />
+                </div>
+              ) : (
+                <p className="text-sm font-semibold truncate">
+                  {user?.city && user?.state ? `${user.city}, ${user.state}` : 'Location not set'}
+                </p>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0"><Building size={16} className="text-muted-foreground" /></div>
             <div className="flex-1 min-w-0">
               <p className="text-[10px] font-bold text-muted-foreground uppercase">Company / Workspace Name</p>
@@ -162,6 +192,21 @@ export default function ProfilePage() {
               ) : (
                 <p className="text-sm font-semibold truncate text-muted-foreground">{companyName}</p>
               )}
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0"><CreditCard size={16} className="text-muted-foreground" /></div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase">Subscription Status</p>
+              <div className="mt-1">
+                {user?.subscription_status === 'ACTIVE' && <span className="inline-flex px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold">Active</span>}
+                {user?.subscription_status === 'TRIAL_ACTIVE' && <span className="inline-flex px-2 py-1 bg-emerald-100 text-emerald-700 rounded text-xs font-bold">Trial Active</span>}
+                {user?.subscription_status === 'EXPIRING_SOON' && <span className="inline-flex px-2 py-1 bg-orange-100 text-orange-700 rounded text-xs font-bold">Expiring Soon</span>}
+                {user?.subscription_status === 'EXPIRED' && <span className="inline-flex px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-bold">Expired</span>}
+                {user?.subscription_status === 'TRIAL_EXPIRED' && <span className="inline-flex px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-bold">Trial Expired</span>}
+                {(!user?.subscription_status || user?.subscription_status === 'NONE') && <span className="inline-flex px-2 py-1 bg-gray-100 text-gray-500 rounded text-xs font-bold">None</span>}
+                {user?.subscription_status === 'PENDING_TRIAL' && <span className="inline-flex px-2 py-1 bg-yellow-100 text-yellow-700 rounded text-xs font-bold">Pending Approval</span>}
+              </div>
             </div>
           </div>
         </div>

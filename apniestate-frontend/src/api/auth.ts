@@ -18,7 +18,11 @@ export interface AuthUser {
   email: string;
   role: Role;
   phone?: string | null;
+  city?: string | null;
+  state?: string | null;
   onboarded?: boolean;
+  profile_completed?: boolean;
+  subscription_status?: string;
   company_id?: string | null;
   company?: any;
   last_workspace_id?: string | null;

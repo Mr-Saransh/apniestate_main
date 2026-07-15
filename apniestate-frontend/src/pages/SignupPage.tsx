@@ -31,9 +31,16 @@ export default function SignupPage() {
     setSubmitting(true);
 
     try {
-      await signup({ email, password });
-      // New signups are auto-provisioned a workspace now
-      navigate('/dashboard', { replace: true });
+      const res = await signup({ email, password });
+      
+      // Navigate based on profile/subscription status
+      if (!res.user.profile_completed) {
+        navigate('/complete-profile', { replace: true });
+      } else if (res.user.subscription_status === 'NONE') {
+        navigate('/subscription', { replace: true });
+      } else {
+        navigate('/dashboard', { replace: true });
+      }
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message);

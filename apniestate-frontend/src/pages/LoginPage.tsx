@@ -23,10 +23,25 @@ export default function LoginPage() {
     setError('');
     try {
       const response = await login({ identifier: demoIdentifier, password: 'admin123' });
-      if (!response.memberships || response.memberships.length === 0) {
-        navigate('/onboarding', { replace: true });
+      
+      const { user } = response;
+      if (!user.profile_completed) {
+        navigate('/complete-profile', { replace: true });
         return;
       }
+      if (user.subscription_status === 'NONE') {
+        navigate('/subscription', { replace: true });
+        return;
+      }
+      if (user.subscription_status === 'PENDING_TRIAL') {
+        navigate('/pending-approval', { replace: true });
+        return;
+      }
+      if (user.subscription_status === 'EXPIRED' || user.subscription_status === 'TRIAL_EXPIRED') {
+        navigate('/renew', { replace: true });
+        return;
+      }
+
       navigate('/dashboard', { replace: true });
     } catch (err) {
       console.error('Demo login failed', err);
@@ -54,13 +69,24 @@ export default function LoginPage() {
     try {
       const response = await login({ identifier, password });
       
-      if (!response.memberships || response.memberships.length === 0) {
-        // No memberships -> Must create a company
-        navigate('/onboarding', { replace: true });
+      const { user } = response;
+      if (!user.profile_completed) {
+        navigate('/complete-profile', { replace: true });
+        return;
+      }
+      if (user.subscription_status === 'NONE') {
+        navigate('/subscription', { replace: true });
+        return;
+      }
+      if (user.subscription_status === 'PENDING_TRIAL') {
+        navigate('/pending-approval', { replace: true });
+        return;
+      }
+      if (user.subscription_status === 'EXPIRED' || user.subscription_status === 'TRIAL_EXPIRED') {
+        navigate('/renew', { replace: true });
         return;
       }
 
-      // For now, route directly to the dashboard
       navigate('/dashboard', { replace: true });
       
     } catch (err) {
@@ -158,7 +184,7 @@ export default function LoginPage() {
               </form>
 
               <div className="login-footer-links" style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '16px' }}>
-                <p style={{ margin: 0 }}>Don't have an account? <Link to="/">Sign up</Link></p>
+                <p style={{ margin: 0 }}>Don't have an account? <Link to="/signup">Sign up</Link></p>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', opacity: 0.5 }}>
                   <div style={{ flex: 1, height: '1px', background: 'currentColor' }} />
                   <span style={{ fontSize: '12px', textTransform: 'uppercase' }}>or</span>
