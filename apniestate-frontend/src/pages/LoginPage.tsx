@@ -250,7 +250,7 @@ export default function LoginPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div style={{ padding: '12px', background: '#F8FAFC', borderRadius: '8px', fontSize: '12px', color: '#475569', marginBottom: '8px', border: '1px solid #E2E8F0' }}>
                 <p style={{ marginBottom: '4px' }}><strong>Builder:</strong> admin@gmail.com / admin123</p>
-                <p style={{ marginBottom: '4px' }}><strong>Supervisor:</strong> sup1@apniestate.com / admin123</p>
+                <p style={{ marginBottom: '4px' }}><strong>Supervisor:</strong> site@gmail.com / admin123</p>
                 <p style={{ marginBottom: '4px' }}><strong>Manager:</strong> pm1@apniestate.com / admin123</p>
                 <p style={{ margin: 0 }}><strong>Accountant:</strong> accounts@apniestate.com / admin123</p>
               </div>
@@ -265,7 +265,7 @@ export default function LoginPage() {
               
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
                 <button 
-                  onClick={() => handleDemoLogin('sup1@apniestate.com', 'Supervisor')}
+                  onClick={() => handleDemoLogin('site@gmail.com', 'Supervisor')}
                   disabled={loggingInRole !== null}
                   style={{ padding: '12px 8px', borderRadius: '12px', backgroundColor: '#EFF6FF', color: '#2648E7', fontWeight: 600, fontSize: '12px', border: '1px solid #DBEAFE', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}
                 >

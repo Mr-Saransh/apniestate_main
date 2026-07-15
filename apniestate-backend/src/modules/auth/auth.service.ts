@@ -41,7 +41,7 @@ export async function loginUser(input: LoginInput) {
   let effectiveSubscriptionStatus = user.subscription_status;
   
   const identifier = user.email || user.username || "";
-  const demoAccounts = ["admin@gmail.com", "sup1@apniestate.com", "pm1@apniestate.com", "accounts@apniestate.com"];
+  const demoAccounts = ["admin@gmail.com", "site@gmail.com", "pm1@apniestate.com", "accounts@apniestate.com"];
   
   if (demoAccounts.includes(identifier)) {
     effectiveSubscriptionStatus = "ACTIVE" as any;
