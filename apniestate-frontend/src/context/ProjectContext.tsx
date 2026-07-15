@@ -8,6 +8,7 @@ interface ProjectContextType {
   activeProject: Project | null;
   setActiveProjectId: (id: string | null) => void;
   loading: boolean;
+  refreshProjects: () => Promise<void>;
 }
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
@@ -20,48 +21,38 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   });
   const [loading, setLoading] = useState(true);
 
+  const fetchProjects = async () => {
+    if (!token) {
+      setProjects([]);
+      setActiveProjectId(null);
+      setLoading(false);
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      const res = await projectsApi.getAll();
+      setProjects(res.data || []);
+      if (res.data && res.data.length > 0) {
+        const savedId = localStorage.getItem('activeProjectId');
+        if (savedId && res.data.find(p => p.id === savedId)) {
+          setActiveProjectId(savedId);
+        } else if (!activeProjectId || !res.data.find(p => p.id === activeProjectId)) {
+          setActiveProjectId(res.data[0].id);
+        }
+      } else {
+        setActiveProjectId(null);
+      }
+    } catch (err) {
+      console.error("Failed to fetch projects for context:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Load projects when authenticated
   useEffect(() => {
-    let isMounted = true;
-    
-    const fetchProjects = async () => {
-      if (!token) {
-        setProjects([]);
-        setActiveProjectId(null);
-        setLoading(false);
-        return;
-      }
-      
-      try {
-        setLoading(true);
-        const res = await projectsApi.getAll();
-        if (isMounted) {
-          setProjects(res.data || []);
-          if (res.data && res.data.length > 0) {
-            const savedId = localStorage.getItem('activeProjectId');
-            if (savedId && res.data.find(p => p.id === savedId)) {
-              setActiveProjectId(savedId);
-            } else if (!activeProjectId || !res.data.find(p => p.id === activeProjectId)) {
-              setActiveProjectId(res.data[0].id);
-            }
-          } else {
-            setActiveProjectId(null);
-          }
-        }
-      } catch (err) {
-        console.error("Failed to fetch projects for context:", err);
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
-
     fetchProjects();
-
-    return () => {
-      isMounted = false;
-    };
   }, [token]);
 
   // Persist active project to localStorage
@@ -76,7 +67,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   const activeProject = projects.find(p => p.id === activeProjectId) || null;
 
   return (
-    <ProjectContext.Provider value={{ projects, activeProjectId, activeProject, setActiveProjectId, loading }}>
+    <ProjectContext.Provider value={{ projects, activeProjectId, activeProject, setActiveProjectId, loading, refreshProjects: fetchProjects }}>
       {children}
     </ProjectContext.Provider>
   );

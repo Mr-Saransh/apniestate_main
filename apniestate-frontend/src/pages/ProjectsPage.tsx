@@ -42,7 +42,7 @@ function fmt(n: number | null | undefined) {
 export default function ProjectsPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { setActiveProjectId } = useProject();
+  const { setActiveProjectId, refreshProjects } = useProject();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -95,11 +95,13 @@ export default function ProjectsPage() {
         status: formStatus, budget: formBudget ? parseFloat(formBudget) : undefined,
         address: formAddress || undefined, city: formCity || undefined,
       };
-      await projectsApi.create(data);
+      const newProjectRes = await projectsApi.create(data);
       setShowCreateModal(false);
       resetForm();
       fetchProjects();
-      navigate('/projects');
+      await refreshProjects();
+      if (newProjectRes.data) setActiveProjectId(newProjectRes.data.id);
+      navigate('/dashboard');
     } catch (err: any) {
       setFormError(err.message || 'Failed to create project');
     } finally {

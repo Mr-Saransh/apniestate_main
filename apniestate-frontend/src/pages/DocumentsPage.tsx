@@ -32,6 +32,7 @@ export default function DocumentsPage() {
   const [name, setName] = useState('');
   const [category, setCategory] = useState('Blueprints');
   const [fileUrl, setFileUrl] = useState('');
+  const [file, setFile] = useState<File | null>(null);
 
   const loadDocuments = async () => {
     try {
@@ -61,6 +62,7 @@ export default function DocumentsPage() {
     setName('');
     setCategory('Blueprints');
     setFileUrl('');
+    setFile(null);
     setFormError('');
   };
 
@@ -76,22 +78,40 @@ export default function DocumentsPage() {
       setFormError('Document Title is required.');
       return;
     }
+    if (!file && !fileUrl) {
+      setFormError('Please select a file or provide a URL.');
+      return;
+    }
 
     setSaving(true);
     setFormError('');
-    // Simulating file metadata
-    const dummyUrl = fileUrl || `https://apniestate-storage.s3.amazonaws.com/docs/${encodeURIComponent(name.toLowerCase())}.pdf`;
-    const dummySize = Math.floor(Math.random() * 4500) + 120; // 120KB to 4.6MB
 
     try {
+      let finalUrl = fileUrl || `https://apniestate-storage.s3.amazonaws.com/docs/${encodeURIComponent(name.toLowerCase())}.pdf`;
+      let finalSize = Math.floor(Math.random() * 4500) + 120;
+
+      if (file) {
+        finalSize = Math.round(file.size / 1024);
+        const formData = new FormData();
+        formData.append('file', file);
+        const uploadRes = await apiClient.upload<any>('/cloudinary/upload', formData);
+        
+        if (uploadRes.success && uploadRes.result?.secure_url) {
+          finalUrl = uploadRes.result.secure_url;
+        } else {
+          throw new Error('Image upload failed');
+        }
+      }
+
       await apiClient.post<DocumentItem>('/documents', {
         name,
         category,
-        file_url: dummyUrl,
+        file_url: finalUrl,
         entity_type: 'company',
-        entity_id: 'default', // would be actual company id
-        file_size: dummySize
+        entity_id: 'default',
+        file_size: finalSize
       });
+      
       loadDocuments();
       handleCloseModal();
     } catch (err: any) {
@@ -213,9 +233,13 @@ export default function DocumentsPage() {
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">File URL (Optional Mock)</label>
-                  <input type="url" className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary" value={fileUrl} onChange={e => setFileUrl(e.target.value)} placeholder="https://..." />
-                  <p className="text-[9px] text-muted-foreground mt-1">Leave empty to auto-generate a mock URL for this demo.</p>
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">File Upload</label>
+                  <input type="file" onChange={e => setFile(e.target.files?.[0] || null)} className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary" accept="application/pdf,image/*,.doc,.docx" />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Or File URL</label>
+                  <input type="url" className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary" value={fileUrl} onChange={e => setFileUrl(e.target.value)} placeholder="https://..." disabled={!!file} />
                 </div>
               </div>
               
