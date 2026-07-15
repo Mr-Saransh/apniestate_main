@@ -125,7 +125,7 @@ export default function TopBar({ onOpenSidebar }: { onOpenSidebar: () => void })
             </div>
             <div className="p-2 border-t border-border">
               <button 
-                onClick={() => { setShowSwitcher(false); navigate('/projects/new'); }}
+                onClick={() => { setShowSwitcher(false); navigate('/projects?create=true'); }}
                 className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl font-semibold text-sm text-slate-700 hover:bg-slate-100 transition-colors"
               >
                 <Plus size={16} /> Create New Project
