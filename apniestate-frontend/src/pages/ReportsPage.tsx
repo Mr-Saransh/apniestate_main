@@ -50,57 +50,90 @@ async function downloadCsv(type: string, projectId: string) {
 
 function addHeader(doc: jsPDF, title: string, projectName?: string) {
   const pageW = doc.internal.pageSize.getWidth();
-  // Gradient bar
-  doc.setFillColor(38, 72, 231);
-  doc.rect(0, 0, pageW, 36, 'F');
-  doc.setFillColor(99, 102, 241);
-  doc.rect(0, 36, pageW, 4, 'F');
+  // Premium dark header with brand blue accent
+  doc.setFillColor(15, 23, 42); // Slate-900
+  doc.rect(0, 0, pageW, 42, 'F');
+  doc.setFillColor(38, 72, 231); // Brand blue
+  doc.rect(0, 42, pageW, 4, 'F');
 
   doc.setTextColor(255, 255, 255);
-  doc.setFontSize(18);
+  doc.setFontSize(22);
   doc.setFont('helvetica', 'bold');
-  doc.text(title, 14, 18);
+  doc.text(title, 14, 24);
 
   if (projectName) {
-    doc.setFontSize(10);
+    doc.setFontSize(11);
     doc.setFont('helvetica', 'normal');
-    doc.text(projectName, 14, 28);
+    doc.setTextColor(180, 195, 255);
+    doc.text(`Project: ${projectName}`, 14, 34);
   }
 
   doc.setFontSize(9);
-  doc.text(`Generated: ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}`, pageW - 14, 18, { align: 'right' });
+  doc.setTextColor(180, 195, 255);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`REPORT GENERATED`, pageW - 14, 20, { align: 'right' });
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.text(`${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`, pageW - 14, 26, { align: 'right' });
 
   doc.setTextColor(0, 0, 0);
-  return 48; // y position after header
+  return 60; // y position after header
 }
 
 function addSectionTitle(doc: jsPDF, title: string, y: number) {
-  doc.setFontSize(13);
+  doc.setFontSize(14);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(38, 72, 231);
-  doc.text(title, 14, y);
+  doc.setTextColor(15, 23, 42);
+  doc.text(title.toUpperCase(), 14, y);
+  
+  // Premium dual-tone underline
   doc.setDrawColor(38, 72, 231);
+  doc.setLineWidth(1.5);
+  doc.line(14, y + 4, 44, y + 4);
+  doc.setDrawColor(226, 232, 240);
   doc.setLineWidth(0.5);
-  doc.line(14, y + 2, doc.internal.pageSize.getWidth() - 14, y + 2);
+  doc.line(44, y + 4, doc.internal.pageSize.getWidth() - 14, y + 4);
+  
   doc.setTextColor(0, 0, 0);
-  return y + 10;
+  return y + 14;
 }
 
 function addKVPairs(doc: jsPDF, pairs: [string, string | number][], startY: number) {
   let y = startY;
   doc.setFontSize(10);
   pairs.forEach(([label, value]) => {
-    if (y > doc.internal.pageSize.getHeight() - 20) {
+    if (y > doc.internal.pageSize.getHeight() - 30) {
       doc.addPage();
       y = 20;
     }
     doc.setFont('helvetica', 'bold');
+    doc.setTextColor(100, 116, 139);
     doc.text(`${label}:`, 16, y);
     doc.setFont('helvetica', 'normal');
+    doc.setTextColor(15, 23, 42);
     doc.text(String(value), 80, y);
-    y += 7;
+    y += 8;
   });
   return y;
+}
+
+function addFooter(doc: jsPDF) {
+  const pageCount = (doc as any).internal.getNumberOfPages ? (doc as any).internal.getNumberOfPages() : (doc as any).getNumberOfPages ? (doc as any).getNumberOfPages() : doc.internal.pages.length - 1;
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setDrawColor(226, 232, 240);
+    doc.setLineWidth(0.5);
+    doc.line(14, pageH - 15, pageW - 14, pageH - 15);
+    
+    doc.setFontSize(8);
+    doc.setTextColor(148, 163, 184);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Apni Estate - Premium Construction Management System', 14, pageH - 8);
+    doc.text(`Page ${i} of ${pageCount}`, pageW - 14, pageH - 8, { align: 'right' });
+  }
 }
 
 function formatCurrency(n: number | null | undefined) {
@@ -141,6 +174,7 @@ async function generateProjectsPdf(projectId: string) {
     });
   }
 
+  addFooter(doc);
   doc.save('monthly_summary_report.pdf');
 }
 
@@ -172,6 +206,7 @@ async function generateFinancePdf(projectId: string) {
     });
   }
 
+  addFooter(doc);
   doc.save('finance_report.pdf');
 }
 
@@ -203,6 +238,7 @@ async function generateMaterialPdf(projectId: string) {
     });
   }
 
+  addFooter(doc);
   doc.save('material_report.pdf');
 }
 
@@ -222,6 +258,7 @@ async function generateLabourPdf(projectId: string) {
     ['Attendance Rate', `${data.attendance_rate ?? 0}%`],
   ], y);
 
+  addFooter(doc);
   doc.save('labour_report.pdf');
 }
 
@@ -245,6 +282,7 @@ async function generateMilestonePdf(projectId: string) {
     });
   }
 
+  addFooter(doc);
   doc.save('milestone_progress_report.pdf');
 }
 
@@ -419,6 +457,7 @@ async function generateAllInOnePdf(projectId: string) {
     });
   }
 
+  addFooter(doc);
   doc.save('complete_project_report.pdf');
 }
 

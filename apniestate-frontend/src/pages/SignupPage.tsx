@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Navigate, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import { authApi } from '@/api/auth';
 import { ApiError } from '@/api/client';
 import { AlertCircle, Eye, EyeOff, ShieldCheck, MapPin, TrendingUp, Users } from 'lucide-react';
 import Logo from '@/components/shared/Logo';
@@ -11,9 +12,30 @@ export default function SignupPage() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [otp, setOtp] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [sendingOtp, setSendingOtp] = useState(false);
+
+  const handleSendOtp = async () => {
+    if (!email) {
+      setError('Please enter your email to receive an OTP.');
+      return;
+    }
+    setError('');
+    setSendingOtp(true);
+    try {
+      await authApi.sendOtp(email);
+      setOtpSent(true);
+      setError('OTP sent to your email.');
+    } catch (err: any) {
+      setError(err.message || 'Failed to send OTP.');
+    } finally {
+      setSendingOtp(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -31,7 +53,13 @@ export default function SignupPage() {
     setSubmitting(true);
 
     try {
-      const res = await signup({ email, password });
+      if (!otpSent) {
+        setError('Please request and enter the OTP first.');
+        setSubmitting(false);
+        return;
+      }
+      
+      const res = await signup({ email, password, otp });
       
       // Navigate based on profile/subscription status
       if (!res.user.profile_completed) {
@@ -123,14 +151,42 @@ export default function SignupPage() {
                   </div>
                 </div>
 
-                <button
-                  type="submit"
-                  className="btn btn-primary btn-full login-btn"
-                  disabled={submitting}
-                  style={{ marginTop: '24px' }}
-                >
-                  {submitting ? 'Creating account...' : 'Sign Up'}
-                </button>
+                {otpSent && (
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="signup-otp">OTP Code</label>
+                    <input
+                      id="signup-otp"
+                      type="text"
+                      className="form-input"
+                      placeholder="Enter 6-digit OTP"
+                      value={otp}
+                      onChange={(e) => setOtp(e.target.value)}
+                      required
+                      maxLength={6}
+                    />
+                  </div>
+                )}
+
+                {!otpSent ? (
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-full"
+                    onClick={handleSendOtp}
+                    disabled={sendingOtp || !email}
+                    style={{ marginTop: '24px' }}
+                  >
+                    {sendingOtp ? 'Sending...' : 'Send OTP to Email'}
+                  </button>
+                ) : (
+                  <button
+                    type="submit"
+                    className="btn btn-primary btn-full login-btn"
+                    disabled={submitting}
+                    style={{ marginTop: '24px' }}
+                  >
+                    {submitting ? 'Creating account...' : 'Sign Up'}
+                  </button>
+                )}
               </form>
 
               <div className="login-footer-links">

@@ -2,12 +2,14 @@ import { apiClient } from './client';
 
 export interface LoginCredentials {
   identifier: string;
-  password: string;
+  password?: string;
+  otp?: string;
 }
 
 export interface SignupCredentials {
   email: string;
-  password: string;
+  password?: string;
+  otp?: string;
 }
 
 export type Role = 'ADMIN' | 'BUILDER' | 'SITE_SUPERVISOR' | 'ACCOUNTANT' | 'INVENTORY_MANAGER' | 'PROJECT_MANAGER' | 'WORKER';
@@ -56,6 +58,9 @@ export const authApi = {
 
   signup: (credentials: SignupCredentials) =>
     apiClient.post<AuthResponse>('/auth/signup', credentials),
+
+  sendOtp: (email: string) =>
+    apiClient.post<{success: boolean, message: string}>('/auth/send-otp', { email }),
 
   switchWorkspace: (companyId: string, role: string) =>
     apiClient.post<AuthResponse>('/auth/switch-workspace', { company_id: companyId, role }),

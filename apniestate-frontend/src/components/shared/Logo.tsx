@@ -45,7 +45,8 @@ export default function Logo({ size = 'md', variant = 'default', className = '',
           width: 'auto',
           maxWidth: '100%',
           objectFit: 'contain',
-          display: 'block'
+          display: 'block',
+          borderRadius: '8px'
         }}
         draggable={false}
       />

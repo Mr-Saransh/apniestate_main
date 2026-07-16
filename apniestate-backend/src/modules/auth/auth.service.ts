@@ -16,8 +16,20 @@ export async function loginUser(input: LoginInput) {
   });
   if (!user || !user.is_active) return null;
 
-  const valid = await bcrypt.compare(input.password, user.password_hash);
-  if (!valid) return null;
+  if (input.otp) {
+    const otpRecord = await prisma.otpVerification.findFirst({
+      where: { email: user.email!, otp: input.otp }
+    });
+    if (!otpRecord || otpRecord.expires_at < new Date()) {
+      throw new Error("Invalid or expired OTP");
+    }
+    await prisma.otpVerification.delete({ where: { id: otpRecord.id } });
+  } else if (input.password) {
+    const valid = await bcrypt.compare(input.password, user.password_hash);
+    if (!valid) return null;
+  } else {
+    return null;
+  }
 
   // Fetch all ACTIVE memberships for this user
   const memberships = await prisma.companyMembership.findMany({
@@ -100,6 +112,14 @@ export async function logoutUser(userId: string, tokenId?: string) {
 export async function signupUser(input: import("./auth.schema").SignupInput) {
   const existing = await prisma.user.findUnique({ where: { email: input.email } });
   if (existing) return null;
+
+  const otpRecord = await prisma.otpVerification.findFirst({
+    where: { email: input.email, otp: input.otp }
+  });
+  if (!otpRecord || otpRecord.expires_at < new Date()) {
+    throw new Error("Invalid or expired OTP");
+  }
+  await prisma.otpVerification.delete({ where: { id: otpRecord.id } });
 
   const passwordHash = await bcrypt.hash(input.password, 10);
   const name = input.email.split("@")[0];

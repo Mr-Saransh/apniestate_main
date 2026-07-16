@@ -13,7 +13,13 @@ export async function POST(req: NextRequest) {
   if ("error" in parsed) return parsed.error;
 
 
-  const result = await loginUser(parsed.data);
+  let result;
+  try {
+    result = await loginUser(parsed.data);
+  } catch (error: any) {
+    return badRequest(error.message);
+  }
+  
   if (!result) return unauthorized();
 
   const refreshCookie = serialize("refresh_token", result.refreshToken, {

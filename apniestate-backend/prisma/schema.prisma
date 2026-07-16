@@ -2213,3 +2213,13 @@ model Subscription {
   @@index([expires_at], name: "idx_subscription_expires")
   @@map("subscriptions")
 }
+
+model OtpVerification {
+  id         String   @id @default(cuid())
+  email      String   @unique
+  otp        String
+  expires_at DateTime
+  created_at DateTime @default(now())
+
+  @@map("otp_verifications")
+}

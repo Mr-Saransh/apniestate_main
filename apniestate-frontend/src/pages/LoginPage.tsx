@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Navigate, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import { authApi } from '@/api/auth';
 import { ApiError } from '@/api/client';
 import { AlertCircle, Eye, EyeOff, ShieldCheck, MapPin, TrendingUp, Users, Building2, HardHat, Briefcase, Calculator, Loader2 } from 'lucide-react';
 import Logo from '@/components/shared/Logo';
@@ -11,45 +12,31 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
+  const [otp, setOtp] = useState('');
+  const [loginMethod, setLoginMethod] = useState<'password' | 'otp'>('password');
+  const [otpSent, setOtpSent] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [showDemoModal, setShowDemoModal] = useState(false);
-  const [loggingInRole, setLoggingInRole] = useState<string | null>(null);
 
-  const handleDemoLogin = async (demoIdentifier: string, roleName: string) => {
-    setLoggingInRole(roleName);
+  const handleSendOtp = async () => {
+    if (!identifier) {
+      setError('Please enter your email to receive an OTP.');
+      return;
+    }
     setError('');
+    setLoading(true);
     try {
-      const response = await login({ identifier: demoIdentifier, password: 'admin123' });
-      
-      const { user } = response;
-      if (!user.profile_completed) {
-        navigate('/complete-profile', { replace: true });
-        return;
-      }
-      if (user.subscription_status === 'NONE') {
-        navigate('/subscription', { replace: true });
-        return;
-      }
-      if (user.subscription_status === 'PENDING_TRIAL') {
-        navigate('/pending-approval', { replace: true });
-        return;
-      }
-      if (user.subscription_status === 'EXPIRED' || user.subscription_status === 'TRIAL_EXPIRED') {
-        navigate('/renew', { replace: true });
-        return;
-      }
-
-      navigate('/dashboard', { replace: true });
-    } catch (err) {
-      console.error('Demo login failed', err);
+      await authApi.sendOtp(identifier);
+      setOtpSent(true);
+      setError('OTP sent to your email.');
+    } catch (err: any) {
+      setError(err.message || 'Failed to send OTP.');
     } finally {
-      setLoggingInRole(null);
+      setLoading(false);
     }
   };
-
   if (isLoading) {
     return (
       <div className="loading-page" style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
@@ -67,7 +54,11 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const response = await login({ identifier, password });
+      const credentials = loginMethod === 'password' 
+        ? { identifier, password } 
+        : { identifier, otp };
+      
+      const response = await login(credentials);
       
       const { user } = response;
       if (!user.profile_completed) {
@@ -124,6 +115,70 @@ export default function LoginPage() {
               )}
 
               <form onSubmit={handleSubmit}>
+                <div 
+                  style={{ 
+                    marginBottom: '24px', 
+                    position: 'relative', 
+                    display: 'flex', 
+                    flexDirection: 'row',
+                    background: 'rgba(255, 255, 255, 0.15)', 
+                    borderRadius: '8px',
+                    padding: '4px',
+                    overflow: 'hidden'
+                  }}
+                >
+                  <div 
+                    style={{
+                      position: 'absolute',
+                      top: '4px',
+                      bottom: '4px',
+                      left: '4px',
+                      width: 'calc(50% - 4px)',
+                      background: '#2648E7',
+                      borderRadius: '6px',
+                      transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      transform: loginMethod === 'password' ? 'translateX(0)' : 'translateX(100%)',
+                      zIndex: 0
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => { setLoginMethod('password'); setOtpSent(false); setError(''); }}
+                    style={{ 
+                      flex: 1, 
+                      padding: '10px 0', 
+                      background: 'transparent', 
+                      border: 'none', 
+                      color: loginMethod === 'password' ? '#FFFFFF' : 'rgba(255,255,255,0.7)', 
+                      fontWeight: 'bold', 
+                      cursor: 'pointer',
+                      position: 'relative',
+                      zIndex: 1,
+                      transition: 'color 0.3s ease'
+                    }}
+                  >
+                    Password
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setLoginMethod('otp'); setOtpSent(false); setError(''); }}
+                    style={{ 
+                      flex: 1, 
+                      padding: '10px 0', 
+                      background: 'transparent', 
+                      border: 'none', 
+                      color: loginMethod === 'otp' ? '#FFFFFF' : 'rgba(255,255,255,0.7)', 
+                      fontWeight: 'bold', 
+                      cursor: 'pointer',
+                      position: 'relative',
+                      zIndex: 1,
+                      transition: 'color 0.3s ease'
+                    }}
+                  >
+                    OTP
+                  </button>
+                </div>
+
                 <div className="form-group">
                   <label className="form-label" htmlFor="login-identifier">Email or Username</label>
                   <input
@@ -139,28 +194,58 @@ export default function LoginPage() {
                   />
                 </div>
 
-                <div className="form-group">
-                  <label className="form-label" htmlFor="login-password">Password</label>
-                  <div className="password-input-wrap">
-                    <input
-                      id="login-password"
-                      type={showPassword ? 'text' : 'password'}
-                      className="form-input"
-                      placeholder="Enter your password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      autoComplete="current-password"
-                    />
-                    <button
-                      type="button"
-                      className="password-toggle"
-                      onClick={() => setShowPassword(!showPassword)}
-                    >
-                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                    </button>
+                {loginMethod === 'password' ? (
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="login-password">Password</label>
+                    <div className="password-input-wrap">
+                      <input
+                        id="login-password"
+                        type={showPassword ? 'text' : 'password'}
+                        className="form-input"
+                        placeholder="Enter your password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required={loginMethod === 'password'}
+                        autoComplete="current-password"
+                      />
+                      <button
+                        type="button"
+                        className="password-toggle"
+                        onClick={() => setShowPassword(!showPassword)}
+                      >
+                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="form-group">
+                    {!otpSent ? (
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-full"
+                        onClick={handleSendOtp}
+                        disabled={loading || !identifier}
+                        style={{ marginBottom: '16px' }}
+                      >
+                        {loading ? 'Sending...' : 'Send OTP to Email'}
+                      </button>
+                    ) : (
+                      <>
+                        <label className="form-label" htmlFor="login-otp">OTP Code</label>
+                        <input
+                          id="login-otp"
+                          type="text"
+                          className="form-input"
+                          placeholder="Enter 6-digit OTP"
+                          value={otp}
+                          onChange={(e) => setOtp(e.target.value)}
+                          required={loginMethod === 'otp'}
+                          maxLength={6}
+                        />
+                      </>
+                    )}
+                  </div>
+                )}
 
                 <div className="form-actions">
                   <label className="checkbox-label">
@@ -185,17 +270,6 @@ export default function LoginPage() {
 
               <div className="login-footer-links" style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '16px' }}>
                 <p style={{ margin: 0 }}>Don't have an account? <Link to="/signup">Sign up</Link></p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', opacity: 0.5 }}>
-                  <div style={{ flex: 1, height: '1px', background: 'currentColor' }} />
-                  <span style={{ fontSize: '12px', textTransform: 'uppercase' }}>or</span>
-                  <div style={{ flex: 1, height: '1px', background: 'currentColor' }} />
-                </div>
-                <button 
-                  onClick={() => setShowDemoModal(true)}
-                  style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.4)', padding: '6px 12px', fontSize: '13px', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, color: '#FFFFFF', transition: 'all 0.2s ease' }}
-                >
-                  View Demo Accounts
-                </button>
               </div>
             </div>
           </div>
@@ -234,65 +308,7 @@ export default function LoginPage() {
         </div>
       </div>
       
-      {/* Demo Accounts Modal */}
-      {showDemoModal && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-          <div style={{ backgroundColor: '#fff', borderRadius: '16px', padding: '32px', width: '100%', maxWidth: '420px', boxShadow: '0 20px 40px rgba(0,0,0,0.2)', position: 'relative' }}>
-            <button 
-              onClick={() => setShowDemoModal(false)}
-              style={{ position: 'absolute', top: '16px', right: '16px', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '20px', color: '#64748B' }}
-            >
-              ×
-            </button>
-            <h3 style={{ fontSize: '20px', fontWeight: 800, color: '#0F172A', marginBottom: '8px' }}>Select Demo Account</h3>
-            <p style={{ fontSize: '14px', color: '#64748B', marginBottom: '24px' }}>Jump straight into the app with a pre-configured role.</p>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div style={{ padding: '12px', background: '#F8FAFC', borderRadius: '8px', fontSize: '12px', color: '#475569', marginBottom: '8px', border: '1px solid #E2E8F0' }}>
-                <p style={{ marginBottom: '4px' }}><strong>Builder:</strong> admin@gmail.com / admin123</p>
-                <p style={{ marginBottom: '4px' }}><strong>Supervisor:</strong> site@gmail.com / admin123</p>
-                <p style={{ marginBottom: '4px' }}><strong>Manager:</strong> pm1@apniestate.com / admin123</p>
-                <p style={{ margin: 0 }}><strong>Accountant:</strong> accounts@apniestate.com / admin123</p>
-              </div>
-              <button 
-                onClick={() => handleDemoLogin('admin@gmail.com', 'Builder')}
-                disabled={loggingInRole !== null}
-                style={{ width: '100%', padding: '16px', borderRadius: '12px', backgroundColor: '#2648E7', color: 'white', fontWeight: 'bold', fontSize: '14px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
-              >
-                {loggingInRole === 'Builder' ? <Loader2 className="animate-spin w-5 h-5" /> : <Building2 className="w-5 h-5" />}
-                Builder (Admin)
-              </button>
-              
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
-                <button 
-                  onClick={() => handleDemoLogin('site@gmail.com', 'Supervisor')}
-                  disabled={loggingInRole !== null}
-                  style={{ padding: '12px 8px', borderRadius: '12px', backgroundColor: '#EFF6FF', color: '#2648E7', fontWeight: 600, fontSize: '12px', border: '1px solid #DBEAFE', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}
-                >
-                  {loggingInRole === 'Supervisor' ? <Loader2 className="animate-spin w-4 h-4" /> : <HardHat className="w-4 h-4" />}
-                  Supervisor
-                </button>
-                <button 
-                  onClick={() => handleDemoLogin('pm1@apniestate.com', 'Manager')}
-                  disabled={loggingInRole !== null}
-                  style={{ padding: '12px 8px', borderRadius: '12px', backgroundColor: '#EFF6FF', color: '#2648E7', fontWeight: 600, fontSize: '12px', border: '1px solid #DBEAFE', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}
-                >
-                  {loggingInRole === 'Manager' ? <Loader2 className="animate-spin w-4 h-4" /> : <Briefcase className="w-4 h-4" />}
-                  Manager
-                </button>
-                <button 
-                  onClick={() => handleDemoLogin('accounts@apniestate.com', 'Accountant')}
-                  disabled={loggingInRole !== null}
-                  style={{ padding: '12px 8px', borderRadius: '12px', backgroundColor: '#EFF6FF', color: '#2648E7', fontWeight: 600, fontSize: '12px', border: '1px solid #DBEAFE', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}
-                >
-                  {loggingInRole === 'Accountant' ? <Loader2 className="animate-spin w-4 h-4" /> : <Calculator className="w-4 h-4" />}
-                  Accountant
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+
     </div>
   );
 }

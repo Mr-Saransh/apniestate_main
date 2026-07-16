@@ -9,7 +9,12 @@ export async function POST(req: NextRequest) {
   const parsed = await validateBody(req, SignupSchema);
   if ("error" in parsed) return parsed.error;
 
-  const result = await signupUser(parsed.data);
+  let result;
+  try {
+    result = await signupUser(parsed.data);
+  } catch (error: any) {
+    return conflict(error.message);
+  }
   if (!result) return conflict("User with this email already exists");
 
   const refreshCookie = serialize("refresh_token", result.refreshToken, {

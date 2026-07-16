@@ -318,14 +318,55 @@ function OrdersTab({ orders }: { orders: OrderSummary[] }) {
 function ReceivedTab({ received }: { received: ReceivedSummary[] }) {
   const handleDownloadPDF = async (r: ReceivedSummary) => {
     const doc = new jsPDF();
-    doc.setFontSize(18);
-    doc.text("Goods Receipt Note (GRN)", 14, 20);
+    const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
+
+    // Premium Header
+    doc.setFillColor(15, 23, 42); // Slate-900
+    doc.rect(0, 0, pageW, 40, 'F');
+    doc.setFillColor(38, 72, 231); // Brand blue
+    doc.rect(0, 40, pageW, 4, 'F');
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(22);
+    doc.setFont('helvetica', 'bold');
+    doc.text("GOODS RECEIPT NOTE", 14, 24);
+
+    doc.setFontSize(10);
+    doc.setTextColor(180, 195, 255);
+    doc.text(`GRN ID: ${r.id}`, 14, 32);
+
+    doc.setFontSize(9);
+    doc.text(`GENERATED`, pageW - 14, 20, { align: 'right' });
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`${new Date().toLocaleDateString('en-IN')}`, pageW - 14, 26, { align: 'right' });
+
+    // Details Section
+    doc.setTextColor(15, 23, 42);
     doc.setFontSize(11);
-    doc.text(`GRN ID: ${r.id}`, 14, 30);
-    doc.text(`Vendor: ${r.vendor}`, 14, 37);
-    doc.text(`Date Received: ${r.received}`, 14, 44);
-    doc.text(`Total Amount: ${r.amount}`, 14, 51);
-    doc.text(`Quality Status: ${r.quality}`, 14, 58);
+    doc.text("Vendor Details", 14, 55);
+    
+    doc.setDrawColor(38, 72, 231);
+    doc.setLineWidth(1);
+    doc.line(14, 58, 40, 58);
+
+    doc.setFontSize(10);
+    doc.setTextColor(100, 116, 139);
+    doc.setFont('helvetica', 'bold');
+    doc.text("Vendor Name:", 14, 68);
+    doc.text("Date Received:", 14, 76);
+    doc.text("Total Amount:", 110, 68);
+    doc.text("Quality Status:", 110, 76);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(15, 23, 42);
+    doc.text(r.vendor, 45, 68);
+    doc.text(r.received, 45, 76);
+    doc.text(r.amount, 140, 68);
+    doc.text(r.quality, 140, 76);
+
+    let currentY = 85;
 
     if (r.fullItems && r.fullItems.length > 0) {
       const tableData = r.fullItems.map(item => [
@@ -335,15 +376,24 @@ function ReceivedTab({ received }: { received: ReceivedSummary[] }) {
         `₹${item.total.toLocaleString()}`
       ]);
       autoTable(doc, {
-        startY: 65,
+        startY: currentY,
         head: [['Material', 'Quantity', 'Unit Price', 'Total']],
         body: tableData,
+        headStyles: { fillColor: [38, 72, 231] },
+        styles: { fontSize: 9 },
       });
+      currentY = (doc as any).lastAutoTable?.finalY || currentY;
     }
 
     if (r.billUrl) {
-      const finalY = (doc as any).lastAutoTable?.finalY || 65;
-      doc.text("Attached Bill:", 14, finalY + 15);
+      doc.setTextColor(15, 23, 42);
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text("Attached Bill", 14, currentY + 15);
+      doc.setDrawColor(38, 72, 231);
+      doc.setLineWidth(1);
+      doc.line(14, currentY + 18, 40, currentY + 18);
+
       try {
         const img = new Image();
         img.crossOrigin = "Anonymous";
@@ -353,22 +403,34 @@ function ReceivedTab({ received }: { received: ReceivedSummary[] }) {
           img.onerror = resolve; // Continue even if image fails
         });
 
-        // Basic scaling to fit page width (A4 is 210mm wide)
         const maxWidth = 180;
         const scale = maxWidth / img.width;
         const width = img.width * scale;
         const height = img.height * scale;
 
-        // Add new page if image doesn't fit
-        if (finalY + 20 + height > 280) {
+        if (currentY + 25 + height > pageH - 20) {
           doc.addPage();
           doc.addImage(img, 'JPEG', 15, 20, width, height);
         } else {
-          doc.addImage(img, 'JPEG', 15, finalY + 20, width, height);
+          doc.addImage(img, 'JPEG', 15, currentY + 25, width, height);
         }
       } catch (err) {
         console.error("Failed to add image to PDF", err);
       }
+    }
+
+    // Footer
+    const pageCount = (doc as any).internal.getNumberOfPages ? (doc as any).internal.getNumberOfPages() : (doc as any).getNumberOfPages ? (doc as any).getNumberOfPages() : doc.internal.pages.length - 1;
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setDrawColor(226, 232, 240);
+      doc.setLineWidth(0.5);
+      doc.line(14, pageH - 15, pageW - 14, pageH - 15);
+      doc.setFontSize(8);
+      doc.setTextColor(148, 163, 184);
+      doc.setFont('helvetica', 'normal');
+      doc.text('Apni Estate - Premium Construction Management System', 14, pageH - 8);
+      doc.text(`Page ${i} of ${pageCount}`, pageW - 14, pageH - 8, { align: 'right' });
     }
 
     doc.save(`GRN_${r.id}.pdf`);

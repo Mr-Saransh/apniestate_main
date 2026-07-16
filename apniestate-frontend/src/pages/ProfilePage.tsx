@@ -21,6 +21,21 @@ export default function ProfilePage() {
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [feedback, setFeedback] = useState('');
+  const [submittingFeedback, setSubmittingFeedback] = useState(false);
+  const [feedbackSuccess, setFeedbackSuccess] = useState(false);
+
+  const handleFeedbackSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!feedback.trim()) return;
+    setSubmittingFeedback(true);
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    setSubmittingFeedback(false);
+    setFeedbackSuccess(true);
+    setFeedback('');
+    setTimeout(() => setFeedbackSuccess(false), 3000);
+  };
 
   React.useEffect(() => {
     if (user?.company_id) {
@@ -227,6 +242,37 @@ export default function ProfilePage() {
               <option value="en">{t('profile.english', 'English')}</option>
               <option value="hi">{t('profile.hindi', 'Hindi (हिंदी)')}</option>
             </select>
+          </div>
+        </div>
+      </Card>
+
+      <Card noPad>
+        <div className="p-4 space-y-4">
+          <div className="flex flex-col gap-2">
+            <h3 className="text-sm font-bold text-foreground">Send Feedback</h3>
+            <p className="text-xs text-muted-foreground">We value your input. Let us know how we can improve.</p>
+            <form onSubmit={handleFeedbackSubmit} className="mt-2 space-y-3">
+              <textarea
+                value={feedback}
+                onChange={e => setFeedback(e.target.value)}
+                placeholder="Type your feedback here..."
+                className="w-full h-24 p-3 border border-border rounded-lg text-sm bg-background focus:outline-none focus:border-primary resize-none"
+                required
+              />
+              {feedbackSuccess ? (
+                <div className="text-sm text-green-600 font-bold bg-green-50 p-2 rounded-md text-center">
+                  Thank you for your feedback!
+                </div>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={submittingFeedback || !feedback.trim()}
+                  className="w-full py-2 bg-primary text-white rounded-lg text-sm font-bold disabled:opacity-50 transition-colors"
+                >
+                  {submittingFeedback ? 'Submitting...' : 'Submit Feedback'}
+                </button>
+              )}
+            </form>
           </div>
         </div>
       </Card>
