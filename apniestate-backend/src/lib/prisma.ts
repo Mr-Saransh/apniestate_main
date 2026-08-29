@@ -6,15 +6,24 @@ process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient, pool: Pool };
 
+const poolConfig = {
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
+  max: 20,
+  min: 2,
+  idleTimeoutMillis: 60000,
+  connectionTimeoutMillis: 10000,
+};
+
 let prisma: PrismaClient;
 
 if (process.env.NODE_ENV === "production") {
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+  const pool = new Pool(poolConfig);
   const adapter = new PrismaPg(pool);
   prisma = new PrismaClient({ adapter, log: ["error"] });
 } else {
   if (!globalForPrisma.prisma) {
-    globalForPrisma.pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+    globalForPrisma.pool = new Pool(poolConfig);
     const adapter = new PrismaPg(globalForPrisma.pool);
     globalForPrisma.prisma = new PrismaClient({ adapter, log: ["error"] });
   }

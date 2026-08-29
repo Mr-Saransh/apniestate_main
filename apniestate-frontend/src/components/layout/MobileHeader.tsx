@@ -1,7 +1,7 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
-import { Bell, Menu, Building2 } from 'lucide-react';
-
+import { useAppMode } from '@/context/AppModeContext';
+import { Bell, Menu, Building2, Sparkles, Layers } from 'lucide-react';
 import ProjectSwitcher from '@/components/shared/ProjectSwitcher';
 
 interface MobileHeaderProps {
@@ -9,6 +9,7 @@ interface MobileHeaderProps {
 }
 
 const PAGE_TITLES: Record<string, string> = {
+  '/crm': 'Real Estate CRM',
   '/dashboard': 'Overview',
   '/projects': 'Projects',
   '/tasks': 'Tasks',
@@ -43,6 +44,7 @@ const PAGE_TITLES: Record<string, string> = {
 
 export function MobileHeader({ onMenuClick }: MobileHeaderProps) {
   const { user } = useAuth();
+  const { mode, setMode } = useAppMode();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -59,138 +61,147 @@ export function MobileHeader({ onMenuClick }: MobileHeaderProps) {
   return (
     <>
       <header
-      id="mobile-header"
-      style={{
-        position: 'sticky',
-        top: 0,
-        zIndex: 30,
-        backgroundColor: '#2648E7',
-        color: '#FFFFFF',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '0 16px',
-        height: '56px',
-        flexShrink: 0,
-      }}
-    >
-      {/* Left: Hamburger + Brand */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <button
-          onClick={onMenuClick}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '6px',
-            borderRadius: '8px',
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            color: '#FFFFFF',
-            marginLeft: '-4px',
-            transition: 'background 0.15s'
-          }}
-          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.12)')}
-          onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-          aria-label="Open menu"
-        >
-          <Menu size={20} />
-        </button>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div style={{
-            width: '24px',
-            height: '24px',
-            borderRadius: '6px',
-            backgroundColor: '#FCC300',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0
-          }}>
-            <Building2 size={12} color="#0D1117" />
-          </div>
-          <span style={{ fontSize: '14px', fontWeight: 700, color: '#FFFFFF' }}>
-            Apni Estate
-          </span>
-        </div>
-      </div>
-
-      {/* Right: Notifications + Avatar */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <button
-          onClick={() => navigate('/notifications')}
-          style={{
-            position: 'relative',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '6px',
-            borderRadius: '8px',
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            color: '#FFFFFF',
-            transition: 'background 0.15s'
-          }}
-          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.12)')}
-          onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-          aria-label="Notifications"
-        >
-          <Bell size={20} />
-          {/* Notification dot */}
-          <span style={{
-            position: 'absolute',
-            top: '4px',
-            right: '4px',
-            width: '8px',
-            height: '8px',
-            borderRadius: '50%',
-            backgroundColor: '#FCC300',
-            border: '1.5px solid #2648E7'
-          }} />
-        </button>
-
-        <button
-          onClick={() => navigate('/settings')}
-          style={{
-            width: '28px',
-            height: '28px',
-            borderRadius: '50%',
-            backgroundColor: '#FCC300',
-            color: '#0D1117',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '10px',
-            fontWeight: 700,
-            border: 'none',
-            cursor: 'pointer',
-            flexShrink: 0
-          }}
-        >
-          {user ? getInitials(user.name) : '?'}
-        </button>
-      </div>
-    </header>
-
-      {/* Secondary Context Bar for Mobile */}
-      <div 
-        style={{ 
-          display: 'flex', 
-          gap: '8px', 
-          padding: '8px 16px', 
-          backgroundColor: '#f8fafc', 
-          borderBottom: '1px solid #e2e8f0',
-          flexWrap: 'wrap',
-          position: 'relative',
-          zIndex: 40
+        id="mobile-header"
+        style={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 30,
+          backgroundColor: '#2648E7',
+          color: '#FFFFFF',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0 16px',
+          height: '56px',
+          flexShrink: 0,
         }}
       >
+        {/* Left: Hamburger + Brand + Mode Toggle */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <button
+            onClick={onMenuClick}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '6px',
+              borderRadius: '8px',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              color: '#FFFFFF',
+              marginLeft: '-4px',
+              transition: 'background 0.15s'
+            }}
+            aria-label="Open menu"
+          >
+            <Menu size={20} />
+          </button>
 
-        <ProjectSwitcher />
-      </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{
+              width: '24px',
+              height: '24px',
+              borderRadius: '6px',
+              backgroundColor: '#FCC300',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0
+            }}>
+              <Building2 size={12} color="#0D1117" />
+            </div>
+            <span style={{ fontSize: '14px', fontWeight: 700, color: '#FFFFFF' }}>
+              Apni Estate
+            </span>
+          </div>
+
+          {/* Quick Mode Badge on Mobile */}
+          <button
+            onClick={() => setMode(mode === 'ERP' ? 'CRM' : 'ERP')}
+            className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold flex items-center gap-1 transition-all ${
+              mode === 'CRM'
+                ? 'bg-[#FCC300] text-[#0D1117]'
+                : 'bg-white/20 text-white'
+            }`}
+          >
+            {mode === 'CRM' ? <Sparkles size={10} /> : <Layers size={10} />}
+            {mode}
+          </button>
+        </div>
+
+        {/* Right: Notifications + Avatar */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button
+            onClick={() => navigate('/notifications')}
+            style={{
+              position: 'relative',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '6px',
+              borderRadius: '8px',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              color: '#FFFFFF',
+              transition: 'background 0.15s'
+            }}
+            aria-label="Notifications"
+          >
+            <Bell size={20} />
+            <span style={{
+              position: 'absolute',
+              top: '4px',
+              right: '4px',
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              backgroundColor: '#FCC300',
+              border: '1.5px solid #2648E7'
+            }} />
+          </button>
+
+          <button
+            onClick={() => navigate('/settings')}
+            style={{
+              width: '28px',
+              height: '28px',
+              borderRadius: '50%',
+              backgroundColor: '#FCC300',
+              color: '#0D1117',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '10px',
+              fontWeight: 700,
+              border: 'none',
+              cursor: 'pointer',
+              flexShrink: 0
+            }}
+          >
+            {user ? getInitials(user.name) : '?'}
+          </button>
+        </div>
+      </header>
+
+      {/* Secondary Context Bar for Mobile */}
+      {mode === 'ERP' && (
+        <div 
+          style={{ 
+            display: 'flex', 
+            gap: '8px', 
+            padding: '8px 16px', 
+            backgroundColor: '#f8fafc', 
+            borderBottom: '1px solid #e2e8f0',
+            flexWrap: 'wrap',
+            position: 'relative',
+            zIndex: 40
+          }}
+        >
+          <ProjectSwitcher />
+        </div>
+      )}
     </>
   );
 }

@@ -1,13 +1,15 @@
 import React from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useProject } from '@/context/ProjectContext';
+import { useAppMode } from '@/context/AppModeContext';
 import Logo from '@/components/shared/Logo';
 import {
   LayoutDashboard, Building2, ShoppingCart, Wallet, Users,
   BarChart2, FileSpreadsheet, Package, ClipboardList, Archive,
   Truck, BookOpen, FolderOpen, FileBarChart, Bell, Settings, X,
-  LogOut
+  LogOut, UserCheck, GitCommit, Clock, IndianRupee, Calendar,
+  Sparkles, Layers
 } from "lucide-react";
 import { useTranslation } from 'react-i18next';
 
@@ -18,11 +20,15 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
   const { t } = useTranslation();
   const { user, logout } = useAuth();
   const { activeProject } = useProject();
+  const { mode, setMode } = useAppMode();
   const location = useLocation();
+  const navigate = useNavigate();
+
   const initials = user?.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : 'AR';
   const role = user?.role || 'BUILDER';
 
-  const navGroups: NavGroup[] = [
+  // ─── ERP Navigation Groups ─────────────────────────────────
+  const erpNavGroups: NavGroup[] = [
     {
       label: "", items: [
         { id: "/dashboard", label: t('sidebar.dashboard', 'Dashboard'), icon: LayoutDashboard, hideOnMobile: true },
@@ -58,29 +64,54 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
     }
   ];
 
-  const filteredGroups = navGroups.map(group => {
+  // ─── CRM Navigation Groups ─────────────────────────────────
+  const crmNavGroups: NavGroup[] = [
+    {
+      label: "Sales Core", items: [
+        { id: "/crm?tab=overview", label: "Overview", icon: LayoutDashboard },
+        { id: "/crm?tab=leads", label: "Leads", icon: Users },
+        { id: "/crm?tab=pipeline", label: "Sales Pipeline", icon: GitCommit },
+        { id: "/crm?tab=followups", label: "Follow-ups", icon: Clock },
+      ]
+    },
+    {
+      label: "Deals & Inventory", items: [
+        { id: "/crm?tab=customers", label: "Customers & Deals", icon: IndianRupee },
+        { id: "/crm?tab=activities", label: "Site Visits & Tasks", icon: Calendar },
+        { id: "/crm?tab=properties", label: "Properties Catalog", icon: Building2 },
+      ]
+    },
+    {
+      label: "Account", items: [
+        { id: "/notifications", label: "Notifications", icon: Bell, badge: 3 },
+        { id: "/settings", label: "Settings", icon: Settings },
+      ]
+    }
+  ];
+
+  const activeNavGroups = mode === 'CRM' ? crmNavGroups : erpNavGroups;
+
+  const filteredGroups = activeNavGroups.map(group => {
     let items = group.items;
-    if (role === 'ACCOUNTANT') {
-      const allowed = ['/dashboard', '/finance', '/purchase', '/operations', '/reports', '/boq', '/purchase-orders', '/inventory', '/vendors', '/documents', '/notifications'];
-      items = items.filter(item => allowed.includes(item.id));
-    } else if (role === 'PROJECT_MANAGER') {
-      const allowed = ['/dashboard', '/projects', '/progress', '/purchase', '/finance', '/operations', '/boq', '/material-requests', '/purchase-orders', '/inventory', '/vendors', '/dpr', '/documents', '/reports', '/milestone-report', '/notifications'];
-      items = items.filter(item => allowed.includes(item.id));
+    if (mode === 'ERP') {
+      if (role === 'ACCOUNTANT') {
+        const allowed = ['/dashboard', '/finance', '/purchase', '/operations', '/reports', '/boq', '/purchase-orders', '/inventory', '/vendors', '/documents', '/notifications'];
+        items = items.filter(item => allowed.includes(item.id));
+      } else if (role === 'PROJECT_MANAGER') {
+        const allowed = ['/dashboard', '/projects', '/progress', '/purchase', '/finance', '/operations', '/boq', '/material-requests', '/purchase-orders', '/inventory', '/vendors', '/dpr', '/documents', '/reports', '/milestone-report', '/notifications'];
+        items = items.filter(item => allowed.includes(item.id));
+      }
+      if (role !== 'BUILDER') {
+        items = items.filter(item => item.id !== '/users');
+      }
     }
-    
-    // Only BUILDER can see the Users page
-    if (role !== 'BUILDER') {
-      items = items.filter(item => item.id !== '/users');
-    }
-    
-    // BUILDER see everything, no filter needed.
     return { ...group, items };
   }).filter(group => group.items.length > 0);
 
   return (
     <div className="flex flex-col h-full bg-[#2648E7] text-white border-r border-[#2648E7] overflow-hidden">
-      {/* Logo / Brand */}
-      <div className="px-4 py-5 border-b border-white/10 flex items-center justify-between shrink-0">
+      {/* Logo / Brand Header */}
+      <div className="px-4 py-4 border-b border-white/10 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2.5">
           <Logo size="md" variant="light" />
         </div>
@@ -91,10 +122,41 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
         )}
       </div>
 
-      {activeProject && (
+      {/* Mode Switcher Pill (ERP <-> CRM) */}
+      <div className="px-3 py-2.5 border-b border-white/10 bg-black/10 shrink-0">
+        <div className="flex bg-black/25 p-1 rounded-xl relative">
+          <button
+            type="button"
+            onClick={() => setMode('ERP')}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 ${
+              mode === 'ERP'
+                ? 'bg-white text-[#2648E7] shadow-md scale-100'
+                : 'text-white/70 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <Layers size={13} />
+            <span>ERP</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode('CRM')}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 ${
+              mode === 'CRM'
+                ? 'bg-[#FCC300] text-[#0D1117] shadow-md scale-100'
+                : 'text-white/70 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <Sparkles size={13} />
+            <span>CRM</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Active Project Banner (in ERP mode) */}
+      {mode === 'ERP' && activeProject && (
         <div className="px-4 py-2 border-b border-white/10 bg-black/10 shrink-0">
-           <p className="text-[10px] text-white/70 uppercase tracking-wider font-bold">Active Project</p>
-           <p className="text-sm font-bold text-white truncate leading-tight mt-0.5">{activeProject.name}</p>
+          <p className="text-[10px] text-white/70 uppercase tracking-wider font-bold">Active Project</p>
+          <p className="text-sm font-bold text-white truncate leading-tight mt-0.5">{activeProject.name}</p>
         </div>
       )}
 
@@ -124,8 +186,19 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
               if (['/attendance', '/equipment', '/sites', '/contractors', '/workers'].includes(item.id)) {
                 targetPath = `/operations?tab=${item.id.replace('/', '')}`;
               }
-              
-              const isActive = pathWithSearch === targetPath || (item.id === '/dashboard' && location.pathname === '/');
+
+              // CRM tab active logic
+              let isActive = false;
+              if (item.id.startsWith('/crm')) {
+                if (item.id === '/crm?tab=overview') {
+                  isActive = location.pathname === '/crm' && (location.search === '' || location.search.includes('tab=overview'));
+                } else {
+                  isActive = pathWithSearch === item.id;
+                }
+              } else {
+                isActive = pathWithSearch === targetPath || (item.id === '/dashboard' && location.pathname === '/');
+              }
+
               return (
                 <div key={item.id} className={`px-2 ${item.hideOnMobile || group.hideOnMobile ? 'hidden lg:block' : ''}`}>
                   <NavLink
@@ -154,7 +227,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
         ))}
       </div>
 
-      {/* Bottom: profile */}
+      {/* Bottom Profile & Logout */}
       <div className="px-4 py-4 border-t border-white/10 shrink-0">
         <div className="flex items-center gap-3">
           <div className="size-9 rounded-full bg-[#FCC300] flex items-center justify-center text-[#0D1117] font-bold text-sm shrink-0">
@@ -164,7 +237,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
             <p className="text-sm font-bold text-white truncate leading-tight">{user?.name || 'Asim Raza'}</p>
             <p className="text-[10px] text-white/60 truncate leading-tight">{user?.role ? user.role.replace(/_/g, ' ') : 'Builder'}</p>
           </div>
-          <button onClick={logout} className="text-white/50 hover:text-white transition-colors p-1">
+          <button onClick={logout} className="text-white/50 hover:text-white transition-colors p-1" title="Logout">
             <LogOut size={15} />
           </button>
         </div>

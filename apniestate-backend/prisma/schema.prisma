@@ -322,6 +322,45 @@ enum SubscriptionStatus {
   EXPIRED
 }
 
+// ─── CRM Enums ───────────────────────────────────────────
+
+enum CrmLeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  SITE_VISIT
+  NEGOTIATION
+  BOOKED
+  LOST
+}
+
+enum CrmLeadPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum CrmLeadType {
+  BUYER
+  SELLER
+  INVESTOR
+  RENTER
+}
+
+enum CrmFollowupStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+}
+
+enum CrmActivityType {
+  TASK
+  SITE_VISIT
+  MEETING
+  CALL
+  NOTE
+}
+
 // ─── Core Models ─────────────────────────────────────────
 
 model User {
@@ -389,6 +428,13 @@ model User {
   company_id                 String?
   company                    Company?            @relation(fields: [company_id], references: [id])
   memberships                CompanyMembership[]
+
+  // CRM relations
+  crm_leads_assigned   CrmLead[]      @relation("CrmLeadAssignee")
+  crm_leads_created    CrmLead[]      @relation("CrmLeadCreator")
+  crm_followups        CrmFollowup[]
+  crm_activities       CrmActivity[]
+  crm_deals            CrmDeal[]
 
   @@index([company_id], name: "idx_user_company_id")
   @@map("users")
@@ -479,6 +525,12 @@ model Project {
   company_id          String?
   company             Company?            @relation(fields: [company_id], references: [id])
   Equipment           Equipment[]
+
+  // CRM relations
+  crm_leads       CrmLead[]
+  crm_activities  CrmActivity[]
+  crm_deals       CrmDeal[]
+  crm_properties  CrmProperty[]
 
   @@index([builder_id], name: "idx_projects_builder_id")
   @@index([manager_id], name: "idx_projects_manager_id")
@@ -1882,6 +1934,13 @@ model Company {
   Equipment      Equipment[]
   LabourCategory LabourCategory[]
 
+  // CRM relations
+  crm_leads       CrmLead[]
+  crm_followups   CrmFollowup[]
+  crm_activities  CrmActivity[]
+  crm_deals       CrmDeal[]
+  crm_properties  CrmProperty[]
+
   @@map("companies")
 }
 
@@ -2222,4 +2281,149 @@ model OtpVerification {
   created_at DateTime @default(now())
 
   @@map("otp_verifications")
+}
+
+// ─── CRM Models ──────────────────────────────────────────
+
+model CrmLead {
+  id          String          @id @default(cuid())
+  company_id  String
+  project_id  String?
+  name        String
+  initials    String?
+  avatar_color String?       @default("#2648E7")
+  phone       String?
+  email       String?
+  type        CrmLeadType    @default(BUYER)
+  status      CrmLeadStatus  @default(NEW)
+  priority    CrmLeadPriority @default(MEDIUM)
+  source      String?        @default("Direct")
+  budget      String?
+  city        String?
+  tags        String[]       @default([])
+  assigned_to String?
+  created_by  String
+  notes       String?
+  last_contacted_at DateTime?
+  created_at  DateTime       @default(now())
+  updated_at  DateTime       @updatedAt
+
+  company    Company    @relation(fields: [company_id], references: [id])
+  project    Project?   @relation(fields: [project_id], references: [id])
+  assignee   User?      @relation("CrmLeadAssignee", fields: [assigned_to], references: [id])
+  creator    User       @relation("CrmLeadCreator", fields: [created_by], references: [id])
+  followups  CrmFollowup[]
+  activities CrmActivity[]
+  deals      CrmDeal[]
+
+  @@index([company_id], name: "idx_crmlead_company")
+  @@index([status], name: "idx_crmlead_status")
+  @@index([assigned_to], name: "idx_crmlead_assignee")
+  @@index([project_id], name: "idx_crmlead_project")
+  @@map("crm_leads")
+}
+
+model CrmFollowup {
+  id          String            @id @default(cuid())
+  company_id  String
+  lead_id     String
+  created_by  String
+  note        String?
+  status      CrmFollowupStatus @default(PENDING)
+  due_at      DateTime
+  completed_at DateTime?
+  outcome     String?
+  created_at  DateTime          @default(now())
+  updated_at  DateTime          @updatedAt
+
+  company  Company  @relation(fields: [company_id], references: [id])
+  lead     CrmLead  @relation(fields: [lead_id], references: [id], onDelete: Cascade)
+  creator  User     @relation(fields: [created_by], references: [id])
+
+  @@index([company_id], name: "idx_crmfollowup_company")
+  @@index([lead_id], name: "idx_crmfollowup_lead")
+  @@index([due_at], name: "idx_crmfollowup_due")
+  @@index([status], name: "idx_crmfollowup_status")
+  @@map("crm_followups")
+}
+
+model CrmActivity {
+  id          String          @id @default(cuid())
+  company_id  String
+  lead_id     String?
+  project_id  String?
+  created_by  String
+  type        CrmActivityType @default(TASK)
+  title       String
+  description String?
+  due_at      DateTime?
+  completed   Boolean         @default(false)
+  completed_at DateTime?
+  priority    CrmLeadPriority @default(MEDIUM)
+  created_at  DateTime        @default(now())
+  updated_at  DateTime        @updatedAt
+
+  company  Company   @relation(fields: [company_id], references: [id])
+  lead     CrmLead?  @relation(fields: [lead_id], references: [id], onDelete: SetNull)
+  project  Project?  @relation(fields: [project_id], references: [id])
+  creator  User      @relation(fields: [created_by], references: [id])
+
+  @@index([company_id], name: "idx_crmactivity_company")
+  @@index([lead_id], name: "idx_crmactivity_lead")
+  @@index([due_at], name: "idx_crmactivity_due")
+  @@index([type], name: "idx_crmactivity_type")
+  @@map("crm_activities")
+}
+
+model CrmDeal {
+  id              String   @id @default(cuid())
+  company_id      String
+  lead_id         String
+  project_id      String?
+  created_by      String
+  customer_name   String
+  property_name   String?
+  deal_value      Float    @default(0)
+  commission      Float    @default(0)
+  amount_received Float    @default(0)
+  payment_mode    String?  @default("UPI")
+  transaction_id  String?
+  deal_date       DateTime @default(now())
+  notes           String?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  company  Company  @relation(fields: [company_id], references: [id])
+  lead     CrmLead  @relation(fields: [lead_id], references: [id], onDelete: Cascade)
+  project  Project? @relation(fields: [project_id], references: [id])
+  creator  User     @relation(fields: [created_by], references: [id])
+
+  @@index([company_id], name: "idx_crmdeal_company")
+  @@index([lead_id], name: "idx_crmdeal_lead")
+  @@map("crm_deals")
+}
+
+model CrmProperty {
+  id          String   @id @default(cuid())
+  company_id  String
+  project_id  String?
+  name        String
+  address     String?
+  price       String?
+  type        String?  @default("Sale")
+  beds        Int?     @default(0)
+  baths       Int?     @default(0)
+  sqft        String?
+  status      String?  @default("Available")
+  image_url   String?
+  featured    Boolean  @default(false)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  company  Company  @relation(fields: [company_id], references: [id])
+  project  Project? @relation(fields: [project_id], references: [id])
+
+  @@index([company_id], name: "idx_crmproperty_company")
+  @@index([project_id], name: "idx_crmproperty_project")
+  @@map("crm_properties")
 }

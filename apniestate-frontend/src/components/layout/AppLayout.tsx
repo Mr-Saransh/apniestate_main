@@ -16,7 +16,7 @@ export default function AppLayout() {
   const { user } = useAuth();
 
   useEffect(() => {
-    const allowedPaths = ['/projects', '/login', '/signup', '/landing', '/complete-profile', '/subscription', '/pending-approval', '/renew', '/profile', '/notifications'];
+    const allowedPaths = ['/projects', '/login', '/signup', '/landing', '/complete-profile', '/subscription', '/pending-approval', '/renew', '/profile', '/notifications', '/crm'];
     const currentPath = location.pathname;
 
     // Admin panel paths are handled in App.tsx directly without AppLayout
@@ -48,7 +48,7 @@ export default function AppLayout() {
       }
 
       // 3. Normal workspace redirect if everything is good
-      if (!projectLoading && projects.length === 0 && !allowedPaths.includes(currentPath)) {
+      if (!projectLoading && projects.length === 0 && !allowedPaths.includes(currentPath) && !currentPath.startsWith('/crm')) {
         if (user?.role === 'BUILDER') {
           navigate('/projects?create=true');
         } else {
@@ -73,7 +73,8 @@ export default function AppLayout() {
     return <Navigate to="/login" replace />;
   }
 
-  const inProject = activeProject !== null && location.pathname !== '/projects';
+  const isCrmRoute = location.pathname.startsWith('/crm');
+  const showNav = (activeProject !== null && location.pathname !== '/projects') || isCrmRoute;
 
   return (
     <div className="h-screen w-screen flex flex-col overflow-hidden bg-background">
@@ -87,7 +88,7 @@ export default function AppLayout() {
       {/* Body */}
       <div className="flex-1 flex overflow-hidden relative">
         {/* Desktop sidebar */}
-        {inProject && (
+        {showNav && (
           <aside className="hidden lg:flex flex-col w-64 shrink-0 h-full z-10 relative shadow-xl">
             <Sidebar />
           </aside>
@@ -114,7 +115,7 @@ export default function AppLayout() {
       </div>
 
       {/* Mobile Bottom Nav */}
-      {inProject && <BottomNav />}
+      {showNav && <BottomNav />}
     </div>
   );
 }
