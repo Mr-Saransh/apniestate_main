@@ -398,7 +398,7 @@ async function main() {
   for (const v of vendors) {
     await prisma.vendor.upsert({
       where: { id: v.id },
-      update: { ...v, company_id: company.id },
+      update: { ...v, company_id: company.id } as any,
       create: { ...v, is_active: true, company_id: company.id } as any,
     });
   }
@@ -949,7 +949,7 @@ async function main() {
   for (const ld of crmLeadsData) {
     await prisma.crmLead.upsert({
       where: { id: ld.id },
-      update: { ...ld, company_id: company.id, project_id: 'proj_downtown_plaza' },
+      update: { ...ld, company_id: company.id, project_id: 'proj_downtown_plaza' } as any,
       create: {
         ...ld,
         company_id: company.id,

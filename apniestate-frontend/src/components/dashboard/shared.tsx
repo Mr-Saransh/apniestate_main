@@ -20,19 +20,29 @@ export function AnimatedNumber({ value, prefix = '', suffix = '', duration = 800
 
     const start = prevRef.current;
     const end = value;
-    const startTime = performance.now();
+    const startTime = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    let animId: number;
 
     const tick = (now: number) => {
-      const elapsed = now - startTime;
-      const progress = Math.min(elapsed / duration, 1);
+      const currentNow = typeof now === 'number' && !isNaN(now) ? now : (typeof performance !== 'undefined' ? performance.now() : Date.now());
+      const elapsed = currentNow - startTime;
+      const progress = Math.min(Math.max(elapsed / duration, 0), 1);
       const eased = 1 - Math.pow(1 - progress, 3);
       const current = Math.round(start + (end - start) * eased);
       setDisplay(current);
-      if (progress < 1) requestAnimationFrame(tick);
+      if (progress < 1) {
+        animId = requestAnimationFrame(tick);
+      }
     };
 
-    requestAnimationFrame(tick);
+    animId = requestAnimationFrame(tick);
     prevRef.current = end;
+
+    return () => {
+      if (animId) {
+        cancelAnimationFrame(animId);
+      }
+    };
   }, [value, duration]);
 
   return <span>{prefix}{display.toLocaleString('en-IN')}{suffix}</span>;

@@ -19,6 +19,7 @@ import {
   FileText,
   BadgePercent,
   Check,
+  Lock,
 } from 'lucide-react';
 
 export default function SettingsPage() {
@@ -60,7 +61,6 @@ export default function SettingsPage() {
     try {
       const res = await usersApi.update(user.id, {
         name: formName,
-        email: formEmail,
         phone: formPhone || undefined,
       });
 
@@ -68,7 +68,6 @@ export default function SettingsPage() {
         updateUser({
           ...user,
           name: formName,
-          email: formEmail,
           phone: formPhone || null,
         });
         setShowEditModal(false);
@@ -418,16 +417,27 @@ export default function SettingsPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1.5">
-                    Email Address *
-                  </label>
-                  <input
-                    type="email"
-                    required
-                    className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-900 outline-none focus:bg-white focus:border-[#2648E7]"
-                    value={formEmail}
-                    onChange={(e) => setFormEmail(e.target.value)}
-                  />
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+                      Email Address
+                    </label>
+                    <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                      <Lock size={11} className="text-slate-400" /> Primary Login ID
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="email"
+                      readOnly
+                      disabled
+                      className="w-full p-3.5 bg-slate-100 border border-slate-200 rounded-xl text-sm font-medium text-slate-500 cursor-not-allowed select-none pr-10"
+                      value={user?.email || formEmail}
+                    />
+                    <Lock size={15} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Email address cannot be changed as it is assigned for authentication.
+                  </p>
                 </div>
                 <div>
                   <label className="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1.5">

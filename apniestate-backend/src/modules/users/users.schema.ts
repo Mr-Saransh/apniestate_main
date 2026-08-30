@@ -17,7 +17,7 @@ export const CreateUserSchema = BaseUserSchema.refine((data) => data.email || da
   path: ["email"],
 });
 
-export const UpdateUserSchema = BaseUserSchema.omit({ password: true }).partial();
+export const UpdateUserSchema = BaseUserSchema.omit({ password: true, email: true }).partial();
 
 export type CreateUserInput = z.infer<typeof CreateUserSchema>;
 export type UpdateUserInput = z.infer<typeof UpdateUserSchema>;
