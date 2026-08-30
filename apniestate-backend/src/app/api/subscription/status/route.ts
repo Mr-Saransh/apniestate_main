@@ -4,6 +4,6 @@ import { getSubscriptionStatus } from "@/modules/subscription/subscription.servi
 import { ok } from "@/lib/response";
 
 export const GET = withAuth(async (_req: NextRequest, user) => {
-  const status = await getSubscriptionStatus(user.sub);
+  const status = await getSubscriptionStatus(user.sub, user.company_id);
   return ok(status);
 });

@@ -3,8 +3,8 @@ import { verifyAccessToken } from "@/lib/jwt";
 import { unauthorized, forbidden } from "@/lib/response";
 import { prisma } from "@/lib/prisma";
 import type { JWTPayload } from "@/types";
-
 import { getRolePermissions } from "@/modules/permissions/permissions.service";
+import { canAccessCRM } from "@/modules/subscription/entitlement.service";
 import { Role } from "@prisma/client";
 
 type RouteHandler = (req: NextRequest, user: JWTPayload, context?: any) => Promise<Response>;
@@ -23,14 +23,14 @@ export function withAuth(handler: RouteHandler) {
     try {
       dbUser = await prisma.user.findUnique({
         where: { id: payload.sub },
-        select: { company_id: true }
+        select: { company_id: true },
       });
     } catch (e) {
       console.warn("Transient DB error in auth middleware", e);
       // Fallback to payload's company_id if DB is unreachable to avoid 500s
       dbUser = { company_id: payload.company_id || null };
     }
-    
+
     if (!dbUser && !payload.company_id) return unauthorized();
 
     if (!payload.company_id) {
@@ -48,10 +48,26 @@ export function withPermission(requiredPermission: string, handler: RouteHandler
     }
 
     const perms = await getRolePermissions(user.role as Role);
-    const hasPerm = perms.some(p => `${p.permission.module}.${p.permission.action}` === requiredPermission);
+    const hasPerm = perms.some((p) => `${p.permission.module}.${p.permission.action}` === requiredPermission);
 
     if (!hasPerm) {
       return forbidden("You do not have permission to perform this action.");
+    }
+
+    return handler(req, user, context);
+  });
+}
+
+/**
+ * Middleware wrapper enforcing CRM entitlement check (₹1,00,000 Plan required).
+ */
+export function withCrmAuth(handler: RouteHandler) {
+  return withAuth(async (req, user, context) => {
+    const crmAccess = await canAccessCRM(user.company_id);
+    if (!crmAccess.allowed) {
+      return forbidden(
+        crmAccess.reason || "CRM is available exclusively on the ₹1,00,000 Premium Plan. Upgrade your subscription to access CRM features."
+      );
     }
 
     return handler(req, user, context);

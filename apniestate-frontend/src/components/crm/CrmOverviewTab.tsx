@@ -1,7 +1,8 @@
 import React from 'react';
 import {
   Users, UserCheck, TrendingUp, IndianRupee, Clock, CheckCircle2,
-  AlertTriangle, Calendar, Plus, ArrowUpRight, Building2, Phone, MessageCircle
+  AlertTriangle, Calendar, Plus, ArrowUpRight, Building2, Phone, MessageCircle,
+  FileSpreadsheet, Sparkles, Zap
 } from 'lucide-react';
 import { type CrmAnalytics, type CrmLead, type CrmFollowup } from '@/api/crm';
 
@@ -12,6 +13,8 @@ interface CrmOverviewTabProps {
   onOpenAddLead: () => void;
   onOpenAddFollowup: () => void;
   onOpenAddDeal: () => void;
+  onOpenImportCsv?: () => void;
+  onOpenAddProperty?: () => void;
   onSelectLead: (leadId: string) => void;
   onNavigateTab: (tabId: string) => void;
 }
@@ -23,6 +26,8 @@ export default function CrmOverviewTab({
   onOpenAddLead,
   onOpenAddFollowup,
   onOpenAddDeal,
+  onOpenImportCsv,
+  onOpenAddProperty,
   onSelectLead,
   onNavigateTab,
 }: CrmOverviewTabProps) {
@@ -42,31 +47,73 @@ export default function CrmOverviewTab({
 
   return (
     <div className="space-y-6">
-      {/* Top Quick Actions Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl bg-white border border-slate-200/80 shadow-sm">
-        <div>
-          <h3 className="text-sm font-extrabold text-slate-900">CRM Quick Launch</h3>
-          <p className="text-xs text-slate-500">Fast triggers to manage your sales pipeline</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={onOpenAddLead}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-[#2648E7] hover:bg-[#1e3bbd] shadow-sm transition-all active:scale-95"
-          >
-            <Plus size={14} /> Add Lead
-          </button>
-          <button
-            onClick={onOpenAddFollowup}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-all active:scale-95"
-          >
-            <Clock size={14} /> Schedule Follow-up
-          </button>
-          <button
-            onClick={onOpenAddDeal}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-amber-800 bg-amber-100 hover:bg-amber-200 transition-all active:scale-95"
-          >
-            <IndianRupee size={14} /> Record Deal
-          </button>
+      {/* Premium CRM Quick Launch Card */}
+      <div className="relative overflow-hidden p-5 rounded-3xl bg-gradient-to-br from-white via-blue-50/20 to-indigo-50/30 border border-slate-200/80 shadow-md shadow-slate-100">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-[#2648E7]/10 text-[#2648E7] flex items-center justify-center shrink-0 shadow-inner">
+              <Zap size={20} className="fill-[#2648E7]/20" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-black text-slate-900 tracking-tight" style={{ fontFamily: 'var(--font-display)' }}>
+                  CRM Quick Launch
+                </h3>
+                <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-[#2648E7]/10 text-[#2648E7] tracking-wider">
+                  Fast Actions
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 font-medium mt-0.5">
+                Instant triggers to create leads, catalog properties, and record deals
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={onOpenAddLead}
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#2648E7] to-[#4F6DFF] hover:opacity-95 shadow-md shadow-[#2648E7]/25 transition-all hover:-translate-y-0.5 active:translate-y-0"
+            >
+              <Plus size={15} strokeWidth={2.5} />
+              <span>Add Lead</span>
+            </button>
+
+            {onOpenAddProperty && (
+              <button
+                onClick={onOpenAddProperty}
+                className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 hover:text-slate-900 shadow-sm transition-all hover:-translate-y-0.5 active:translate-y-0"
+              >
+                <Building2 size={14} className="text-[#2648E7]" />
+                <span>+ Property</span>
+              </button>
+            )}
+
+            {onOpenImportCsv && (
+              <button
+                onClick={onOpenImportCsv}
+                className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 hover:text-slate-900 shadow-sm transition-all hover:-translate-y-0.5 active:translate-y-0"
+              >
+                <FileSpreadsheet size={14} className="text-emerald-600" />
+                <span>Import CSV</span>
+              </button>
+            )}
+
+            <button
+              onClick={onOpenAddFollowup}
+              className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 hover:text-slate-900 shadow-sm transition-all hover:-translate-y-0.5 active:translate-y-0"
+            >
+              <Clock size={14} className="text-indigo-600" />
+              <span>Schedule Follow-up</span>
+            </button>
+
+            <button
+              onClick={onOpenAddDeal}
+              className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-bold text-amber-900 bg-amber-50 border border-amber-200/80 hover:bg-amber-100 shadow-sm transition-all hover:-translate-y-0.5 active:translate-y-0"
+            >
+              <IndianRupee size={14} className="text-amber-700" />
+              <span>Record Deal</span>
+            </button>
+          </div>
         </div>
       </div>
 

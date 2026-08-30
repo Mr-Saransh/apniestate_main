@@ -6,9 +6,16 @@ import { renewSubscription, createRazorpayOrder } from "@/modules/subscription/s
 import { ok, badRequest, serverError } from "@/lib/response";
 
 // GET: Create Razorpay order for renewal
-export const GET = withAuth(async (_req: NextRequest, _user) => {
+export const GET = withAuth(async (req: NextRequest, _user) => {
   try {
-    const order = await createRazorpayOrder();
+    const url = new URL(req.url);
+    const planId = (url.searchParams.get("plan_id") as any) || "PLAN_30K";
+    const durationMonths = parseInt(url.searchParams.get("duration_months") || "4", 10);
+
+    const order = await createRazorpayOrder({
+      plan_id: planId,
+      duration_months: durationMonths,
+    });
     return ok(order, "Renewal order created");
   } catch (err: any) {
     return serverError(err.message || "Failed to create renewal order");
@@ -21,7 +28,7 @@ export const POST = withAuth(async (req: NextRequest, user) => {
   if ("error" in parsed) return parsed.error;
 
   try {
-    const result = await renewSubscription(user.sub, parsed.data);
+    const result = await renewSubscription(user.sub, parsed.data, user.company_id);
     return ok(result, "Subscription renewed successfully");
   } catch (err: any) {
     if (err.message?.includes("verification failed")) {

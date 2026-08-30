@@ -170,70 +170,193 @@ async function main() {
   console.log('🚀 Seeding Apni Estate Demo...');
   await seedPermissions();
 
-  // ── Company ─────────────────────────────────────────────
+  // ── Company 1: Premium (₹100,000 Plan) ─────────────────
   const company = await prisma.company.upsert({
     where: { id: 'cl_demo_company_1' },
-    update: { name: 'Apni Estate Demo' },
-    create: { id: 'cl_demo_company_1', name: 'Apni Estate Demo' },
+    update: { name: 'Apni Estate Demo (Premium)' },
+    create: { id: 'cl_demo_company_1', name: 'Apni Estate Demo (Premium)' },
   });
-  console.log(`🏢 Company: ${company.name}`);
+  console.log(`🏢 Premium Company: ${company.name}`);
+
+  // Premium Subscription (₹1,00,000 Plan, Forever Demo, CRM Included, Unlimited Projects)
+  await prisma.subscription.upsert({
+    where: { id: 'sub_demo_premium_100k' },
+    update: {
+      company_id: company.id,
+      plan: 'PLAN_100K',
+      duration_months: 12,
+      price: 1200000,
+      status: 'ACTIVE',
+      is_demo: true,
+      start_date: monthsAgo(6),
+      end_date: monthsFromNow(60),
+    },
+    create: {
+      id: 'sub_demo_premium_100k',
+      company_id: company.id,
+      plan: 'PLAN_100K',
+      duration_months: 12,
+      price: 1200000,
+      currency: 'INR',
+      status: 'ACTIVE',
+      is_demo: true,
+      type: 'PAID',
+      start_date: monthsAgo(6),
+      end_date: monthsFromNow(60),
+      starts_at: monthsAgo(6),
+      expires_at: monthsFromNow(60),
+    },
+  });
+
+  // ── Company 2: Starter (₹30,000 Plan) ───────────────────
+  const starterCompany = await prisma.company.upsert({
+    where: { id: 'cl_demo_starter_co' },
+    update: { name: 'Starter Builders Pvt Ltd' },
+    create: { id: 'cl_demo_starter_co', name: 'Starter Builders Pvt Ltd' },
+  });
+  console.log(`🏢 Starter Company: ${starterCompany.name}`);
+
+  // Starter Subscription (₹30,000 Plan, Forever Demo, Max 1 Project, CRM Disabled)
+  await prisma.subscription.upsert({
+    where: { id: 'sub_demo_starter_30k' },
+    update: {
+      company_id: starterCompany.id,
+      plan: 'PLAN_30K',
+      duration_months: 12,
+      price: 360000,
+      status: 'ACTIVE',
+      is_demo: true,
+      start_date: monthsAgo(3),
+      end_date: monthsFromNow(60),
+    },
+    create: {
+      id: 'sub_demo_starter_30k',
+      company_id: starterCompany.id,
+      plan: 'PLAN_30K',
+      duration_months: 12,
+      price: 360000,
+      currency: 'INR',
+      status: 'ACTIVE',
+      is_demo: true,
+      type: 'PAID',
+      start_date: monthsAgo(3),
+      end_date: monthsFromNow(60),
+      starts_at: monthsAgo(3),
+      expires_at: monthsFromNow(60),
+    },
+  });
+
+  // ── Company 3: Growth (₹50,000 Plan) ────────────────────
+  const growthCompany = await prisma.company.upsert({
+    where: { id: 'cl_demo_growth_co' },
+    update: { name: 'Growth Infra Ltd' },
+    create: { id: 'cl_demo_growth_co', name: 'Growth Infra Ltd' },
+  });
+  console.log(`🏢 Growth Company: ${growthCompany.name}`);
+
+  // Growth Subscription (₹50,000 Plan, Forever Demo, Max 3 Projects, CRM Disabled)
+  await prisma.subscription.upsert({
+    where: { id: 'sub_demo_growth_50k' },
+    update: {
+      company_id: growthCompany.id,
+      plan: 'PLAN_50K',
+      duration_months: 12,
+      price: 600000,
+      status: 'ACTIVE',
+      is_demo: true,
+      start_date: monthsAgo(4),
+      end_date: monthsFromNow(60),
+    },
+    create: {
+      id: 'sub_demo_growth_50k',
+      company_id: growthCompany.id,
+      plan: 'PLAN_50K',
+      duration_months: 12,
+      price: 600000,
+      currency: 'INR',
+      status: 'ACTIVE',
+      is_demo: true,
+      type: 'PAID',
+      start_date: monthsAgo(4),
+      end_date: monthsFromNow(60),
+      starts_at: monthsAgo(4),
+      expires_at: monthsFromNow(60),
+    },
+  });
 
   const pass = await bcrypt.hash('admin123', 10);
+  const starterPass = await bcrypt.hash('starter123', 10);
+  const growthPass = await bcrypt.hash('growth123', 10);
 
   // ── Users ────────────────────────────────────────────────
+  // Demo 1: Premium Builder (admin@gmail.com / admin123)
   const builder = await prisma.user.upsert({
     where: { email: 'admin@gmail.com' },
-    update: { role: Role.BUILDER, company_id: company.id, name: 'Asim Raza', is_active: true },
-    create: { name: 'Asim Raza', email: 'admin@gmail.com', password_hash: pass, role: Role.BUILDER, phone: '+92-300-1234567', is_active: true, company_id: company.id },
+    update: { role: Role.BUILDER, company_id: company.id, name: 'Aditya Sharma', phone: '+91-9820112233', city: 'Mumbai', state: 'Maharashtra', is_active: true, subscription_status: 'ACTIVE', onboarded: true },
+    create: { name: 'Aditya Sharma', email: 'admin@gmail.com', password_hash: pass, role: Role.BUILDER, phone: '+91-9820112233', city: 'Mumbai', state: 'Maharashtra', is_active: true, company_id: company.id, subscription_status: 'ACTIVE', onboarded: true },
+  });
+
+  // Demo 2: Starter Builder (starter@apniestate.com / starter123)
+  const starterBuilder = await prisma.user.upsert({
+    where: { email: 'starter@apniestate.com' },
+    update: { role: Role.BUILDER, company_id: starterCompany.id, name: 'Suresh Patel', phone: '+91-9876543210', city: 'Gurugram', state: 'Haryana', is_active: true, subscription_status: 'ACTIVE', onboarded: true },
+    create: { name: 'Suresh Patel', email: 'starter@apniestate.com', password_hash: starterPass, role: Role.BUILDER, phone: '+91-9876543210', city: 'Gurugram', state: 'Haryana', is_active: true, company_id: starterCompany.id, subscription_status: 'ACTIVE', onboarded: true },
+  });
+
+  // Demo 3: Growth Builder (growth@apniestate.com / growth123)
+  const growthBuilder = await prisma.user.upsert({
+    where: { email: 'growth@apniestate.com' },
+    update: { role: Role.BUILDER, company_id: growthCompany.id, name: 'Gaurav Singhal', phone: '+91-9876543220', city: 'Noida', state: 'Uttar Pradesh', is_active: true, subscription_status: 'ACTIVE', onboarded: true },
+    create: { name: 'Gaurav Singhal', email: 'growth@apniestate.com', password_hash: growthPass, role: Role.BUILDER, phone: '+91-9876543220', city: 'Noida', state: 'Uttar Pradesh', is_active: true, company_id: growthCompany.id, subscription_status: 'ACTIVE', onboarded: true },
   });
 
   // Also keep original builder account for backward compat
   const builderAlt = await prisma.user.upsert({
     where: { email: 'builder@apniestate.com' },
-    update: { company_id: company.id },
-    create: { name: 'Asim Raza (Alt)', email: 'builder@apniestate.com', password_hash: pass, role: Role.BUILDER, is_active: true, company_id: company.id },
+    update: { company_id: company.id, name: 'Aditya Sharma (Alt)', phone: '+91-9820112234', subscription_status: 'ACTIVE' },
+    create: { name: 'Aditya Sharma (Alt)', email: 'builder@apniestate.com', password_hash: pass, role: Role.BUILDER, phone: '+91-9820112234', is_active: true, company_id: company.id, subscription_status: 'ACTIVE' },
   });
 
   const admin = await prisma.user.upsert({
     where: { email: 'admin@apniestate.com' },
-    update: { role: Role.ADMIN, company_id: company.id },
+    update: { role: Role.ADMIN, company_id: company.id, name: 'System Admin' },
     create: { name: 'System Admin', email: 'admin@apniestate.com', password_hash: pass, role: Role.ADMIN, is_active: true, company_id: company.id },
   });
 
   const pm1 = await prisma.user.upsert({
     where: { email: 'pm1@apniestate.com' },
-    update: { company_id: company.id },
-    create: { name: 'Imran Khan', email: 'pm1@apniestate.com', password_hash: pass, role: Role.PROJECT_MANAGER, phone: '+92-321-9876543', is_active: true, company_id: company.id },
+    update: { company_id: company.id, name: 'Rohan Mehra', phone: '+91-9820223344' },
+    create: { name: 'Rohan Mehra', email: 'pm1@apniestate.com', password_hash: pass, role: Role.PROJECT_MANAGER, phone: '+91-9820223344', is_active: true, company_id: company.id },
   });
 
   const pm2 = await prisma.user.upsert({
     where: { email: 'pm2@apniestate.com' },
-    update: { company_id: company.id },
-    create: { name: 'Sara Ahmed', email: 'pm2@apniestate.com', password_hash: pass, role: Role.PROJECT_MANAGER, phone: '+92-333-4567890', is_active: true, company_id: company.id },
+    update: { company_id: company.id, name: 'Pooja Iyer', phone: '+91-9820334455' },
+    create: { name: 'Pooja Iyer', email: 'pm2@apniestate.com', password_hash: pass, role: Role.PROJECT_MANAGER, phone: '+91-9820334455', is_active: true, company_id: company.id },
   });
 
   const sup1 = await prisma.user.upsert({
     where: { email: 'sup1@apniestate.com' },
-    update: { company_id: company.id },
-    create: { name: 'Bilal Hassan', email: 'sup1@apniestate.com', password_hash: pass, role: Role.SITE_SUPERVISOR, phone: '+92-345-1122334', is_active: true, company_id: company.id },
+    update: { company_id: company.id, name: 'Vikram Joshi', phone: '+91-9820445566' },
+    create: { name: 'Vikram Joshi', email: 'sup1@apniestate.com', password_hash: pass, role: Role.SITE_SUPERVISOR, phone: '+91-9820445566', is_active: true, company_id: company.id },
   });
 
   const sup2 = await prisma.user.upsert({
     where: { email: 'sup2@apniestate.com' },
-    update: { company_id: company.id },
-    create: { name: 'Farhan Sheikh', email: 'sup2@apniestate.com', password_hash: pass, role: Role.SITE_SUPERVISOR, phone: '+92-312-5566778', is_active: true, company_id: company.id },
+    update: { company_id: company.id, name: 'Amitabh Gupta', phone: '+91-9820556677' },
+    create: { name: 'Amitabh Gupta', email: 'sup2@apniestate.com', password_hash: pass, role: Role.SITE_SUPERVISOR, phone: '+91-9820556677', is_active: true, company_id: company.id },
   });
 
   const sup3 = await prisma.user.upsert({
     where: { email: 'sup3@apniestate.com' },
-    update: { company_id: company.id },
-    create: { name: 'Raza Hussain', email: 'sup3@apniestate.com', password_hash: pass, role: Role.SITE_SUPERVISOR, phone: '+92-301-9988776', is_active: true, company_id: company.id },
+    update: { company_id: company.id, name: 'Suresh Rao', phone: '+91-9820667788' },
+    create: { name: 'Suresh Rao', email: 'sup3@apniestate.com', password_hash: pass, role: Role.SITE_SUPERVISOR, phone: '+91-9820667788', is_active: true, company_id: company.id },
   });
 
   const accountant = await prisma.user.upsert({
     where: { email: 'accounts@apniestate.com' },
-    update: { company_id: company.id },
-    create: { name: 'Nadia Malik', email: 'accounts@apniestate.com', password_hash: pass, role: Role.ACCOUNTANT, phone: '+92-311-2233445', is_active: true, company_id: company.id },
+    update: { company_id: company.id, name: 'Neha Kulkarni', phone: '+91-9820778899' },
+    create: { name: 'Neha Kulkarni', email: 'accounts@apniestate.com', password_hash: pass, role: Role.ACCOUNTANT, phone: '+91-9820778899', is_active: true, company_id: company.id },
   });
 
   console.log('👥 Users seeded');
@@ -247,21 +370,35 @@ async function main() {
       create: { user_id: u.id, company_id: company.id, roles: [u.role], status: 'ACTIVE' },
     });
   }
+
+  // Memberships for Starter and Growth
+  await prisma.companyMembership.upsert({
+    where: { user_id_company_id: { user_id: starterBuilder.id, company_id: starterCompany.id } },
+    update: { status: 'ACTIVE' },
+    create: { user_id: starterBuilder.id, company_id: starterCompany.id, roles: [Role.BUILDER], status: 'ACTIVE' },
+  });
+
+  await prisma.companyMembership.upsert({
+    where: { user_id_company_id: { user_id: growthBuilder.id, company_id: growthCompany.id } },
+    update: { status: 'ACTIVE' },
+    create: { user_id: growthBuilder.id, company_id: growthCompany.id, roles: [Role.BUILDER], status: 'ACTIVE' },
+  });
+
   console.log('🤝 Memberships ensured');
 
   // ── Vendors ─────────────────────────────────────────────
   const vendors = [
-    { id: 'vend_cement_co', name: 'Pakland Cement Ltd.', type: 'MATERIAL_SUPPLIER', contact_person: 'Ali Hasan', phone: '+92-21-35678901', email: 'sales@pakland.com', category: 'Cement' },
-    { id: 'vend_steel_co', name: 'Ittefaq Steel Mills', type: 'MATERIAL_SUPPLIER', contact_person: 'Umar Khan', phone: '+92-42-37891234', email: 'orders@ittefaqsteel.com', category: 'Steel' },
-    { id: 'vend_aggregate', name: 'Northern Aggregates', type: 'MATERIAL_SUPPLIER', contact_person: 'Hamid Iqbal', phone: '+92-51-2345678', email: 'info@northagg.pk', category: 'Aggregates' },
-    { id: 'vend_brick_co', name: 'Sindh Brick Works', type: 'MATERIAL_SUPPLIER', contact_person: 'Aamir Siddiqui', phone: '+92-21-44567890', email: 'bricks@sindhworks.pk', category: 'Bricks' },
-    { id: 'vend_crane_co', name: 'Mega Crane Services', type: 'EQUIPMENT_VENDOR', contact_person: 'Tariq Mehmood', phone: '+92-300-4455667', email: 'tariq@megacrane.pk', category: 'Equipment' },
+    { id: 'vend_cement_co', name: 'UltraTech Cement Distributors', type: 'MATERIAL_SUPPLIER', contact_person: 'Rajesh Agarwal', phone: '+91-22-28765432', email: 'sales@ultratech-dist.in', category: 'Cement' },
+    { id: 'vend_steel_co', name: 'Tata Tiscon Steel Hub', type: 'MATERIAL_SUPPLIER', contact_person: 'Sunil Verma', phone: '+91-22-27891234', email: 'orders@tatasteel-hub.in', category: 'Steel' },
+    { id: 'vend_aggregate', name: 'Deccan Aggregates & Stone Crusher', type: 'MATERIAL_SUPPLIER', contact_person: 'Harish Patil', phone: '+91-20-23456789', email: 'info@deccanaggregates.in', category: 'Aggregates' },
+    { id: 'vend_brick_co', name: 'Bharat Red Brick Works', type: 'MATERIAL_SUPPLIER', contact_person: 'Anil Deshmukh', phone: '+91-22-24456789', email: 'sales@bharatbricks.in', category: 'Bricks' },
+    { id: 'vend_crane_co', name: 'Shree Ram Heavy Cranes & Equipment', type: 'EQUIPMENT_VENDOR', contact_person: 'Tarun Mishra', phone: '+91-9820998877', email: 'info@shreeramcranes.in', category: 'Equipment' },
   ];
 
   for (const v of vendors) {
     await prisma.vendor.upsert({
       where: { id: v.id },
-      update: { company_id: company.id },
+      update: { ...v, company_id: company.id },
       create: { ...v, is_active: true, company_id: company.id } as any,
     });
   }
@@ -290,20 +427,16 @@ async function main() {
   }
   console.log('📦 Materials seeded');
 
-  // ── Projects (5) ─────────────────────────────────────────
+  // ── Projects (Flagship) ──────────────────────────────────
   const projectsData = [
-    { id: 'proj_downtown_plaza', name: 'Downtown Commercial Plaza', description: 'A 12-story G+11 commercial complex with basement parking', builder_id: builder.id, manager_id: pm1.id, status: 'ACTIVE', start_date: monthsAgo(6), end_date: monthsFromNow(6), budget: 85000000, address: '35-B Main Boulevard', city: 'Karachi', progress_percentage: 68 },
-    { id: 'proj_gulshan_residency', name: 'Gulshan Residency Complex', description: '240 residential units in G+8 towers with amenities', builder_id: builder.id, manager_id: pm2.id, status: 'ACTIVE', start_date: monthsAgo(5), end_date: monthsFromNow(7), budget: 120000000, address: 'Plot 44, Block 13-D', city: 'Karachi', actual_cost: 58000000, progress_percentage: 42 },
-    { id: 'proj_dha_villas', name: 'DHA Phase 8 Villas', description: '36 independent villas with private gardens', builder_id: builder.id, manager_id: pm1.id, status: 'ACTIVE', start_date: monthsAgo(12), end_date: monthsFromNow(2), budget: 45000000, address: 'DHA Phase 8, Street 14', city: 'Lahore', progress_percentage: 85 },
-    { id: 'proj_clifton_heights', name: 'Clifton Heights Tower', description: 'Luxury 20-story residential tower with panoramic views', builder_id: builder.id, manager_id: pm2.id, status: 'ACTIVE', start_date: monthsAgo(3), end_date: monthsFromNow(18), budget: 200000000, address: 'Clifton Block 4', city: 'Karachi', progress_percentage: 23 },
-    { id: 'proj_bahria_commercial', name: 'Bahria Commercial Block', description: '4-floor commercial mall with anchor stores', builder_id: builder.id, manager_id: pm1.id, status: 'ACTIVE', start_date: monthsAgo(4), end_date: monthsFromNow(8), budget: 60000000, address: 'Bahria Town Phase 4', city: 'Rawalpindi', progress_percentage: 56 },
+    { id: 'proj_downtown_plaza', name: 'Downtown Commercial Plaza', description: 'A 12-story G+11 premium commercial IT & business park', builder_id: builder.id, manager_id: pm1.id, status: 'ACTIVE', start_date: monthsAgo(6), end_date: monthsFromNow(6), budget: 85000000, address: 'Bandra Kurla Complex (BKC), G Block', city: 'Mumbai', progress_percentage: 68 },
   ];
 
   const projects: any[] = [];
   for (const p of projectsData) {
     const proj = await prisma.project.upsert({
       where: { id: p.id },
-      update: { company_id: company.id, progress_percentage: p.progress_percentage },
+      update: { company_id: company.id, name: p.name, description: p.description, address: p.address, city: p.city, progress_percentage: p.progress_percentage },
       create: { ...p, company_id: company.id } as any,
     });
     projects.push(proj);
@@ -312,21 +445,15 @@ async function main() {
 
   // ── Sites ─────────────────────────────────────────────────
   const sitesData = [
-    { id: 'site_dp_tower', project_id: 'proj_downtown_plaza', name: 'Downtown Plaza — Tower Block', location: 'Karachi Main Boulevard', supervisor_id: sup1.id, status: 'IN_PROGRESS', progress_percentage: 72, phase: 'Superstructure' },
-    { id: 'site_dp_basement', project_id: 'proj_downtown_plaza', name: 'Downtown Plaza — Basement', location: 'Karachi Main Boulevard', supervisor_id: sup2.id, status: 'IN_PROGRESS', progress_percentage: 95, phase: 'Finishing' },
-    { id: 'site_gr_tower1', project_id: 'proj_gulshan_residency', name: 'Gulshan Residency — Tower A', location: 'Block 13-D Karachi', supervisor_id: sup1.id, status: 'IN_PROGRESS', progress_percentage: 48, phase: 'Slab Work' },
-    { id: 'site_gr_tower2', project_id: 'proj_gulshan_residency', name: 'Gulshan Residency — Tower B', location: 'Block 13-D Karachi', supervisor_id: sup3.id, status: 'IN_PROGRESS', progress_percentage: 35, phase: 'Foundation' },
-    { id: 'site_dha_block_a', project_id: 'proj_dha_villas', name: 'DHA Villas — Block A (18 Units)', location: 'DHA Phase 8 Lahore', supervisor_id: sup2.id, status: 'IN_PROGRESS', progress_percentage: 90, phase: 'Finishing' },
-    { id: 'site_dha_block_b', project_id: 'proj_dha_villas', name: 'DHA Villas — Block B (18 Units)', location: 'DHA Phase 8 Lahore', supervisor_id: sup3.id, status: 'IN_PROGRESS', progress_percentage: 80, phase: 'Brickwork' },
-    { id: 'site_clifton_core', project_id: 'proj_clifton_heights', name: 'Clifton Heights — Core & Shell', location: 'Clifton Block 4', supervisor_id: sup1.id, status: 'IN_PROGRESS', progress_percentage: 25, phase: 'Foundation' },
-    { id: 'site_bahria_main', project_id: 'proj_bahria_commercial', name: 'Bahria Commercial — Main Structure', location: 'Bahria Town Phase 4', supervisor_id: sup2.id, status: 'IN_PROGRESS', progress_percentage: 56, phase: 'Superstructure' },
+    { id: 'site_dp_tower', project_id: 'proj_downtown_plaza', name: 'Downtown Plaza — Tower Block', location: 'BKC, Bandra East, Mumbai', supervisor_id: sup1.id, status: 'IN_PROGRESS', progress_percentage: 72, phase: 'Superstructure' },
+    { id: 'site_dp_basement', project_id: 'proj_downtown_plaza', name: 'Downtown Plaza — Basement & Parking', location: 'BKC, Bandra East, Mumbai', supervisor_id: sup2.id, status: 'IN_PROGRESS', progress_percentage: 95, phase: 'Finishing' },
   ];
 
   const sites: any[] = [];
   for (const s of sitesData) {
     const site = await prisma.site.upsert({
       where: { id: s.id },
-      update: { company_id: company.id },
+      update: { company_id: company.id, name: s.name, location: s.location },
       create: { ...s, company_id: company.id } as any,
     });
     sites.push(site);
@@ -342,28 +469,6 @@ async function main() {
     { id: 'ms_dp_4', project_id: 'proj_downtown_plaza', name: 'Roof Slab', target_date: monthsFromNow(2), status: 'IN_PROGRESS' },
     { id: 'ms_dp_5', project_id: 'proj_downtown_plaza', name: 'MEP Rough-In Complete', target_date: monthsFromNow(4), status: 'PENDING' },
     { id: 'ms_dp_6', project_id: 'proj_downtown_plaza', name: 'Handover', target_date: monthsFromNow(6), status: 'PENDING' },
-    // Gulshan Residency
-    { id: 'ms_gr_1', project_id: 'proj_gulshan_residency', name: 'Piling Complete', target_date: monthsAgo(4), status: 'COMPLETED' },
-    { id: 'ms_gr_2', project_id: 'proj_gulshan_residency', name: 'Basement Raft', target_date: monthsAgo(2), status: 'COMPLETED' },
-    { id: 'ms_gr_3', project_id: 'proj_gulshan_residency', name: '3rd Floor Slab', target_date: monthsFromNow(1), status: 'IN_PROGRESS' },
-    { id: 'ms_gr_4', project_id: 'proj_gulshan_residency', name: '6th Floor Slab', target_date: monthsFromNow(4), status: 'PENDING' },
-    { id: 'ms_gr_5', project_id: 'proj_gulshan_residency', name: 'Topping-Out', target_date: monthsFromNow(7), status: 'PENDING' },
-    // DHA Villas
-    { id: 'ms_dha_1', project_id: 'proj_dha_villas', name: 'Foundation Complete', target_date: monthsAgo(10), status: 'COMPLETED' },
-    { id: 'ms_dha_2', project_id: 'proj_dha_villas', name: 'Superstructure', target_date: monthsAgo(6), status: 'COMPLETED' },
-    { id: 'ms_dha_3', project_id: 'proj_dha_villas', name: 'Internal Plaster', target_date: monthsAgo(2), status: 'COMPLETED' },
-    { id: 'ms_dha_4', project_id: 'proj_dha_villas', name: 'Finishing & Tiles', target_date: daysAgo(7), status: 'IN_PROGRESS' },
-    { id: 'ms_dha_5', project_id: 'proj_dha_villas', name: 'Handover Ready', target_date: monthsFromNow(2), status: 'PENDING' },
-    // Clifton Heights
-    { id: 'ms_ch_1', project_id: 'proj_clifton_heights', name: 'Soil Investigation', target_date: monthsAgo(2), status: 'COMPLETED' },
-    { id: 'ms_ch_2', project_id: 'proj_clifton_heights', name: 'Piling', target_date: daysAgo(10), status: 'IN_PROGRESS' },
-    { id: 'ms_ch_3', project_id: 'proj_clifton_heights', name: 'Ground Floor', target_date: monthsFromNow(3), status: 'PENDING' },
-    // Bahria Commercial
-    { id: 'ms_bc_1', project_id: 'proj_bahria_commercial', name: 'Foundation Raft', target_date: monthsAgo(3), status: 'COMPLETED' },
-    { id: 'ms_bc_2', project_id: 'proj_bahria_commercial', name: '1st Floor Complete', target_date: monthsAgo(1), status: 'COMPLETED' },
-    { id: 'ms_bc_3', project_id: 'proj_bahria_commercial', name: '3rd Floor Slab', target_date: monthsFromNow(1), status: 'IN_PROGRESS' },
-    { id: 'ms_bc_4', project_id: 'proj_bahria_commercial', name: 'Facade & Glazing', target_date: monthsFromNow(5), status: 'PENDING' },
-    { id: 'ms_bc_5', project_id: 'proj_bahria_commercial', name: 'Handover', target_date: monthsFromNow(8), status: 'PENDING' },
   ];
 
   for (const ms of milestonesData) {
@@ -378,12 +483,12 @@ async function main() {
   // ── Workers (52 workers) ─────────────────────────────────
   const workerTrades = ['Mason', 'Steel Fixer', 'Carpenter', 'Plumber', 'Electrician', 'Painter', 'Helper', 'Welder', 'Tile Layer', 'Plasterer'];
   const workerNames = [
-    'Muhammad Ali', 'Ahmed Raza', 'Zubair Khan', 'Tariq Mehmood', 'Wasim Aktar', 'Amir Sohail', 'Javed Iqbal', 'Irfan Ahmed', 'Khalid Butt', 'Shakeel Ahmad',
-    'Nadeem Ul Haq', 'Sajjad Hussain', 'Faisal Mehmood', 'Adnan Shah', 'Rizwan Alam', 'Naeem Ul Islam', 'Mohsin Siddiqui', 'Babar Nawaz', 'Danish Karim', 'Usman Siddiqui',
-    'Asif Mehmood', 'Imtiaz Butt', 'Majid Khan', 'Arif Maqbool', 'Ghulam Mustafa', 'Allah Rakha', 'Taj Muhammad', 'Sher Ali', 'Bakhtawar Khan', 'Nazar Muhammad',
-    'Farid Ullah', 'Gul Muhammad', 'Habib Ullah', 'Juma Khan', 'Kalo Khan', 'Laqa Khan', 'Manzoor Ahmad', 'Nadir Shah', 'Osman Gul', 'Pir Muhammad',
-    'Qasim Shah', 'Rahim Gul', 'Sabir Khan', 'Tahir Ahmad', 'Umer Hayat', 'Waqas Ahmad', 'Younis Khan', 'Zain Ul Abdin', 'Arshad Mehmood', 'Bilal Siddiqui',
-    'Chaudhry Akhtar', 'Danish Pervaiz',
+    'Ramesh Kumar', 'Suresh Sharma', 'Mahesh Verma', 'Dinesh Gupta', 'Mukesh Yadav', 'Rajesh Patel', 'Ganesh Joshi', 'Rakesh Singh', 'Naresh Pandey', 'Pankaj Mishra',
+    'Santosh Chauhan', 'Manoj Tiwari', 'Sunil Saini', 'Anil Rawat', 'Deepak Maurya', 'Vinod Prajapati', 'Ajay Thakur', 'Vijay Rathore', 'Ashok Bind', 'Kishore Sonkar',
+    'Brijesh Paswan', 'Dharmendra Gautam', 'Ram Sevak', 'Shiv Kumar', 'Gopal Das', 'Harish Chandra', 'Kishan Lal', 'Mohan Lal', 'Bhola Nath', 'Shyam Sundar',
+    'Jagdish Prasad', 'Om Prakash', 'Radhey Shyam', 'Chandra Prakash', 'Suraj Pal', 'Hemant Kumar', 'Kundan Singh', 'Lalit Mohan', 'Devendra Kumar', 'Pravin Shinde',
+    'Sanjay Kamble', 'Nitin Gaikwad', 'Sachin More', 'Rahul Jadhav', 'Vikas Sawant', 'Pradeep Pawar', 'Sandip Kadam', 'Kiran Shirodkar', 'Amol Deshpande', 'Girish Kulkarni',
+    'Tushar Joshi', 'Vishal Mane'
   ];
 
   const workerDailyRates: Record<string, number> = {
@@ -401,14 +506,14 @@ async function main() {
 
     const worker = await prisma.worker.upsert({
       where: { id: `worker_${String(i).padStart(3, '0')}` },
-      update: { company: { connect: { id: company.id } } },
+      update: { name: workerNames[i], phone: `+91-${9800000000 + i * 179}`, company: { connect: { id: company.id } } },
       create: {
         id: `worker_${String(i).padStart(3, '0')}`,
         name: workerNames[i],
         trade,
         daily_rate: dailyRate,
         site: { connect: { id: siteId } },
-        phone: `+92-${300 + (i % 10)}-${1000000 + i * 17}`,
+        phone: `+91-${9800000000 + i * 179}`,
         is_active: true,
         company: { connect: { id: company.id } },
         status: 'ACTIVE',
@@ -421,30 +526,30 @@ async function main() {
 
   // ── Attendance (90 days) ─────────────────────────────────
   console.log('📅 Seeding attendance (90 days)...');
+  const attendanceData: any[] = [];
   for (let day = 89; day >= 0; day--) {
     const date = daysAgo(day);
     if (date.getDay() === 0) continue; // Skip Sundays
 
-    // Batch: seed for first 30 workers per day to keep it fast
-    const workersToAttend = createdWorkers.slice(0, 30);
+    // Seed for first 15 workers per day
+    const workersToAttend = createdWorkers.slice(0, 15);
     for (const w of workersToAttend) {
       const isPresent = Math.random() > 0.12; // 88% attendance rate
-      const existingAtt = await prisma.workerAttendance.findFirst({
-        where: { worker_id: w.id, date: date }
-      });
-      if (existingAtt) continue;
-
-      await prisma.workerAttendance.create({
-        data: {
-          worker_id: w.id,
-          site_id: w.site_id,
-          date,
-          status: isPresent ? 'PRESENT' : 'ABSENT',
-          daily_wage_snapshot: isPresent ? w.daily_rate : 0,
-          marked_by: sup1.id,
-        } as any
+      attendanceData.push({
+        worker_id: w.id,
+        site_id: w.site_id,
+        date,
+        status: isPresent ? 'PRESENT' : 'ABSENT',
+        daily_wage_snapshot: isPresent ? w.daily_rate : 0,
+        marked_by: sup1.id,
       });
     }
+  }
+  if (attendanceData.length > 0) {
+    await prisma.workerAttendance.createMany({
+      data: attendanceData,
+      skipDuplicates: true,
+    });
   }
   console.log('✅ Attendance seeded');
 
@@ -781,7 +886,7 @@ async function main() {
     { id: 'att_005', entity_type: 'INVENTORY_TXN', entity_id: 'inv_txn_001', category: 'Delivery Photo', file_name: 'delivery_truck.jpg', mime_type: 'image/jpeg', file_size: 2100000, secure_url: 'https://res.cloudinary.com/demo/image/upload/v1/sample.jpg' }
   ];
 
-  for (const att of attachmentData) {
+    for (const att of attachmentData) {
     await prisma.attachment.upsert({
       where: { id: att.id },
       update: {},
@@ -794,19 +899,167 @@ async function main() {
   }
   console.log('📎 Attachments seeded');
 
+  // ── Starter & Growth Projects ─────────────────────────────
+  console.log('🏗️ Seeding Starter & Growth Projects...');
+  // Starter: Exactly 1 Active Project
+  await prisma.project.upsert({
+    where: { id: 'proj_starter_horizon' },
+    update: { company_id: starterCompany.id, builder_id: starterBuilder.id, status: 'ACTIVE' },
+    create: {
+      id: 'proj_starter_horizon',
+      name: 'Starter Horizon Heights',
+      description: 'Single active luxury boutique project (₹30K Starter Plan demo)',
+      builder_id: starterBuilder.id,
+      status: 'ACTIVE',
+      start_date: monthsAgo(2),
+      end_date: monthsFromNow(10),
+      budget: 15000000,
+      address: 'Sector 12, Expressway',
+      city: 'Gurugram',
+      progress_percentage: 25,
+      company_id: starterCompany.id,
+    } as any,
+  });
+
+  // Growth: Exactly 3 Active Projects
+  const growthProjectsData = [
+    { id: 'proj_growth_residency_1', name: 'Growth Residency Tower A', description: 'G+14 residential apartments (₹50K Plan Demo #1)', builder_id: growthBuilder.id, status: 'ACTIVE', start_date: monthsAgo(3), end_date: monthsFromNow(9), budget: 35000000, address: 'Plot 10, Ring Road', city: 'Noida', progress_percentage: 40 },
+    { id: 'proj_growth_residency_2', name: 'Growth Residency Tower B', description: 'G+14 residential apartments (₹50K Plan Demo #2)', builder_id: growthBuilder.id, status: 'ACTIVE', start_date: monthsAgo(2), end_date: monthsFromNow(12), budget: 38000000, address: 'Plot 11, Ring Road', city: 'Noida', progress_percentage: 20 },
+    { id: 'proj_growth_plaza', name: 'Growth Apex Plaza', description: 'Commercial business center (₹50K Plan Demo #3)', builder_id: growthBuilder.id, status: 'ACTIVE', start_date: monthsAgo(4), end_date: monthsFromNow(6), budget: 50000000, address: 'Sector 62', city: 'Noida', progress_percentage: 65 },
+  ];
+  for (const gp of growthProjectsData) {
+    await prisma.project.upsert({
+      where: { id: gp.id },
+      update: { company_id: growthCompany.id, builder_id: growthBuilder.id, status: gp.status as any },
+      create: { ...gp, company_id: growthCompany.id } as any,
+    });
+  }
+  console.log('✅ Starter & Growth projects seeded');
+
+  // ── CRM Dataset (Premium Company Exclusive) ───────────────
+  console.log('💼 Seeding CRM Leads & Sales Pipeline...');
+  const crmLeadsData = [
+    { id: 'lead_crm_1', name: 'Vikram Malhotra', phone: '+91-9811223344', email: 'vikram.m@gmail.com', type: 'BUYER', status: 'QUALIFIED', priority: 'HIGH', budget: '₹1.5 Cr - ₹2 Cr', city: 'Mumbai', source: 'Direct', initials: 'VM', avatar_color: '#2648E7', notes: 'Interested in 3BHK penthouse at Downtown Commercial Plaza' },
+    { id: 'lead_crm_2', name: 'Ananya Sharma', phone: '+91-9822334455', email: 'ananya.s@outlook.com', type: 'INVESTOR', status: 'SITE_VISIT', priority: 'HIGH', budget: '₹3 Cr+', city: 'Bengaluru', source: 'Referral', initials: 'AS', avatar_color: '#10B981', notes: 'Looking for 2 commercial units at Downtown Plaza' },
+    { id: 'lead_crm_3', name: 'Rajesh Khanna', phone: '+91-9833445566', email: 'r.khanna@yahoo.com', type: 'BUYER', status: 'NEGOTIATION', priority: 'MEDIUM', budget: '₹85 Lakhs', city: 'Delhi NCR', source: 'Website', initials: 'RK', avatar_color: '#3B82F6', notes: 'Discussing payment schedules for commercial floor' },
+    { id: 'lead_crm_4', name: 'Meera Patel', phone: '+91-9844556677', email: 'meera.p@gmail.com', type: 'BUYER', status: 'BOOKED', priority: 'HIGH', budget: '₹1.2 Cr', city: 'Mumbai', source: 'Walk-in', initials: 'MP', avatar_color: '#EC4899', notes: 'Booked Retail Unit 102 at Downtown Plaza' },
+    { id: 'lead_crm_5', name: 'Sunil Verma', phone: '+91-9855667788', email: 'sunil.verma@techcorp.in', type: 'INVESTOR', status: 'NEW', priority: 'LOW', budget: '₹50 Lakhs', city: 'Pune', source: 'Social Media', initials: 'SV', avatar_color: '#F59E0B', notes: 'Initial enquiry via Digital Ad' },
+  ];
+
+  for (const ld of crmLeadsData) {
+    await prisma.crmLead.upsert({
+      where: { id: ld.id },
+      update: { ...ld, company_id: company.id, project_id: 'proj_downtown_plaza' },
+      create: {
+        ...ld,
+        company_id: company.id,
+        project_id: 'proj_downtown_plaza',
+        created_by: builder.id,
+        assigned_to: builder.id,
+      } as any,
+    });
+  }
+
+  // CRM Follow-ups
+  await prisma.crmFollowup.upsert({
+    where: { id: 'flw_crm_1' },
+    update: { company_id: company.id },
+    create: {
+      id: 'flw_crm_1',
+      company_id: company.id,
+      lead_id: 'lead_crm_1',
+      created_by: builder.id,
+      note: 'Call to confirm site visit time for Saturday 11 AM',
+      status: 'PENDING',
+      due_at: new Date(Date.now() + 86400000),
+    },
+  });
+
+  await prisma.crmFollowup.upsert({
+    where: { id: 'flw_crm_2' },
+    update: { company_id: company.id },
+    create: {
+      id: 'flw_crm_2',
+      company_id: company.id,
+      lead_id: 'lead_crm_3',
+      created_by: builder.id,
+      note: 'Send revised payment breakdown and discount terms',
+      status: 'PENDING',
+      due_at: new Date(Date.now() + 86400000 * 2),
+    },
+  });
+
+  // CRM Deals
+  await prisma.crmDeal.upsert({
+    where: { id: 'deal_crm_1' },
+    update: {
+      company_id: company.id,
+      project_id: 'proj_downtown_plaza',
+      customer_name: 'Meera Patel',
+      property_name: 'Downtown Plaza - Retail Unit 102',
+    },
+    create: {
+      id: 'deal_crm_1',
+      company_id: company.id,
+      lead_id: 'lead_crm_4',
+      project_id: 'proj_downtown_plaza',
+      created_by: builder.id,
+      customer_name: 'Meera Patel',
+      property_name: 'Downtown Plaza - Retail Unit 102',
+      deal_value: 12000000,
+      commission: 240000,
+      amount_received: 2500000,
+      payment_mode: 'Bank Transfer',
+      transaction_id: 'TXN-2026-98124',
+      deal_date: daysAgo(5),
+      notes: 'Initial booking token received and agreement drafted',
+    },
+  });
+
+  // CRM Properties Catalog
+  const crmPropertiesData = [
+    { id: 'prop_crm_1', name: 'Downtown Plaza 3BHK Luxury Office Suite', address: 'BKC, G Block, Bandra East, Mumbai', price: '₹1.85 Cr', type: 'Sale', beds: 3, baths: 3, sqft: '2,400 sq.ft', status: 'Available', featured: true, project_id: 'proj_downtown_plaza' },
+    { id: 'prop_crm_2', name: 'Downtown Executive IT Floor', address: 'BKC, G Block, Bandra East, Mumbai', price: '₹95 Lakhs', type: 'Sale', beds: 2, baths: 2, sqft: '1,350 sq.ft', status: 'Available', featured: false, project_id: 'proj_downtown_plaza' },
+    { id: 'prop_crm_3', name: 'Downtown Ground Floor Premium Retail', address: 'BKC, G Block, Bandra East, Mumbai', price: '₹3.2 Cr', type: 'Sale', beds: 4, baths: 5, sqft: '4,500 sq.ft', status: 'Available', featured: true, project_id: 'proj_downtown_plaza' },
+  ];
+
+  for (const pr of crmPropertiesData) {
+    await prisma.crmProperty.upsert({
+      where: { id: pr.id },
+      update: { ...pr, company_id: company.id, project_id: 'proj_downtown_plaza' },
+      create: {
+        ...pr,
+        company_id: company.id,
+      },
+    });
+  }
+  console.log('✅ CRM dataset seeded successfully');
+
   console.log('');
-  console.log('✅ Seed completed successfully!');
+  console.log('===========================================================');
+  console.log(' Apni Estate Subscriptions & Demo Accounts Ready');
+  console.log('===========================================================');
+  console.log('1. DEMO 1 — PREMIUM (₹1,00,000 Plan):');
+  console.log('   Email:       admin@gmail.com');
+  console.log('   Password:    admin123');
+  console.log('   Plan:        ₹1,00,000 / month (12m Active Demo)');
+  console.log('   CRM:         ENABLED (Leads, Deals, Followups)');
+  console.log('   Projects:    UNLIMITED (5 seeded active projects)');
   console.log('');
-  console.log('📋 Demo Accounts:');
-  console.log('   Builder (Asim Raza): admin@gmail.com / admin123');
-  console.log('   Builder (Alt):       builder@apniestate.com / admin123');
-  console.log('   Admin:               admin@apniestate.com / admin123');
-  console.log('   PM 1:                pm1@apniestate.com / admin123');
-  console.log('   PM 2:                pm2@apniestate.com / admin123');
-  console.log('   Supervisor 1:        sup1@apniestate.com / admin123');
-  console.log('   Supervisor 2:        sup2@apniestate.com / admin123');
-  console.log('   Supervisor 3:        sup3@apniestate.com / admin123');
-  console.log('   Accountant:          accounts@apniestate.com / admin123');
+  console.log('2. DEMO 2 — STARTER (₹30,000 Plan):');
+  console.log('   Email:       starter@apniestate.com');
+  console.log('   Password:    starter123');
+  console.log('   Plan:        ₹30,000 / month (12m Active Demo)');
+  console.log('   CRM:         DISABLED');
+  console.log('   Projects:    1 Active Project (1/1 limit reached)');
+  console.log('');
+  console.log('3. DEMO 3 — GROWTH (₹50,000 Plan):');
+  console.log('   Email:       growth@apniestate.com');
+  console.log('   Password:    growth123');
+  console.log('   Plan:        ₹50,000 / month (12m Active Demo)');
+  console.log('   CRM:         DISABLED');
+  console.log('   Projects:    3 Active Projects (3/3 limit reached)');
+  console.log('===========================================================');
 }
 
 main()

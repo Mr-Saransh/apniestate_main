@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { withAuth } from "@/middleware/auth.middleware";
+import { withCrmAuth } from "@/middleware/auth.middleware";
 import { prisma } from "@/lib/prisma";
 import { ok, badRequest, serverError } from "@/lib/response";
 
@@ -7,7 +7,7 @@ import { ok, badRequest, serverError } from "@/lib/response";
 const analyticsCache = new Map<string, { data: any; expiry: number }>();
 
 // GET /api/crm/analytics — computed CRM dashboard stats with fast caching
-export const GET = withAuth(async (req, user) => {
+export const GET = withCrmAuth(async (req, user) => {
   try {
     if (!user.company_id) return badRequest("No company context");
     const cid = user.company_id;

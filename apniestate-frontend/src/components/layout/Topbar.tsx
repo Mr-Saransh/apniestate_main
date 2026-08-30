@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MapPin, Bell, Menu, ChevronDown, Check, Building2, Plus } from 'lucide-react';
+import { MapPin, Bell, Menu, ChevronDown, Check, Building2, Plus, Zap, Shield, Sparkles } from 'lucide-react';
 import { useProject } from '@/context/ProjectContext';
 import { useAuth } from '@/context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { subscriptionApi, CompanyEntitlements } from '@/api/subscription';
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; bg: string; text: string; dot: string }> = {
@@ -25,10 +26,21 @@ export default function TopBar({ onOpenSidebar }: { onOpenSidebar: () => void })
   const { projects, activeProject, activeProjectId, setActiveProjectId } = useProject();
   const { user } = useAuth();
   const navigate = useNavigate();
-  const initials = user?.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : 'AR';
+  const initials = user?.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : 'AS';
   
   const [showSwitcher, setShowSwitcher] = useState(false);
+  const [entitlements, setEntitlements] = useState<CompanyEntitlements | null>(null);
   const switcherRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    subscriptionApi.getEntitlements()
+      .then(res => {
+        if (res.success && res.data) {
+          setEntitlements(res.data);
+        }
+      })
+      .catch(() => {});
+  }, [projects.length]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {

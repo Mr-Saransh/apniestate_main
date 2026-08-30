@@ -1,9 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
-  Plus, Sparkles
+  Plus,
+  Sparkles,
+  Lock,
+  ArrowRight,
+  Building2,
+  Users,
+  GitCommit,
+  Clock,
+  IndianRupee,
+  Layers,
+  ShieldCheck,
+  CheckCircle2,
 } from 'lucide-react';
 import { crmApi, type CrmLead, type CrmAnalytics, type CrmFollowup, type CrmProperty } from '@/api/crm';
+import { subscriptionApi, type CompanyEntitlements } from '@/api/subscription';
+import { useAppMode } from '@/context/AppModeContext';
 
 // Tabs
 import CrmOverviewTab from '@/components/crm/CrmOverviewTab';
@@ -29,12 +42,16 @@ type CrmTab = 'overview' | 'leads' | 'pipeline' | 'followups' | 'customers' | 'a
 
 export default function CrmWorkspace() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const { setMode } = useAppMode();
   const tab = (searchParams.get('tab') || 'overview') as CrmTab;
 
   const [leads, setLeads] = useState<CrmLead[]>([]);
   const [followups, setFollowups] = useState<CrmFollowup[]>([]);
   const [analytics, setAnalytics] = useState<CrmAnalytics | null>(null);
+  const [entitlements, setEntitlements] = useState<CompanyEntitlements | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isCrmLocked, setIsCrmLocked] = useState(false);
 
   // Modal States
   const [isAddLeadOpen, setIsAddLeadOpen] = useState(false);
@@ -58,6 +75,18 @@ export default function CrmWorkspace() {
   const fetchCrmData = async (silent = false) => {
     try {
       if (!silent && leads.length === 0) setLoading(true);
+
+      // Check entitlements first
+      const entRes = await subscriptionApi.getEntitlements();
+      if (entRes.success && entRes.data) {
+        setEntitlements(entRes.data);
+        if (!entRes.data.has_crm) {
+          setIsCrmLocked(true);
+          setLoading(false);
+          return;
+        }
+      }
+
       const [leadsRes, followupsRes, analyticsRes] = await Promise.all([
         crmApi.getLeads(),
         crmApi.getFollowups(),
@@ -67,8 +96,10 @@ export default function CrmWorkspace() {
       if (leadsRes.success && leadsRes.data) setLeads(leadsRes.data);
       if (followupsRes.success && followupsRes.data) setFollowups(followupsRes.data);
       if (analyticsRes.success && analyticsRes.data) setAnalytics(analyticsRes.data);
-    } catch (err) {
-      console.error('Failed to load CRM workspace data:', err);
+    } catch (err: any) {
+      if (err.message?.includes('CRM is available exclusively') || err.status === 403) {
+        setIsCrmLocked(true);
+      }
     } finally {
       setLoading(false);
     }
@@ -108,148 +139,217 @@ export default function CrmWorkspace() {
   };
 
   const handleDeleteLead = async (leadId: string) => {
-    if (!confirm('Are you sure you want to delete this lead? All associated follow-ups will also be removed.')) return;
-    try {
-      await crmApi.deleteLead(leadId);
-      await fetchCrmData();
-    } catch (err) {
-      console.error('Failed to delete lead:', err);
+    if (confirm('Are you sure you want to delete this lead?')) {
+      try {
+        await crmApi.deleteLead(leadId);
+        fetchCrmData(true);
+      } catch (err: any) {
+        alert(err.message || 'Failed to delete lead');
+      }
     }
   };
 
-  return (
-    <div className="flex flex-col h-full bg-slate-50/50 min-h-screen">
-      {/* Top Header */}
-      <div className="bg-white border-b border-slate-200/80 px-4 lg:px-8 py-3.5 shrink-0 sticky top-0 z-20 shadow-xs">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#2648E7] to-[#1e3bbd] flex items-center justify-center text-white shadow-sm">
-              <Sparkles size={16} />
-            </div>
-            <div>
-              <h1 className="text-base lg:text-lg font-bold text-slate-900 leading-tight" style={{ fontFamily: "var(--font-display)" }}>
-                {tab === 'overview' ? 'CRM Overview' :
-                 tab === 'leads' ? 'Leads Directory' :
-                 tab === 'pipeline' ? 'Sales Pipeline' :
-                 tab === 'followups' ? 'Follow-up Reminders' :
-                 tab === 'customers' ? 'Customers & Deals' :
-                 tab === 'activities' ? 'Activities & Visits' :
-                 tab === 'properties' ? 'Properties Catalog' : 'Real Estate CRM'}
-              </h1>
-              <p className="text-[11px] text-slate-400">Leads, Follow-ups, Pipeline & Sales Management</p>
-            </div>
-          </div>
-
-          <button
-            onClick={() => setIsAddLeadOpen(true)}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-[#2648E7] hover:bg-[#1e3bbd] shadow-sm transition-all active:scale-95"
-          >
-            <Plus size={14} /> Add Lead
-          </button>
+  if (loading) {
+    return (
+      <div className="flex h-full items-center justify-center bg-slate-50/50 min-h-[400px]">
+        <div className="relative flex justify-center items-center">
+          <div className="absolute animate-ping w-12 h-12 rounded-full bg-[#2648E7]/20" />
+          <div className="w-8 h-8 rounded-full border-4 border-[#2648E7]/20 border-t-[#2648E7] animate-spin relative z-10" />
         </div>
       </div>
+    );
+  }
 
-      {/* Main Workspace Body */}
-      <div className="flex-1 w-full max-w-7xl mx-auto px-4 lg:px-8 py-6">
-        {tab === 'overview' && (
-          <CrmOverviewTab
-            analytics={analytics}
-            leads={leads}
-            followups={followups}
-            onOpenAddLead={() => setIsAddLeadOpen(true)}
-            onOpenAddFollowup={() => handleOpenAddFollowup()}
-            onOpenAddDeal={() => handleOpenAddDeal()}
-            onSelectLead={handleOpenLeadDetail}
-            onNavigateTab={handleTabChange}
-          />
-        )}
+  // Locked CRM View
+  if (isCrmLocked) {
+    return (
+      <div className="p-6 md:p-12 max-w-4xl mx-auto space-y-8 animate-in fade-in duration-500">
+        <div className="relative overflow-hidden rounded-[2.5rem] bg-gradient-to-br from-slate-900 via-[#0B132B] to-[#1C2541] border border-white/10 p-8 md:p-12 text-white shadow-2xl text-center">
+          <div className="absolute top-0 right-1/4 w-80 h-80 bg-[#2648E7]/20 rounded-full blur-3xl pointer-events-none -translate-y-1/2" />
+          <div className="absolute bottom-0 left-1/4 w-80 h-80 bg-[#FCC300]/10 rounded-full blur-3xl pointer-events-none translate-y-1/2" />
 
-        {tab === 'leads' && (
-          <CrmLeadsTab
-            leads={leads}
-            loading={loading}
-            onOpenAddLead={() => setIsAddLeadOpen(true)}
-            onOpenImportLeads={() => setIsImportOpen(true)}
-            onSelectLead={handleOpenLeadDetail}
-            onOpenEditLead={handleOpenEditLead}
-            onDeleteLead={handleDeleteLead}
-          />
-        )}
+          <div className="relative z-10 max-w-2xl mx-auto space-y-6">
+            <div className="w-20 h-20 rounded-3xl bg-gradient-to-tr from-[#FCC300]/20 to-[#2648E7]/30 border border-white/20 flex items-center justify-center mx-auto shadow-inner">
+              <Lock size={36} className="text-[#FCC300]" />
+            </div>
 
-        {tab === 'pipeline' && (
-          <CrmPipelineTab
-            leads={leads}
-            onSelectLead={handleOpenLeadDetail}
-            onOpenAddLead={() => setIsAddLeadOpen(true)}
-            onLeadUpdated={fetchCrmData}
-          />
-        )}
+            <div>
+              <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#FCC300]/10 border border-[#FCC300]/30 text-[#FCC300] text-xs font-black uppercase tracking-wider mb-3">
+                <Sparkles size={13} />
+                <span>Enterprise Feature</span>
+              </div>
+              <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white">
+                Unlock Real Estate CRM
+              </h1>
+              <p className="text-slate-300 text-sm sm:text-base mt-2 leading-relaxed">
+                The full CRM & Sales Pipeline workspace is available exclusively on the <strong>₹1,00,000 Enterprise Plan</strong>.
+                Accelerate buyer conversions, organize client follow-ups, and track unit bookings in one unified interface.
+              </p>
+            </div>
 
-        {tab === 'followups' && (
-          <CrmFollowupsTab
-            followups={followups}
-            onOpenAddFollowup={() => handleOpenAddFollowup()}
-            onSelectLead={handleOpenLeadDetail}
-            onFollowupUpdated={fetchCrmData}
-          />
-        )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-left pt-2 pb-4">
+              {[
+                { title: 'Omnichannel Lead Capture', desc: 'Direct, WhatsApp, social ads, walk-in inquiries' },
+                { title: 'Visual Kanban Pipeline', desc: 'Drag-and-drop deals across qualification to booking' },
+                { title: 'Automated Follow-ups', desc: 'Never miss buyer visits, scheduled calls, or payment reminders' },
+                { title: 'Deals & Commission Tracking', desc: 'Token payments, builder commissions, & buyer ledgers' },
+              ].map((f, i) => (
+                <div key={i} className="p-4 rounded-2xl bg-white/5 border border-white/10 flex items-start gap-3">
+                  <CheckCircle2 size={18} className="text-emerald-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-xs font-bold text-white">{f.title}</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">{f.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
 
-        {tab === 'customers' && (
-          <CrmCustomersTab
-            leads={leads}
-            onOpenAddDeal={handleOpenAddDeal}
-            onSelectLead={handleOpenLeadDetail}
-          />
-        )}
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2">
+              <button
+                onClick={() => navigate('/subscription')}
+                className="w-full sm:w-auto px-8 py-4 rounded-2xl font-extrabold text-sm bg-gradient-to-r from-[#2648E7] to-[#4F6DFF] hover:from-[#1e3bbd] hover:to-[#2648E7] text-white shadow-xl shadow-[#2648E7]/40 hover:scale-105 transition-all flex items-center justify-center gap-2"
+              >
+                <Sparkles size={16} className="text-[#FCC300]" />
+                <span>Upgrade to Enterprise Plan (₹1,00,000)</span>
+                <ArrowRight size={16} />
+              </button>
 
-        {tab === 'activities' && (
-          <CrmActivitiesTab
-            leads={leads}
-            onOpenAddActivity={() => setIsAddActivityOpen(true)}
-            onSelectLead={handleOpenLeadDetail}
-          />
-        )}
+              <button
+                onClick={() => setMode('ERP')}
+                className="w-full sm:w-auto px-6 py-4 rounded-2xl font-bold text-sm bg-white/10 hover:bg-white/15 text-slate-300 hover:text-white transition-colors flex items-center justify-center gap-2"
+              >
+                <Layers size={16} />
+                <span>Back to Construction ERP</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-        {tab === 'properties' && (
-          <CrmPropertiesTab
-            leads={leads}
-            onOpenAddProperty={() => setIsAddPropertyOpen(true)}
-            onOpenShareProperty={handleOpenShareProperty}
-          />
-        )}
+  return (
+    <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-300">
+      {/* Workspace Header */}
+      <div className="border-b border-slate-200/80 pb-3">
+        <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight" style={{ fontFamily: 'var(--font-display)' }}>
+          Real Estate CRM
+        </h1>
+        <p className="text-xs md:text-sm text-slate-500 font-medium mt-0.5">
+          Manage your leads, sales pipeline, site visits, and property transactions
+        </p>
       </div>
 
-      {/* Modals & Drawers */}
+      {/* Tab Contents */}
+      {tab === 'overview' && (
+        <CrmOverviewTab
+          analytics={analytics}
+          leads={leads}
+          followups={followups}
+          onOpenAddLead={() => setIsAddLeadOpen(true)}
+          onOpenAddFollowup={() => handleOpenAddFollowup()}
+          onOpenAddDeal={() => handleOpenAddDeal()}
+          onOpenImportCsv={() => setIsImportOpen(true)}
+          onOpenAddProperty={() => setIsAddPropertyOpen(true)}
+          onSelectLead={handleOpenLeadDetail}
+          onNavigateTab={handleTabChange}
+        />
+      )}
+
+      {tab === 'leads' && (
+        <CrmLeadsTab
+          leads={leads}
+          loading={loading}
+          onOpenAddLead={() => setIsAddLeadOpen(true)}
+          onOpenImportLeads={() => setIsImportOpen(true)}
+          onSelectLead={handleOpenLeadDetail}
+          onOpenEditLead={handleOpenEditLead}
+          onDeleteLead={handleDeleteLead}
+        />
+      )}
+
+      {tab === 'pipeline' && (
+        <CrmPipelineTab
+          leads={leads}
+          onSelectLead={handleOpenLeadDetail}
+          onOpenAddLead={() => setIsAddLeadOpen(true)}
+          onLeadUpdated={() => fetchCrmData(true)}
+        />
+      )}
+
+      {tab === 'followups' && (
+        <CrmFollowupsTab
+          followups={followups}
+          onOpenAddFollowup={() => handleOpenAddFollowup()}
+          onSelectLead={handleOpenLeadDetail}
+          onFollowupUpdated={() => fetchCrmData(true)}
+        />
+      )}
+
+      {tab === 'customers' && (
+        <CrmCustomersTab
+          leads={leads}
+          onOpenAddDeal={handleOpenAddDeal}
+          onSelectLead={handleOpenLeadDetail}
+        />
+      )}
+
+      {tab === 'activities' && (
+        <CrmActivitiesTab
+          leads={leads}
+          onOpenAddActivity={() => setIsAddActivityOpen(true)}
+          onSelectLead={handleOpenLeadDetail}
+        />
+      )}
+
+      {tab === 'properties' && (
+        <CrmPropertiesTab
+          leads={leads}
+          onOpenAddProperty={() => setIsAddPropertyOpen(true)}
+          onOpenShareProperty={handleOpenShareProperty}
+        />
+      )}
+
+      {/* Modals */}
       <AddLeadModal
         isOpen={isAddLeadOpen}
         onClose={() => setIsAddLeadOpen(false)}
         onSuccess={() => {
-          fetchCrmData();
+          setIsAddLeadOpen(false);
+          fetchCrmData(true);
         }}
       />
 
       <EditLeadModal
         lead={editingLead}
         isOpen={isEditLeadOpen}
-        onClose={() => setIsEditLeadOpen(false)}
+        onClose={() => {
+          setIsEditLeadOpen(false);
+          setEditingLead(null);
+        }}
         onSuccess={() => {
-          fetchCrmData();
+          setIsEditLeadOpen(false);
+          setEditingLead(null);
+          fetchCrmData(true);
         }}
       />
 
       <LeadDetailModal
         leadId={selectedLeadId}
         isOpen={isDetailOpen}
-        onClose={() => setIsDetailOpen(false)}
+        onClose={() => {
+          setIsDetailOpen(false);
+          setSelectedLeadId(null);
+        }}
         onLeadUpdated={() => fetchCrmData(true)}
-        onOpenEdit={lead => {
+        onOpenEdit={(lead: CrmLead) => {
           setIsDetailOpen(false);
           handleOpenEditLead(lead);
         }}
-        onOpenAddFollowup={id => {
-          handleOpenAddFollowup(id);
+        onOpenAddFollowup={(leadId: string) => {
+          handleOpenAddFollowup(leadId);
         }}
-        onOpenAddDeal={lead => {
+        onOpenAddDeal={(lead: CrmLead) => {
           handleOpenAddDeal(lead);
         }}
       />
@@ -258,42 +358,67 @@ export default function CrmWorkspace() {
         leadId={followupLeadId}
         leads={leads}
         isOpen={isAddFollowupOpen}
-        onClose={() => setIsAddFollowupOpen(false)}
-        onSuccess={() => fetchCrmData(true)}
+        onClose={() => {
+          setIsAddFollowupOpen(false);
+          setFollowupLeadId(null);
+        }}
+        onSuccess={() => {
+          setIsAddFollowupOpen(false);
+          setFollowupLeadId(null);
+          fetchCrmData(true);
+        }}
       />
 
       <AddDealModal
         lead={dealLead}
         leads={leads}
         isOpen={isAddDealOpen}
-        onClose={() => setIsAddDealOpen(false)}
-        onSuccess={() => fetchCrmData(true)}
+        onClose={() => {
+          setIsAddDealOpen(false);
+          setDealLead(null);
+        }}
+        onSuccess={() => {
+          setIsAddDealOpen(false);
+          setDealLead(null);
+          fetchCrmData(true);
+        }}
       />
 
       <AddActivityModal
         leads={leads}
         isOpen={isAddActivityOpen}
         onClose={() => setIsAddActivityOpen(false)}
-        onSuccess={() => fetchCrmData(true)}
+        onSuccess={() => {
+          setIsAddActivityOpen(false);
+          fetchCrmData(true);
+        }}
       />
 
       <AddPropertyModal
         isOpen={isAddPropertyOpen}
         onClose={() => setIsAddPropertyOpen(false)}
-        onSuccess={() => fetchCrmData(true)}
+        onSuccess={() => {
+          setIsAddPropertyOpen(false);
+        }}
       />
 
       <SharePropertyModal
         property={sharingProperty}
         leads={leads}
         isOpen={isSharePropertyOpen}
-        onClose={() => setIsSharePropertyOpen(false)}
+        onClose={() => {
+          setIsSharePropertyOpen(false);
+          setSharingProperty(null);
+        }}
       />
 
       <ImportLeadsModal
         isOpen={isImportOpen}
         onClose={() => setIsImportOpen(false)}
-        onSuccess={() => fetchCrmData(true)}
+        onSuccess={() => {
+          setIsImportOpen(false);
+          fetchCrmData(true);
+        }}
       />
     </div>
   );

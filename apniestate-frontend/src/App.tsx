@@ -119,6 +119,7 @@ export default function App() {
                     <Route path="/more" element={<MorePage />} />
                     <Route path="/notifications" element={<NotificationsPage />} />
                     <Route path="/profile" element={<ProfilePage />} />
+                    <Route path="/settings" element={<SettingsPage />} />
 
                     {/* Guarded Modules */}
                     <Route element={<RouteGuard permission="tasks.read" />}>
@@ -169,7 +170,6 @@ export default function App() {
                       <Route path="/users" element={<UsersPage />} />
                       <Route path="/users/invitations" element={<CompanyInvitationsPage />} />
                       <Route path="/users/resignations" element={<CompanyResignationsPage />} />
-                      <Route path="/settings" element={<SettingsPage />} />
                     </Route>
                     
                     <Route element={<RouteGuard permission="documents.read" />}>

@@ -67,6 +67,21 @@ export default function CalendarPage() {
 
   const today = new Date();
 
+  const monthsList = React.useMemo(() => {
+    const list = [];
+    const now = new Date();
+    for (let i = -2; i <= 12; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+      list.push({
+        date: d,
+        label: d.toLocaleString('default', { month: 'short', year: 'numeric' }),
+        isSelected: d.getFullYear() === year && d.getMonth() === month,
+        isCurrent: d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth(),
+      });
+    }
+    return list;
+  }, [year, month]);
+
   if (loading && events.length === 0) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -79,20 +94,41 @@ export default function CalendarPage() {
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <PH title="Calendar" sub="Project milestones, deliveries & key dates" />
 
+      {/* Horizontally Scrollable Month Strip */}
+      <div className="flex gap-2 overflow-x-auto pb-1 scroll-smooth no-scrollbar">
+        {monthsList.map((mItem, idx) => (
+          <button
+            key={idx}
+            onClick={() => setCurrentDate(mItem.date)}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold shrink-0 transition-all border ${
+              mItem.isSelected
+                ? 'bg-primary text-white border-primary shadow-sm'
+                : mItem.isCurrent
+                ? 'bg-white text-primary border-primary/40 hover:bg-primary/5'
+                : 'bg-white text-muted-foreground border-border hover:bg-muted'
+            }`}
+          >
+            {mItem.label}
+          </button>
+        ))}
+      </div>
+
       <Card noPad>
         <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/30">
           <button
             onClick={() => setCurrentDate(new Date(year, month - 1, 1))}
-            className="p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+            className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+            title="Previous Month"
           >
-            <ChevronLeft size={16} />
+            <ChevronLeft size={18} />
           </button>
-          <span className="text-xs font-bold text-foreground">{monthLabel}</span>
+          <span className="text-sm font-extrabold text-foreground">{monthLabel}</span>
           <button
             onClick={() => setCurrentDate(new Date(year, month + 1, 1))}
-            className="p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+            className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+            title="Next Month"
           >
-            <ChevronRight size={16} />
+            <ChevronRight size={18} />
           </button>
         </div>
 
@@ -113,7 +149,7 @@ export default function CalendarPage() {
               <div key={idx} className="min-h-[48px] p-1 rounded-lg hover:bg-muted/30 transition-colors">
                 {day && (
                   <div className="flex flex-col items-center">
-                    <span className={`w-5 h-5 flex items-center justify-center rounded-full text-[10px] ${isToday ? 'bg-primary text-white font-bold' : 'text-foreground'}`}>
+                    <span className={`w-6 h-6 flex items-center justify-center rounded-full text-xs font-semibold ${isToday ? 'bg-primary text-white font-bold shadow-sm' : 'text-foreground'}`}>
                       {day}
                     </span>
                     <div className="flex flex-wrap justify-center gap-0.5 mt-1">

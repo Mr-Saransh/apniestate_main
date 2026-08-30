@@ -1,371 +1,545 @@
+import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
 import { signAccessToken } from "@/lib/jwt";
-import type { Role } from "@/types";
-import type { CompleteProfileInput, PaySubscriptionInput } from "./subscription.schema";
-import crypto from "crypto";
+import type {
+  CreateOrderInput,
+  PaySubscriptionInput,
+  RenewSubscriptionInput,
+  SelectPlanInput,
+} from "./subscription.schema";
+import {
+  COMMERCIAL_PLANS,
+  calculateSubscriptionPrice,
+  getCompanyEntitlements,
+  getCompanySubscription,
+  type CommercialPlanId,
+} from "./entitlement.service";
 
-const SUBSCRIPTION_AMOUNT = 31999; // ₹31,999 per month
-const TRIAL_DAYS = 15;
+// ─── Razorpay Config ─────────────────────────────────────
 
-// ─── Profile Completion ──────────────────────────────────
+const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || "";
+const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || "";
 
-export async function completeProfile(userId: string, input: CompleteProfileInput) {
-  const user = await prisma.user.update({
-    where: { id: userId },
-    data: {
-      name: input.name,
-      phone: input.phone,
-      city: input.city,
-      state: input.state,
-      profile_completed: true,
+// ─── Create Razorpay Order ────────────────────────────────
+
+export async function createRazorpayOrder(params?: {
+  plan_id?: CommercialPlanId;
+  duration_months?: number;
+}) {
+  const planId = params?.plan_id || "PLAN_30K";
+  const durationMonths = params?.duration_months || 4;
+
+  const totalAmountINR = calculateSubscriptionPrice(planId, durationMonths);
+  const amountInPaise = totalAmountINR * 100;
+
+  if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
+    // Return mock order in development if keys not configured
+    return {
+      id: `order_mock_${Date.now()}`,
+      amount: amountInPaise,
+      currency: "INR",
+      receipt: `rcpt_${Date.now()}`,
+      plan_id: planId,
+      duration_months: durationMonths,
+    };
+  }
+
+  const credentials = Buffer.from(
+    `${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`
+  ).toString("base64");
+
+  const res = await fetch("https://api.razorpay.com/v1/orders", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Basic ${credentials}`,
     },
+    body: JSON.stringify({
+      amount: amountInPaise,
+      currency: "INR",
+      receipt: `sub_${Date.now()}`,
+      notes: {
+        product: "Apni Estate Subscription",
+        plan: planId,
+        duration_months: durationMonths,
+      },
+    }),
   });
 
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error?.description || "Failed to create Razorpay order");
+  }
+
+  const data = await res.json();
   return {
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    role: user.role,
-    phone: user.phone,
-    city: user.city,
-    state: user.state,
-    profile_completed: user.profile_completed,
-    subscription_status: user.subscription_status,
-    company_id: user.company_id,
-    onboarded: user.onboarded,
-    last_workspace_id: user.last_workspace_id,
+    ...data,
+    plan_id: planId,
+    duration_months: durationMonths,
   };
 }
 
-// ─── Razorpay Order Creation ────────────────────────────
-
-export async function createRazorpayOrder() {
-  const Razorpay = (await import("razorpay")).default;
-  const razorpay = new Razorpay({
-    key_id: process.env.RAZORPAY_KEY_ID!,
-    key_secret: process.env.RAZORPAY_KEY_SECRET!,
-  });
-
-  const order = await razorpay.orders.create({
-    amount: SUBSCRIPTION_AMOUNT * 100, // Razorpay expects paise
-    currency: "INR",
-    receipt: `sub_${Date.now()}`,
-    notes: {
-      purpose: "Apni Estate Monthly Subscription",
-    },
-  });
-
-  return order;
-}
-
-// ─── Payment Verification & Workspace Creation ──────────
+// ─── Verify Payment & Activate Company Subscription ───────
 
 export async function verifyAndActivateSubscription(
   userId: string,
   input: PaySubscriptionInput
 ) {
-  // Verify Razorpay signature
-  const generatedSignature = crypto
-    .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET!)
-    .update(`${input.razorpay_order_id}|${input.razorpay_payment_id}`)
-    .digest("hex");
+  const {
+    razorpay_payment_id,
+    razorpay_order_id,
+    razorpay_signature,
+    plan_id = "PLAN_30K",
+    duration_months = 4,
+  } = input;
 
-  if (generatedSignature !== input.razorpay_signature) {
-    throw new Error("Payment verification failed — invalid signature");
+  const planId = plan_id as CommercialPlanId;
+  const durationMonths = Number(duration_months) || 4;
+
+  // 1. Verify signature
+  if (RAZORPAY_KEY_SECRET) {
+    const body = `${razorpay_order_id}|${razorpay_payment_id}`;
+    const expected = crypto
+      .createHmac("sha256", RAZORPAY_KEY_SECRET)
+      .update(body)
+      .digest("hex");
+
+    if (expected !== razorpay_signature) {
+      throw new Error("Payment signature verification failed");
+    }
   }
 
+  const totalAmountINR = calculateSubscriptionPrice(planId, durationMonths);
   const now = new Date();
-  const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days
+  const expiresAt = new Date(now);
+  expiresAt.setMonth(expiresAt.getMonth() + durationMonths);
 
-  // Transaction: create subscription, company, membership
+  // 2. Transaction: Ensure company, create company subscription & update user status
   const result = await prisma.$transaction(async (tx) => {
     const user = await tx.user.findUnique({ where: { id: userId } });
     if (!user) throw new Error("User not found");
 
-    // Create company/workspace
-    const company = await tx.company.create({
-      data: { name: `${user.name}'s Workspace` },
-    });
+    let companyId = user.company_id;
+    let company = null;
 
-    // Create membership
-    const membership = await tx.companyMembership.create({
-      data: {
-        user_id: userId,
+    if (companyId) {
+      company = await tx.company.findUnique({ where: { id: companyId } });
+    }
+
+    if (!company) {
+      // Create new Company for the user
+      company = await tx.company.create({
+        data: { name: `${user.name}'s Workspace` },
+      });
+      companyId = company.id;
+
+      // Create company membership
+      await tx.companyMembership.create({
+        data: {
+          user_id: userId,
+          company_id: company.id,
+          roles: ["BUILDER"],
+          status: "ACTIVE",
+        },
+      });
+    }
+
+    // Expire any existing subscriptions for this company
+    await tx.subscription.updateMany({
+      where: {
         company_id: company.id,
-        roles: ["BUILDER"],
-        status: "ACTIVE",
+        status: { in: ["ACTIVE", "TRIAL_ACTIVE", "EXPIRING_SOON"] },
       },
+      data: { status: "EXPIRED" },
     });
 
-    // Create subscription record
+    // Create Company Subscription record
     const subscription = await tx.subscription.create({
       data: {
+        company_id: company.id,
         user_id: userId,
-        type: "PAID",
+        plan: planId,
+        duration_months: durationMonths,
+        start_date: now,
+        end_date: expiresAt,
         status: "ACTIVE",
-        amount: SUBSCRIPTION_AMOUNT,
+        price: totalAmountINR,
+        currency: "INR",
+        is_demo: false,
+        payment_id: razorpay_payment_id,
+        razorpay_order_id: razorpay_order_id,
+        razorpay_signature: razorpay_signature,
+        type: "PAID",
         starts_at: now,
         expires_at: expiresAt,
-        payment_id: input.razorpay_payment_id,
-        razorpay_order_id: input.razorpay_order_id,
-        razorpay_signature: input.razorpay_signature,
       },
     });
 
-    // Update user
+    // Update User
     const updatedUser = await tx.user.update({
       where: { id: userId },
       data: {
         subscription_status: "ACTIVE",
-        onboarded: true,
         company_id: company.id,
-        last_workspace_id: company.id,
       },
     });
 
-    return { user: updatedUser, company, membership, subscription };
+    // Generate refreshed JWT with company_id
+    const accessToken = signAccessToken({
+      sub: updatedUser.id,
+      role: updatedUser.role,
+      email: updatedUser.email || "",
+      company_id: company.id,
+    });
+
+    return { subscription, user: updatedUser, accessToken };
   });
 
-  // Generate new token with company_id
-  const accessToken = signAccessToken({
-    sub: result.user.id,
-    email: result.user.email || "",
-    role: result.user.role as Role,
-    company_id: result.company.id,
-  });
-
-  return {
-    accessToken,
-    user: {
-      id: result.user.id,
-      name: result.user.name,
-      email: result.user.email || "",
-      role: result.user.role as Role,
-      company_id: result.company.id,
-      onboarded: true,
-      last_workspace_id: result.company.id,
-      profile_completed: result.user.profile_completed,
-      subscription_status: "ACTIVE" as const,
-      phone: result.user.phone,
-      city: result.user.city,
-      state: result.user.state,
-    },
-    subscription: {
-      id: result.subscription.id,
-      type: result.subscription.type,
-      status: result.subscription.status,
-      starts_at: result.subscription.starts_at,
-      expires_at: result.subscription.expires_at,
-    },
-    memberships: [
-      {
-        id: result.membership.id,
-        user_id: result.membership.user_id,
-        company_id: result.membership.company_id,
-        roles: result.membership.roles,
-        status: result.membership.status,
-        company: {
-          id: result.company.id,
-          name: result.company.name,
-        },
-      },
-    ],
-  };
+  return result;
 }
 
-// ─── Trial Request ──────────────────────────────────────
+// ─── Complete Profile ─────────────────────────────────────
 
-export async function requestTrial(userId: string) {
-  const existingTrial = await prisma.subscription.findFirst({
-    where: {
-      user_id: userId,
-      type: "TRIAL",
+export async function completeProfile(userId: string, data: { name: string; phone: string; city: string; state: string }) {
+  return prisma.user.update({
+    where: { id: userId },
+    data: {
+      name: data.name,
+      phone: data.phone,
+      city: data.city,
+      state: data.state,
+      profile_completed: true,
     },
   });
+}
 
-  if (existingTrial) {
-    throw new Error("You have already requested or used a free trial.");
+// ─── Renew Subscription ───────────────────────────────────
+
+export async function renewSubscription(
+  userId: string,
+  input: RenewSubscriptionInput,
+  companyId?: string | null
+) {
+  const {
+    razorpay_payment_id,
+    razorpay_order_id,
+    razorpay_signature,
+    plan_id = "PLAN_30K",
+    duration_months = 4,
+  } = input;
+
+  const planId = plan_id as CommercialPlanId;
+  const durationMonths = Number(duration_months) || 4;
+
+  if (RAZORPAY_KEY_SECRET) {
+    const body = `${razorpay_order_id}|${razorpay_payment_id}`;
+    const expected = crypto
+      .createHmac("sha256", RAZORPAY_KEY_SECRET)
+      .update(body)
+      .digest("hex");
+
+    if (expected !== razorpay_signature) {
+      throw new Error("Payment signature verification failed");
+    }
   }
 
-  const subscription = await prisma.subscription.create({
-    data: {
-      user_id: userId,
-      type: "TRIAL",
-      status: "PENDING_TRIAL",
-      starts_at: new Date(), // Will be updated when admin approves
-      expires_at: new Date(), // Will be updated when admin approves
-    },
+  const totalAmountINR = calculateSubscriptionPrice(planId, durationMonths);
+  const now = new Date();
+  const expiresAt = new Date(now);
+  expiresAt.setMonth(expiresAt.getMonth() + durationMonths);
+
+  const result = await prisma.$transaction(async (tx) => {
+    let effectiveCompanyId = companyId;
+    if (!effectiveCompanyId) {
+      const u = await tx.user.findUnique({ where: { id: userId } });
+      effectiveCompanyId = u?.company_id || null;
+    }
+
+    if (effectiveCompanyId) {
+      await tx.subscription.updateMany({
+        where: {
+          company_id: effectiveCompanyId,
+          status: { in: ["ACTIVE", "TRIAL_ACTIVE", "EXPIRING_SOON", "EXPIRED"] },
+        },
+        data: { status: "EXPIRED" },
+      });
+    }
+
+    const subscription = await tx.subscription.create({
+      data: {
+        company_id: effectiveCompanyId,
+        user_id: userId,
+        plan: planId,
+        duration_months: durationMonths,
+        start_date: now,
+        end_date: expiresAt,
+        status: "ACTIVE",
+        price: totalAmountINR,
+        currency: "INR",
+        is_demo: false,
+        payment_id: razorpay_payment_id,
+        razorpay_order_id: razorpay_order_id,
+        razorpay_signature: razorpay_signature,
+        type: "PAID",
+        starts_at: now,
+        expires_at: expiresAt,
+      },
+    });
+
+    await tx.user.update({
+      where: { id: userId },
+      data: { subscription_status: "ACTIVE" },
+    });
+
+    return subscription;
   });
 
-  await prisma.user.update({
-    where: { id: userId },
-    data: { subscription_status: "PENDING_TRIAL" },
-  });
-
-  return subscription;
+  return result;
 }
 
-// ─── Get Subscription Status ─────────────────────────────
+// ─── Get Subscription Status & Entitlements ───────────────
 
-export async function getSubscriptionStatus(userId: string) {
+export async function getSubscriptionStatus(
+  userId: string,
+  companyId?: string | null
+) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: {
       id: true,
       subscription_status: true,
       profile_completed: true,
+      company_id: true,
     },
   });
 
-  const activeSubscription = await prisma.subscription.findFirst({
-    where: {
-      user_id: userId,
-      status: { in: ["ACTIVE", "TRIAL_ACTIVE", "EXPIRING_SOON", "PENDING_TRIAL"] },
-    },
-    orderBy: { created_at: "desc" },
-  });
+  if (!user) throw new Error("User not found");
+
+  const effectiveCompanyId = companyId || user.company_id;
+  const entitlements = await getCompanyEntitlements(effectiveCompanyId);
+
+  // Retrieve active subscription
+  let sub = null;
+  if (effectiveCompanyId) {
+    sub = await getCompanySubscription(effectiveCompanyId);
+  }
+
+  if (!sub) {
+    sub = await prisma.subscription.findFirst({
+      where: { user_id: userId },
+      orderBy: { created_at: "desc" },
+    });
+  }
 
   let daysRemaining = 0;
-  if (activeSubscription && activeSubscription.expires_at) {
-    daysRemaining = Math.max(
-      0,
-      Math.ceil(
-        (activeSubscription.expires_at.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
-      )
-    );
+  if (sub && (sub.end_date || sub.expires_at)) {
+    const end = sub.end_date || sub.expires_at;
+    const diff = new Date(end!).getTime() - Date.now();
+    daysRemaining = Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
   }
 
   return {
-    subscription_status: user?.subscription_status || "NONE",
-    profile_completed: user?.profile_completed || false,
-    subscription: activeSubscription
+    subscription_status: entitlements.status,
+    profile_completed: user.profile_completed,
+    entitlements,
+    subscription: sub
       ? {
-          id: activeSubscription.id,
-          type: activeSubscription.type,
-          status: activeSubscription.status,
-          starts_at: activeSubscription.starts_at,
-          expires_at: activeSubscription.expires_at,
+          id: sub.id,
+          plan: sub.plan,
+          duration_months: sub.duration_months,
+          type: sub.type,
+          status: sub.status,
+          price: sub.price,
+          is_demo: sub.is_demo,
+          starts_at: sub.start_date || sub.starts_at,
+          expires_at: sub.end_date || sub.expires_at,
           days_remaining: daysRemaining,
         }
       : null,
   };
 }
 
-// ─── Renew Subscription ─────────────────────────────────
+// ─── Cron / Batch Expiry Checking ────────────────────────
 
-export async function renewSubscription(
-  userId: string,
-  input: PaySubscriptionInput
-) {
-  // Verify Razorpay signature
-  const generatedSignature = crypto
-    .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET!)
-    .update(`${input.razorpay_order_id}|${input.razorpay_payment_id}`)
-    .digest("hex");
-
-  if (generatedSignature !== input.razorpay_signature) {
-    throw new Error("Payment verification failed — invalid signature");
-  }
-
+export async function checkExpiringSubscriptions() {
   const now = new Date();
-  const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+  const in7Days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
-  // Mark old subscriptions as expired
-  await prisma.subscription.updateMany({
-    where: { user_id: userId, status: { in: ["EXPIRED", "TRIAL_EXPIRED", "EXPIRING_SOON"] } },
+  // 1. Expire all past due subscriptions that are not demo accounts
+  const expiredSubs = await prisma.subscription.updateMany({
+    where: {
+      is_demo: false,
+      status: { in: ["ACTIVE", "EXPIRING_SOON", "TRIAL_ACTIVE"] },
+      OR: [
+        { end_date: { lt: now } },
+        { expires_at: { lt: now } },
+      ],
+    },
     data: { status: "EXPIRED" },
   });
 
-  // Create new subscription
-  const subscription = await prisma.subscription.create({
-    data: {
-      user_id: userId,
-      type: "PAID",
+  // 2. Mark expiring soon within 7 days
+  const expiringSoon = await prisma.subscription.updateMany({
+    where: {
+      is_demo: false,
       status: "ACTIVE",
-      amount: SUBSCRIPTION_AMOUNT,
-      starts_at: now,
-      expires_at: expiresAt,
-      payment_id: input.razorpay_payment_id,
-      razorpay_order_id: input.razorpay_order_id,
-      razorpay_signature: input.razorpay_signature,
+      OR: [
+        { end_date: { gte: now, lte: in7Days } },
+        { expires_at: { gte: now, lte: in7Days } },
+      ],
     },
-  });
-
-  await prisma.user.update({
-    where: { id: userId },
-    data: { subscription_status: "ACTIVE" },
+    data: { status: "EXPIRING_SOON" },
   });
 
   return {
-    subscription: {
-      id: subscription.id,
-      type: subscription.type,
-      status: subscription.status,
-      starts_at: subscription.starts_at,
-      expires_at: subscription.expires_at,
-    },
+    expired_count: expiredSubs.count,
+    expiring_soon_count: expiringSoon.count,
+    timestamp: now,
   };
 }
 
-// ─── Admin: Approve Trial ────────────────────────────────
+// ─── Select Plan (Manual/Direct selection) ───────────────
 
-export async function approveTrial(userId: string, adminId: string) {
+export async function selectPlan(userId: string, input: SelectPlanInput) {
+  const { plan_id, duration_months = 4 } = input;
+  const planId = plan_id as CommercialPlanId;
+  const durationMonths = Number(duration_months) || 4;
+
+  const totalAmountINR = calculateSubscriptionPrice(planId, durationMonths);
   const now = new Date();
-  const expiresAt = new Date(now.getTime() + TRIAL_DAYS * 24 * 60 * 60 * 1000);
+  const expiresAt = new Date(now);
+  expiresAt.setMonth(expiresAt.getMonth() + durationMonths);
 
   const result = await prisma.$transaction(async (tx) => {
-    // Find the pending trial
-    const trial = await tx.subscription.findFirst({
-      where: { user_id: userId, status: "PENDING_TRIAL" },
-    });
-    if (!trial) throw new Error("No pending trial found for this user");
-
-    // Update the subscription
-    await tx.subscription.update({
-      where: { id: trial.id },
-      data: {
-        status: "TRIAL_ACTIVE",
-        starts_at: now,
-        expires_at: expiresAt,
-        approved_by: adminId,
-      },
-    });
-
     const user = await tx.user.findUnique({ where: { id: userId } });
     if (!user) throw new Error("User not found");
 
-    // Create company/workspace for the user
-    const company = await tx.company.create({
-      data: { name: `${user.name}'s Workspace` },
+    let companyId = user.company_id;
+    if (!companyId) {
+      const co = await tx.company.create({
+        data: { name: `${user.name}'s Workspace` },
+      });
+      companyId = co.id;
+      await tx.companyMembership.create({
+        data: { user_id: userId, company_id: co.id, roles: ["BUILDER"], status: "ACTIVE" },
+      });
+    }
+
+    await tx.subscription.updateMany({
+      where: {
+        company_id: companyId,
+        status: { in: ["ACTIVE", "TRIAL_ACTIVE", "EXPIRING_SOON"] },
+      },
+      data: { status: "EXPIRED" },
     });
 
-    await tx.companyMembership.create({
+    const subscription = await tx.subscription.create({
       data: {
+        company_id: companyId,
         user_id: userId,
-        company_id: company.id,
-        roles: ["BUILDER"],
+        plan: planId,
+        duration_months: durationMonths,
+        start_date: now,
+        end_date: expiresAt,
         status: "ACTIVE",
+        price: totalAmountINR,
+        currency: "INR",
+        is_demo: false,
+        type: "PAID",
+        starts_at: now,
+        expires_at: expiresAt,
       },
     });
 
-    // Update user status
-    await tx.user.update({
+    const updatedUser = await tx.user.update({
       where: { id: userId },
-      data: {
-        subscription_status: "TRIAL_ACTIVE",
-        onboarded: true,
-        company_id: company.id,
-        last_workspace_id: company.id,
-      },
+      data: { subscription_status: "ACTIVE", company_id: companyId },
     });
 
-    return { trial, company };
+    return { subscription, user: updatedUser };
   });
 
   return result;
 }
 
-// ─── Admin: Reject Trial ─────────────────────────────────
+// ─── Request Trial ────────────────────────────────────────
+
+export async function requestTrial(userId: string) {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) throw new Error("User not found");
+
+  if (user.subscription_status === "TRIAL_ACTIVE") {
+    throw new Error("You already have an active trial");
+  }
+  if (user.subscription_status === "ACTIVE") {
+    throw new Error("You already have an active subscription");
+  }
+
+  let companyId = user.company_id;
+  if (!companyId) {
+    const company = await prisma.company.create({
+      data: { name: `${user.name}'s Workspace` },
+    });
+    companyId = company.id;
+    await prisma.companyMembership.create({
+      data: { user_id: userId, company_id: company.id, roles: ["BUILDER"], status: "ACTIVE" },
+    });
+  }
+
+  const existing = await prisma.subscription.findFirst({
+    where: { user_id: userId, type: "TRIAL" },
+  });
+
+  if (existing) {
+    throw new Error("Trial already requested or used previously");
+  }
+
+  const subscription = await prisma.subscription.create({
+    data: {
+      company_id: companyId,
+      user_id: userId,
+      type: "TRIAL",
+      plan: "PLAN_30K",
+      duration_months: 1,
+      status: "PENDING_TRIAL",
+      price: 0,
+      currency: "INR",
+    },
+  });
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { subscription_status: "PENDING_TRIAL", company_id: companyId },
+  });
+
+  return subscription;
+}
+
+// ─── Admin Approval: Trial ────────────────────────────────
+
+export async function approveTrial(userId: string, _adminUsername?: string) {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) throw new Error("User not found");
+
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000); // 15 days
+
+  await prisma.subscription.updateMany({
+    where: { user_id: userId, status: "PENDING_TRIAL" },
+    data: {
+      status: "TRIAL_ACTIVE",
+      start_date: now,
+      end_date: expiresAt,
+      starts_at: now,
+      expires_at: expiresAt,
+    },
+  });
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { subscription_status: "TRIAL_ACTIVE" },
+  });
+}
 
 export async function rejectTrial(userId: string) {
   await prisma.subscription.updateMany({
@@ -393,17 +567,20 @@ export async function getAllUsersForAdmin() {
       state: true,
       subscription_status: true,
       profile_completed: true,
+      company_id: true,
       created_at: true,
       subscriptions: {
         orderBy: { created_at: "desc" },
         take: 1,
         select: {
           id: true,
+          plan: true,
+          duration_months: true,
+          price: true,
           type: true,
           status: true,
-          amount: true,
-          starts_at: true,
-          expires_at: true,
+          start_date: true,
+          end_date: true,
           payment_id: true,
           created_at: true,
         },
@@ -417,96 +594,4 @@ export async function getAllUsersForAdmin() {
     latest_subscription: u.subscriptions[0] || null,
     subscriptions: undefined,
   }));
-}
-
-// ─── Check Expiring Subscriptions (Cron-like) ────────────
-
-export async function checkExpiringSubscriptions() {
-  const now = new Date();
-  const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-  const threeDaysFromNow = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
-
-  // Find subscriptions expiring within 7 days
-  const expiringIn7 = await prisma.subscription.findMany({
-    where: {
-      status: { in: ["ACTIVE", "TRIAL_ACTIVE"] },
-      expires_at: { lte: sevenDaysFromNow, gt: now },
-      notification_7day: false,
-    },
-  });
-
-  for (const sub of expiringIn7) {
-    await prisma.notification.create({
-      data: {
-        user_id: sub.user_id,
-        title: "Subscription Expiring Soon",
-        message: `Your ${sub.type === "TRIAL" ? "free trial" : "subscription"} expires in ${Math.ceil((sub.expires_at.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))} days. Renew now to avoid interruption.`,
-        type: "SUBSCRIPTION",
-        priority: "HIGH",
-      },
-    });
-
-    await prisma.subscription.update({
-      where: { id: sub.id },
-      data: { notification_7day: true },
-    });
-
-    // Update user status to EXPIRING_SOON
-    await prisma.user.update({
-      where: { id: sub.user_id },
-      data: { subscription_status: "EXPIRING_SOON" },
-    });
-  }
-
-  // Find subscriptions expiring within 3 days
-  const expiringIn3 = await prisma.subscription.findMany({
-    where: {
-      status: { in: ["ACTIVE", "TRIAL_ACTIVE", "EXPIRING_SOON"] },
-      expires_at: { lte: threeDaysFromNow, gt: now },
-      notification_3day: false,
-    },
-  });
-
-  for (const sub of expiringIn3) {
-    await prisma.notification.create({
-      data: {
-        user_id: sub.user_id,
-        title: "⚠️ Subscription Expiring in 3 Days",
-        message: `Your ${sub.type === "TRIAL" ? "free trial" : "subscription"} expires very soon! Renew now to keep your data.`,
-        type: "SUBSCRIPTION",
-        priority: "URGENT",
-      },
-    });
-
-    await prisma.subscription.update({
-      where: { id: sub.id },
-      data: { notification_3day: true, status: "EXPIRING_SOON" },
-    });
-  }
-
-  // Find and expire already-expired subscriptions
-  const expired = await prisma.subscription.findMany({
-    where: {
-      status: { in: ["ACTIVE", "TRIAL_ACTIVE", "EXPIRING_SOON"] },
-      expires_at: { lte: now },
-    },
-  });
-
-  for (const sub of expired) {
-    const newStatus = sub.type === "TRIAL" ? "TRIAL_EXPIRED" : "EXPIRED";
-    await prisma.subscription.update({
-      where: { id: sub.id },
-      data: { status: newStatus },
-    });
-    await prisma.user.update({
-      where: { id: sub.user_id },
-      data: { subscription_status: newStatus },
-    });
-  }
-
-  return {
-    notified7day: expiringIn7.length,
-    notified3day: expiringIn3.length,
-    expired: expired.length,
-  };
 }

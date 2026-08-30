@@ -9,9 +9,10 @@ import {
   BarChart2, FileSpreadsheet, Package, ClipboardList, Archive,
   Truck, BookOpen, FolderOpen, FileBarChart, Bell, Settings, X,
   LogOut, UserCheck, GitCommit, Clock, IndianRupee, Calendar,
-  Sparkles, Layers
+  Sparkles, Layers, Lock
 } from "lucide-react";
 import { useTranslation } from 'react-i18next';
+import { subscriptionApi, CompanyEntitlements } from '@/api/subscription';
 
 type NavItem = { id: string; label: string; icon: React.ElementType; badge?: number; hideOnMobile?: boolean };
 type NavGroup = { label: string; items: NavItem[]; hideOnMobile?: boolean };
@@ -23,8 +24,19 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
   const { mode, setMode } = useAppMode();
   const location = useLocation();
   const navigate = useNavigate();
+  const [entitlements, setEntitlements] = React.useState<CompanyEntitlements | null>(null);
 
-  const initials = user?.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : 'AR';
+  React.useEffect(() => {
+    subscriptionApi.getEntitlements()
+      .then(res => {
+        if (res.success && res.data) {
+          setEntitlements(res.data);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const initials = user?.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : 'AS';
   const role = user?.role || 'BUILDER';
 
   // ─── ERP Navigation Groups ─────────────────────────────────
@@ -59,7 +71,12 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
         { id: "/users", label: "Users", icon: Users },
         { id: "/reports", label: "Reports", icon: FileBarChart },
         { id: "/milestone-report", label: "Milestone Prog. Report", icon: FileBarChart },
+      ]
+    },
+    {
+      label: "Account", items: [
         { id: "/notifications", label: "Notifications", icon: Bell, badge: 3 },
+        { id: "/settings", label: "Settings", icon: Settings },
       ]
     }
   ];
@@ -95,10 +112,10 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
     let items = group.items;
     if (mode === 'ERP') {
       if (role === 'ACCOUNTANT') {
-        const allowed = ['/dashboard', '/finance', '/purchase', '/operations', '/reports', '/boq', '/purchase-orders', '/inventory', '/vendors', '/documents', '/notifications'];
+        const allowed = ['/dashboard', '/finance', '/purchase', '/operations', '/reports', '/boq', '/purchase-orders', '/inventory', '/vendors', '/documents', '/notifications', '/settings'];
         items = items.filter(item => allowed.includes(item.id));
       } else if (role === 'PROJECT_MANAGER') {
-        const allowed = ['/dashboard', '/projects', '/progress', '/purchase', '/finance', '/operations', '/boq', '/material-requests', '/purchase-orders', '/inventory', '/vendors', '/dpr', '/documents', '/reports', '/milestone-report', '/notifications'];
+        const allowed = ['/dashboard', '/projects', '/progress', '/purchase', '/finance', '/operations', '/boq', '/material-requests', '/purchase-orders', '/inventory', '/vendors', '/dpr', '/documents', '/reports', '/milestone-report', '/notifications', '/settings'];
         items = items.filter(item => allowed.includes(item.id));
       }
       if (role !== 'BUILDER') {
@@ -148,6 +165,9 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
           >
             <Sparkles size={13} />
             <span>CRM</span>
+            {entitlements && !entitlements.has_crm && (
+              <Lock size={11} className="text-amber-300 ml-0.5 shrink-0" />
+            )}
           </button>
         </div>
       </div>
@@ -234,7 +254,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
             {initials}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-white truncate leading-tight">{user?.name || 'Asim Raza'}</p>
+            <p className="text-sm font-bold text-white truncate leading-tight">{user?.name || 'Aditya Sharma'}</p>
             <p className="text-[10px] text-white/60 truncate leading-tight">{user?.role ? user.role.replace(/_/g, ' ') : 'Builder'}</p>
           </div>
           <button onClick={logout} className="text-white/50 hover:text-white transition-colors p-1" title="Logout">

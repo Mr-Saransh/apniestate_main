@@ -1,10 +1,10 @@
 import { NextRequest } from "next/server";
-import { withAuth } from "@/middleware/auth.middleware";
+import { withCrmAuth } from "@/middleware/auth.middleware";
 import { prisma } from "@/lib/prisma";
 import { ok, created, badRequest, serverError } from "@/lib/response";
 
 // GET /api/crm/properties
-export const GET = withAuth(async (req, user) => {
+export const GET = withCrmAuth(async (req, user) => {
   try {
     if (!user.company_id) return badRequest("No company context");
     const properties = await prisma.crmProperty.findMany({
@@ -22,7 +22,7 @@ export const GET = withAuth(async (req, user) => {
 });
 
 // POST /api/crm/properties
-export const POST = withAuth(async (req, user) => {
+export const POST = withCrmAuth(async (req, user) => {
   try {
     if (!user.company_id) return badRequest("No company context");
     const body = await req.json();

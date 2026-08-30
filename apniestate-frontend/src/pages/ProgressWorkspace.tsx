@@ -1,7 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useProject } from '@/context/ProjectContext';
-import { BarChart2, Plus, CheckCircle2, Calendar as CalendarIcon, UploadCloud, X, ArrowRight, Trash2, Loader2 } from 'lucide-react';
+import {
+  BarChart2,
+  Plus,
+  CheckCircle2,
+  Calendar as CalendarIcon,
+  UploadCloud,
+  X,
+  ArrowRight,
+  Trash2,
+  Loader2,
+  ChevronLeft,
+  ChevronRight,
+  CalendarDays,
+  Flag,
+} from 'lucide-react';
 import { apiClient } from '@/api/client';
 import { milestonesApi, type Milestone } from '@/api/milestones';
 
@@ -28,17 +42,20 @@ export default function ProgressWorkspace() {
   const [showDprModal, setShowDprModal] = useState(false);
   const [selectedMilestone, setSelectedMilestone] = useState<Milestone | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [showDateInfoModal, setShowDateInfoModal] = useState(false);
 
-  // Milestone Form
+  // Calendar View Date & Month navigation
+  const [viewDate, setViewDate] = useState(new Date());
+  const monthScrollRef = useRef<HTMLDivElement>(null);
+
+  // Add Milestone Form
   const [mName, setMName] = useState('');
   const [mTargetDate, setMTargetDate] = useState('');
   const [isCreatingMilestone, setIsCreatingMilestone] = useState(false);
 
-  // DPR Form
+  // Submit DPR Form
   const [dprSiteId, setDprSiteId] = useState('');
   const [dprSummary, setDprSummary] = useState('');
-  const [dprPercentage, setDprPercentage] = useState<number>(0);
+  const [dprPercentage, setDprPercentage] = useState(0);
   const [dprPhotoUrl, setDprPhotoUrl] = useState('');
   const [isUploading, setIsUploading] = useState(false);
 
@@ -46,16 +63,23 @@ export default function ProgressWorkspace() {
     if (!activeProjectId) return;
     try {
       setLoading(true);
-      const [mRes, dRes, projRes] = await Promise.all([
+      const [milestonesRes, dprsRes, sitesRes] = await Promise.all([
         milestonesApi.getAll(activeProjectId),
-        apiClient.get(`/dpr?project_id=${activeProjectId}`),
-        apiClient.get(`/projects/${activeProjectId}`)
+        apiClient.get<any>(`/dpr?project_id=${activeProjectId}`),
+        apiClient.get<any>(`/sites?project_id=${activeProjectId}`)
       ]);
-      setMilestones(mRes.data || []);
-      setDprs((dRes.data as any[]) || []);
-      const projectSites = (projRes.data as any)?.sites || [];
-      setSites(projectSites);
-      if (projectSites.length > 0) setDprSiteId(projectSites[0].id);
+
+      if (milestonesRes.success && milestonesRes.data) {
+        setMilestones(milestonesRes.data);
+      }
+      if (dprsRes.success) setDprs(Array.isArray(dprsRes.data) ? dprsRes.data : []);
+      if (sitesRes.success) {
+        const sitesData = Array.isArray(sitesRes.data) ? sitesRes.data : [];
+        setSites(sitesData);
+        if (sitesData.length > 0 && !dprSiteId) {
+          setDprSiteId(sitesData[0].id);
+        }
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -69,21 +93,20 @@ export default function ProgressWorkspace() {
 
   const handleAddMilestone = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsCreatingMilestone(true);
+    if (!activeProjectId || !mName || !mTargetDate) return;
     try {
+      setIsCreatingMilestone(true);
       await milestonesApi.create({
-        project_id: activeProjectId!,
+        project_id: activeProjectId,
         name: mName,
-        target_date: new Date(mTargetDate).toISOString(),
-        weight: 1,
-        status: 'PENDING'
+        target_date: mTargetDate
       });
       setShowAddMilestone(false);
       setMName('');
       setMTargetDate('');
       fetchData();
     } catch (err) {
-      alert("Failed to add milestone");
+      alert("Failed to create milestone");
     } finally {
       setIsCreatingMilestone(false);
     }
@@ -102,23 +125,25 @@ export default function ProgressWorkspace() {
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setIsUploading(true);
-    const token = localStorage.getItem('access_token');
-    const formData = new FormData();
-    formData.append("file", file);
+
     try {
+      setIsUploading(true);
+      const token = localStorage.getItem('access_token');
+      const formData = new FormData();
+      formData.append("file", file);
+      
       const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
       const res = await fetch(`${baseUrl}/cloudinary/upload`, {
         method: "POST",
-        headers: { "Authorization": `Bearer ${token}` },
+        headers: token ? { "Authorization": `Bearer ${token}` } : {},
         body: formData
       });
       const data = await res.json();
-      if (data.success) {
+      if (data.success && data.result?.secure_url) {
         setDprPhotoUrl(data.result.secure_url);
       }
     } catch (err) {
-      alert("Error uploading image.");
+      alert("Failed to upload image");
     } finally {
       setIsUploading(false);
     }
@@ -126,17 +151,18 @@ export default function ProgressWorkspace() {
 
   const handleSubmitDpr = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!dprSiteId || !dprSummary) return;
+
     try {
       const payload: any = {
         project_id: activeProjectId,
         site_id: dprSiteId,
+        report_date: new Date().toISOString(),
         summary: dprSummary,
-        completion_percentage: Number(dprPercentage),
-        status: "SUBMITTED"
+        completion_percentage: dprPercentage,
+        milestone_id: selectedMilestone ? selectedMilestone.id : undefined,
       };
-      if (selectedMilestone) {
-        payload.milestone_id = selectedMilestone.id;
-      }
+
       if (dprPhotoUrl) {
         payload.photos = [dprPhotoUrl];
       }
@@ -156,26 +182,58 @@ export default function ProgressWorkspace() {
     setSelectedDate(date);
   };
 
-  if (!activeProjectId) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
-        <BarChart2 size={48} className="text-muted-foreground opacity-40 mb-4" />
-        <h2 className="text-xl font-bold text-foreground">No Project Selected</h2>
-        <p className="text-sm text-muted-foreground mt-2 max-w-xs">Please select a project from the top bar to view progress.</p>
-      </div>
-    );
-  }
-
-  // Calendar logic
+  // Calendar logic for horizontally scrollable multi-month view
   const today = new Date();
-  const currentMonth = today.getMonth();
-  const currentYear = today.getFullYear();
-  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-  const firstDayOfMonth = new Date(currentYear, currentMonth, 1).getDay();
+  const viewMonth = viewDate.getMonth();
+  const viewYear = viewDate.getFullYear();
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const firstDayOfMonth = new Date(viewYear, viewMonth, 1).getDay();
   
   const calendarDays = [];
   for (let i = 0; i < firstDayOfMonth; i++) calendarDays.push(null);
-  for (let i = 1; i <= daysInMonth; i++) calendarDays.push(new Date(currentYear, currentMonth, i));
+  for (let i = 1; i <= daysInMonth; i++) calendarDays.push(new Date(viewYear, viewMonth, i));
+
+  // Generate 16 months for horizontal scroll selector (-2 past months to +13 future months)
+  const monthsList = useMemo(() => {
+    const list = [];
+    const now = new Date();
+    for (let i = -2; i <= 13; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+      const mCount = milestones.filter(m => {
+        const md = new Date(m.target_date);
+        return md.getFullYear() === d.getFullYear() && md.getMonth() === d.getMonth();
+      }).length;
+      list.push({
+        date: d,
+        label: d.toLocaleString('default', { month: 'short', year: 'numeric' }),
+        fullLabel: d.toLocaleString('default', { month: 'long', year: 'numeric' }),
+        year: d.getFullYear(),
+        month: d.getMonth(),
+        milestoneCount: mCount,
+        isCurrent: d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth(),
+        isSelected: d.getFullYear() === viewYear && d.getMonth() === viewMonth,
+      });
+    }
+    return list;
+  }, [milestones, viewYear, viewMonth]);
+
+  const goToPrevMonth = () => {
+    setViewDate(new Date(viewYear, viewMonth - 1, 1));
+  };
+
+  const goToNextMonth = () => {
+    setViewDate(new Date(viewYear, viewMonth + 1, 1));
+  };
+
+  const goToMonth = (d: Date) => {
+    setViewDate(d);
+  };
+
+  const goToToday = () => {
+    const now = new Date();
+    setViewDate(now);
+    setSelectedDate(now);
+  };
 
   // DPRs for selected date
   const dprsForSelectedDate = selectedDate ? dprs.filter(d => {
@@ -193,12 +251,22 @@ export default function ProgressWorkspace() {
            md.getDate() === selectedDate.getDate();
   }) : [];
 
+  if (!activeProjectId) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
+        <BarChart2 size={48} className="text-muted-foreground opacity-40 mb-4" />
+        <h2 className="text-xl font-bold text-foreground">No Project Selected</h2>
+        <p className="text-sm text-muted-foreground mt-2 max-w-xs">Please select a project from the top bar to view progress.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-full bg-background relative">
       <div className="bg-white border-b border-border px-4 pt-4 pb-0 shrink-0 sticky top-0 z-10">
         <h2 className="text-base font-bold text-foreground mb-3" style={{ fontFamily: "var(--font-display)" }}>Progress Tracking</h2>
         <div className="flex gap-0">
-          {[{ id: "timeline", label: "Timeline & Milestones" }, { id: "calendar", label: "Calendar" }].map(({ id, label }) => (
+          {[{ id: "timeline", label: "Timeline & Milestones" }, { id: "calendar", label: "Calendar & Schedule" }].map(({ id, label }) => (
             <button
               key={id}
               onClick={() => setSearchParams({ tab: id }, { replace: true })}
@@ -255,7 +323,7 @@ export default function ProgressWorkspace() {
                           <p className={`font-semibold text-sm ${m.status === 'IN_PROGRESS' ? "text-[#2648E7]" : "text-foreground"}`}>{m.name}</p>
                           <div className="flex items-center gap-2">
                             <span className="text-xs font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded-md">
-                              {new Date(m.target_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                              {new Date(m.target_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                             </span>
                             {m.status === 'COMPLETED' && <CheckCircle2 size={16} className="text-emerald-500" />}
                             <button onClick={() => handleDeleteMilestone(m.id)} className="p-1 hover:bg-muted text-muted-foreground hover:text-red-500 rounded-lg transition-colors">
@@ -286,66 +354,119 @@ export default function ProgressWorkspace() {
                   </div>
                 ))}
               </div>
-
-              <div className="mt-8">
-                <SectionLabel>Recent Daily Logs</SectionLabel>
-                <div className="space-y-3">
-                  {dprs.slice(0, 5).map((d) => (
-                    <Card key={d.id} className="p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <p className="text-sm font-bold text-[#2648E7]">
-                          {new Date(d.report_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-                        </p>
-                        {d.photos?.length > 0 && (
-                          <span className="text-xs font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{d.photos.length} photos</span>
-                        )}
-                      </div>
-                      <p className="text-sm text-foreground leading-relaxed">{d.summary}</p>
-                      {d.milestone_id && (
-                        <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
-                          <ArrowRight size={12} /> Contributed to milestone
-                        </p>
-                      )}
-                    </Card>
-                  ))}
-                  {dprs.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">No recent logs.</p>}
-                </div>
-                
-                <div className="mt-4">
-                  <button 
-                    onClick={() => { setSelectedMilestone(null); setShowDprModal(true); }}
-                    className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-bold text-sm text-white bg-slate-800 hover:bg-slate-900 transition-colors"
-                  >
-                    <Plus size={16} /> Submit General DPR
-                  </button>
-                </div>
-              </div>
             </>
           ) : (
-            <div>
-              <SectionLabel>{today.toLocaleString('default', { month: 'long', year: 'numeric' })}</SectionLabel>
-              <Card className="p-5">
-                <div className="grid grid-cols-7 gap-1 mb-3">
-                  {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
-                    <p key={d} className="text-[11px] font-bold text-muted-foreground text-center">{d}</p>
+            <div className="space-y-4">
+              {/* Horizontally Scrollable Month Strip */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <SectionLabel>Select Month & Target Timeline</SectionLabel>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={goToToday}
+                      className="text-xs font-bold px-2.5 py-1 rounded-lg bg-muted hover:bg-muted/80 text-foreground transition-colors"
+                    >
+                      Today
+                    </button>
+                    <button
+                      onClick={goToNextMonth}
+                      className="text-xs font-bold px-2.5 py-1 rounded-lg bg-[#2648E7]/10 hover:bg-[#2648E7]/20 text-[#2648E7] transition-colors flex items-center gap-1"
+                    >
+                      Next Month <ChevronRight size={13} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Horizontal Scroll Month Bar */}
+                <div 
+                  ref={monthScrollRef}
+                  className="flex gap-2 overflow-x-auto pb-2 scroll-smooth no-scrollbar"
+                  style={{ scrollSnapType: 'x mandatory' }}
+                >
+                  {monthsList.map((mItem, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => goToMonth(mItem.date)}
+                      style={{ scrollSnapAlign: 'start' }}
+                      className={`px-3.5 py-2 rounded-xl text-xs font-bold shrink-0 transition-all flex items-center gap-1.5 border ${
+                        mItem.isSelected
+                          ? "bg-[#2648E7] text-white border-[#2648E7] shadow-md shadow-[#2648E7]/30"
+                          : mItem.isCurrent
+                          ? "bg-white text-[#2648E7] border-[#2648E7]/40 hover:bg-[#2648E7]/5"
+                          : "bg-white text-muted-foreground border-border hover:bg-muted hover:text-foreground"
+                      }`}
+                    >
+                      <span>{mItem.label}</span>
+                      {mItem.milestoneCount > 0 && (
+                        <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${
+                          mItem.isSelected ? "bg-white/20 text-white" : "bg-amber-100 text-amber-800"
+                        }`}>
+                          {mItem.milestoneCount} 🏁
+                        </span>
+                      )}
+                    </button>
                   ))}
                 </div>
+              </div>
+
+              {/* Main Month Calendar Card */}
+              <Card className="p-5">
+                {/* Month Navigator Header */}
+                <div className="flex items-center justify-between mb-4 pb-3 border-b border-border">
+                  <button
+                    onClick={goToPrevMonth}
+                    className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                    title="Previous Month"
+                  >
+                    <ChevronLeft size={18} />
+                  </button>
+
+                  <div className="text-center">
+                    <h3 className="text-base font-extrabold text-foreground">
+                      {viewDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
+                    </h3>
+                    <p className="text-[11px] text-muted-foreground font-medium">
+                      {milestones.filter(m => {
+                        const md = new Date(m.target_date);
+                        return md.getFullYear() === viewYear && md.getMonth() === viewMonth;
+                      }).length} milestone(s) scheduled this month
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={goToNextMonth}
+                    className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                    title="Next Month"
+                  >
+                    <ChevronRight size={18} />
+                  </button>
+                </div>
+
+                {/* Weekday headers */}
+                <div className="grid grid-cols-7 gap-1 mb-2">
+                  {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
+                    <p key={d} className="text-[11px] font-bold text-muted-foreground text-center py-1">{d}</p>
+                  ))}
+                </div>
+
+                {/* Day Cells Grid */}
                 <div className="grid grid-cols-7 gap-1">
                   {calendarDays.map((date, idx) => {
                     if (!date) return <div key={`empty-${idx}`} className="aspect-square" />;
                     
-                    const isToday = date.getDate() === today.getDate() && date.getMonth() === today.getMonth();
+                    const isToday = date.getDate() === today.getDate() && date.getMonth() === today.getMonth() && date.getFullYear() === today.getFullYear();
+                    const isSelected = selectedDate && date.getDate() === selectedDate.getDate() && date.getMonth() === selectedDate.getMonth() && date.getFullYear() === selectedDate.getFullYear();
                     
                     // Check if milestone target is this date
                     const hasMilestone = milestones.some(m => {
                       const md = new Date(m.target_date);
-                      return md.getDate() === date.getDate() && md.getMonth() === date.getMonth();
+                      return md.getDate() === date.getDate() && md.getMonth() === date.getMonth() && md.getFullYear() === date.getFullYear();
                     });
                     
                     // Check if DPR exists
                     const hasLog = dprs.some(d => {
                       const dd = new Date(d.report_date);
-                      return dd.getDate() === date.getDate() && dd.getMonth() === date.getMonth();
+                      return dd.getDate() === date.getDate() && dd.getMonth() === date.getMonth() && dd.getFullYear() === date.getFullYear();
                     });
 
                     return (
@@ -353,15 +474,15 @@ export default function ProgressWorkspace() {
                         key={idx}
                         onClick={() => handleDateClick(date)}
                         className={`aspect-square rounded-xl flex flex-col items-center justify-center text-sm font-semibold relative gap-0.5 transition-all ${
-                          selectedDate?.getTime() === date.getTime() ? "ring-2 ring-[#2648E7] ring-offset-2" : ""
+                          isSelected ? "ring-2 ring-[#2648E7] ring-offset-2 scale-105 z-10 font-bold" : ""
                         } ${
                           isToday ? "bg-[#2648E7] text-white shadow-md shadow-[#2648E7]/20" :
-                          hasMilestone ? "bg-amber-50 text-amber-800 border border-amber-100" :
-                          hasLog ? "bg-indigo-50 text-indigo-800 border border-indigo-100" :
-                          "text-foreground hover:bg-muted"
+                          hasMilestone ? "bg-amber-50 text-amber-800 border border-amber-200" :
+                          hasLog ? "bg-indigo-50 text-indigo-800 border border-indigo-200" :
+                          "text-foreground hover:bg-muted/70"
                         }`}
                       >
-                        {date.getDate()}
+                        <span>{date.getDate()}</span>
                         <div className="flex gap-0.5">
                           {hasLog && !isToday && <span className="size-1.5 rounded-full bg-indigo-500" />}
                           {hasMilestone && !isToday && <span className="size-1.5 rounded-full bg-amber-500" />}
@@ -370,22 +491,37 @@ export default function ProgressWorkspace() {
                     );
                   })}
                 </div>
-                <div className="flex items-center gap-5 mt-5 pt-4 border-t border-border justify-center">
+
+                {/* Legend */}
+                <div className="flex items-center gap-5 mt-5 pt-4 border-t border-border justify-center flex-wrap">
                   <div className="flex items-center gap-2"><span className="size-2.5 rounded-full bg-indigo-500" /><p className="text-xs text-muted-foreground font-medium">DPR Logged</p></div>
-                  <div className="flex items-center gap-2"><span className="size-2.5 rounded-full bg-amber-500" /><p className="text-xs text-muted-foreground font-medium">Milestone</p></div>
+                  <div className="flex items-center gap-2"><span className="size-2.5 rounded-full bg-amber-500" /><p className="text-xs text-muted-foreground font-medium">Milestone Target</p></div>
                   <div className="flex items-center gap-2"><span className="size-2.5 rounded-full bg-[#2648E7]" /><p className="text-xs text-muted-foreground font-medium">Today</p></div>
                 </div>
               </Card>
 
+              {/* Selected Date Activity & Add Milestone Action */}
               {selectedDate && (
-                <div className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
-                  <SectionLabel>
-                    Activity on {selectedDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
-                  </SectionLabel>
+                <div className="mt-6 animate-in fade-in slide-in-from-bottom-4 duration-300 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <SectionLabel>
+                      Schedule on {selectedDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+                    </SectionLabel>
+                    <button
+                      onClick={() => {
+                        const offsetDate = new Date(selectedDate.getTime() - (selectedDate.getTimezoneOffset() * 60000));
+                        setMTargetDate(offsetDate.toISOString().split('T')[0]);
+                        setShowAddMilestone(true);
+                      }}
+                      className="text-xs font-bold px-3 py-1.5 bg-[#2648E7] hover:bg-[#1a35b3] text-white rounded-lg transition-colors flex items-center gap-1 shadow-sm"
+                    >
+                      <Plus size={13} /> Set Milestone for this Date
+                    </button>
+                  </div>
                   
                   <div className="space-y-4">
-                    {/* Milestones Section */}
-                    {milestonesForSelectedDate.length > 0 && (
+                    {/* Milestones on Selected Date */}
+                    {milestonesForSelectedDate.length > 0 ? (
                       <div className="space-y-3">
                         {milestonesForSelectedDate.map(m => (
                           <div key={m.id} className={`rounded-xl px-4 py-3 border ${m.status === 'COMPLETED' ? "bg-emerald-50/50 border-emerald-100" : "bg-amber-50/50 border-amber-100"}`}>
@@ -410,26 +546,26 @@ export default function ProgressWorkspace() {
                           </div>
                         ))}
                       </div>
+                    ) : (
+                      <button 
+                        onClick={() => {
+                          const offsetDate = new Date(selectedDate.getTime() - (selectedDate.getTimezoneOffset() * 60000));
+                          setMTargetDate(offsetDate.toISOString().split('T')[0]);
+                          setShowAddMilestone(true);
+                        }}
+                        className="w-full border-2 border-dashed border-border rounded-xl p-5 flex flex-col items-center justify-center gap-2 text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors group bg-white"
+                      >
+                        <div className="bg-primary/10 p-2.5 rounded-full shadow-sm group-hover:scale-110 transition-transform">
+                          <Plus size={18} className="text-[#2648E7]" />
+                        </div>
+                        <span className="text-sm font-semibold">No milestone set for this date. Click to schedule!</span>
+                      </button>
                     )}
-
-                    <button 
-                      onClick={() => {
-                        // Adjust date for local timezone to ensure YYYY-MM-DD matches correctly
-                        const offsetDate = new Date(selectedDate.getTime() - (selectedDate.getTimezoneOffset() * 60000));
-                        setMTargetDate(offsetDate.toISOString().split('T')[0]);
-                        setShowAddMilestone(true);
-                      }}
-                      className="w-full border-2 border-dashed border-border rounded-xl p-4 flex flex-col items-center justify-center gap-2 text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors group"
-                    >
-                      <div className="bg-white p-2 rounded-full shadow-sm group-hover:scale-110 transition-transform">
-                        <Plus size={16} className="text-[#2648E7]" />
-                      </div>
-                      <span className="text-sm font-semibold">Add Milestone for this Date</span>
-                    </button>
 
                     {/* DPRs Section */}
                     {dprsForSelectedDate.length > 0 && (
-                      <div className="space-y-3 mt-6">
+                      <div className="space-y-3 mt-4">
+                        <p className="text-xs font-bold uppercase text-muted-foreground">Daily Logs on this Date</p>
                         {dprsForSelectedDate.map(dpr => (
                           <div key={dpr.id} className="border border-border rounded-xl p-4 bg-white shadow-sm">
                             <div className="flex items-start justify-between mb-2">

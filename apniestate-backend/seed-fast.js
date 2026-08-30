@@ -27,11 +27,11 @@ async function run() {
 
     // 2. Users
     const users = [
-      { id: 'usr_1', name: 'Asim Raza', email: 'admin@gmail.com', role: 'BUILDER' },
+      { id: 'usr_1', name: 'Aditya Sharma', email: 'admin@gmail.com', role: 'BUILDER' },
       { id: 'usr_2', name: 'System Admin', email: 'admin@apniestate.com', role: 'ADMIN' },
-      { id: 'usr_3', name: 'Sara Ahmed', email: 'pm2@apniestate.com', role: 'PROJECT_MANAGER' },
-      { id: 'usr_4', name: 'Bilal Hassan', email: 'sup1@apniestate.com', role: 'SITE_SUPERVISOR' },
-      { id: 'usr_5', name: 'Nadia Malik', email: 'accounts@apniestate.com', role: 'ACCOUNTANT' }
+      { id: 'usr_3', name: 'Pooja Iyer', email: 'pm2@apniestate.com', role: 'PROJECT_MANAGER' },
+      { id: 'usr_4', name: 'Vikram Joshi', email: 'sup1@apniestate.com', role: 'SITE_SUPERVISOR' },
+      { id: 'usr_5', name: 'Neha Kulkarni', email: 'accounts@apniestate.com', role: 'ACCOUNTANT' }
     ];
 
     for (const u of users) {
@@ -51,13 +51,13 @@ async function run() {
     // 3. Project & Site
     await client.query(`
       INSERT INTO "public"."projects" (id, name, company_id, builder_id, manager_id, status, budget, start_date, end_date, created_at, updated_at)
-      VALUES ('proj_1', 'Gulberg Greens Plaza', 'cl_demo_company_1', (SELECT id FROM users WHERE email='admin@gmail.com'), (SELECT id FROM users WHERE email='pm2@apniestate.com'), 'ACTIVE', 50000000, NOW(), NOW() + interval '1 year', NOW(), NOW())
+      VALUES ('proj_1', 'Downtown Commercial Plaza', 'cl_demo_company_1', (SELECT id FROM users WHERE email='admin@gmail.com'), (SELECT id FROM users WHERE email='pm2@apniestate.com'), 'ACTIVE', 85000000, NOW(), NOW() + interval '1 year', NOW(), NOW())
       ON CONFLICT (id) DO NOTHING;
     `);
 
     await client.query(`
       INSERT INTO "public"."sites" (id, name, project_id, company_id, supervisor_id, location, status, created_at, updated_at)
-      VALUES ('site_1', 'Main Structure', 'proj_1', 'cl_demo_company_1', (SELECT id FROM users WHERE email='sup1@apniestate.com'), 'Islamabad', 'IN_PROGRESS', NOW(), NOW())
+      VALUES ('site_1', 'Tower Block', 'proj_1', 'cl_demo_company_1', (SELECT id FROM users WHERE email='sup1@apniestate.com'), 'BKC, Mumbai', 'IN_PROGRESS', NOW(), NOW())
       ON CONFLICT (id) DO NOTHING;
     `);
 

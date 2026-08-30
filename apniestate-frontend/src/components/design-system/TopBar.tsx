@@ -258,7 +258,7 @@ export function TopBar({ title: customTitle, icon: customIcon, leftAction }: Top
             boxShadow: '0 1px 4px rgba(0,0,0,0.1)'
           }}
         >
-          {user ? getInitials(user.name) : 'AR'}
+          {user ? getInitials(user.name) : 'AS'}
         </div>
 
         {showDropdown && (

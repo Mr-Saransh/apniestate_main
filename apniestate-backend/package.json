@@ -6,7 +6,7 @@
     "seed": "ts-node --project tsconfig.seed.json prisma/seed.ts"
   },
   "scripts": {
-    "dev": "cross-env NODE_TLS_REJECT_UNAUTHORIZED=0 next dev -p 3001",
+    "dev": "cross-env NODE_TLS_REJECT_UNAUTHORIZED=0 NODE_OPTIONS=--max-old-space-size=4096 next dev -p 3001",
     "build": "prisma generate && prisma db push --accept-data-loss && next build",
     "start": "next start",
     "postinstall": "prisma generate"

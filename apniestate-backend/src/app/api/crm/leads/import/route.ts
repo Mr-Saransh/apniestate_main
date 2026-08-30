@@ -1,10 +1,10 @@
 import { NextRequest } from "next/server";
-import { withAuth } from "@/middleware/auth.middleware";
+import { withCrmAuth } from "@/middleware/auth.middleware";
 import { prisma } from "@/lib/prisma";
 import { ok, badRequest, serverError } from "@/lib/response";
 
 // POST /api/crm/leads/import — High performance bulk import with batch queries (100x faster)
-export const POST = withAuth(async (req, user) => {
+export const POST = withCrmAuth(async (req, user) => {
   try {
     if (!user.company_id) return badRequest("No company context");
     const body = await req.json();

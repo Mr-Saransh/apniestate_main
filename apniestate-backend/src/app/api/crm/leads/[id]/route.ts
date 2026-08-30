@@ -1,10 +1,10 @@
 import { NextRequest } from "next/server";
-import { withAuth } from "@/middleware/auth.middleware";
+import { withCrmAuth } from "@/middleware/auth.middleware";
 import { prisma } from "@/lib/prisma";
 import { ok, badRequest, notFound, serverError } from "@/lib/response";
 
 // GET /api/crm/leads/[id]
-export const GET = withAuth(async (req, user, context) => {
+export const GET = withCrmAuth(async (req, user, context) => {
   try {
     if (!user.company_id) return badRequest("No company context");
     const { id } = await context.params;
@@ -27,7 +27,7 @@ export const GET = withAuth(async (req, user, context) => {
 });
 
 // PUT /api/crm/leads/[id]
-export const PUT = withAuth(async (req, user, context) => {
+export const PUT = withCrmAuth(async (req, user, context) => {
   try {
     if (!user.company_id) return badRequest("No company context");
     const { id } = await context.params;
@@ -86,7 +86,7 @@ export const PUT = withAuth(async (req, user, context) => {
 });
 
 // DELETE /api/crm/leads/[id]
-export const DELETE = withAuth(async (req, user, context) => {
+export const DELETE = withCrmAuth(async (req, user, context) => {
   try {
     if (!user.company_id) return badRequest("No company context");
     const { id } = await context.params;
