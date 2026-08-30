@@ -23,7 +23,32 @@ export async function createInvitation(data: {
       where: { user_id_company_id: { user_id: user.id, company_id: data.company_id } }
     });
     if (membership && membership.status === "ACTIVE") {
-      throw new Error("User is already an active member of this company");
+      if (membership.roles.includes(data.role)) {
+        throw new Error(`User is already an active ${data.role.replace(/_/g, " ")} in this company`);
+      }
+      // Add the new role to the existing company membership directly
+      const updatedRoles = [...membership.roles, data.role];
+      await prisma.companyMembership.update({
+        where: { id: membership.id },
+        data: { roles: updatedRoles }
+      });
+      const company = await prisma.company.findUnique({ where: { id: data.company_id } });
+      await notifyUsers(
+        [user.id],
+        "New Role Assigned",
+        `You have been assigned the ${data.role.replace(/_/g, " ")} role in ${company?.name || "the company"}.`,
+        { type: "info" }
+      );
+      return {
+        id: `role_added_${membership.id}`,
+        company_id: data.company_id,
+        invited_by: data.invited_by,
+        email: emailLower,
+        role: data.role,
+        status: "ACCEPTED",
+        created_at: new Date(),
+        expires_at: new Date(),
+      };
     }
   }
 

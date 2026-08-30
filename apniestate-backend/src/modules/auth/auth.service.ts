@@ -37,8 +37,43 @@ export async function loginUser(input: LoginInput) {
     include: { company: true }
   });
 
-  // Issue token with whatever is currently the user's active pointer
-  const accessToken = signAccessToken({ sub: user.id, email: user.email || user.username || "", role: user.role as Role, company_id: user.company_id });
+  const currentMembership = memberships.find((m) => m.company_id === user.company_id);
+  const allCompanyRoles = currentMembership ? currentMembership.roles : [user.role];
+  const hasBuilder = allCompanyRoles.includes("BUILDER") || allCompanyRoles.includes("ADMIN") || user.role === "BUILDER" || user.role === "ADMIN";
+  const hasCrmRole = allCompanyRoles.includes("CRM_MANAGER") || allCompanyRoles.includes("TELECALLER") || allCompanyRoles.includes("SALES_EXECUTIVE") || user.role === "CRM_MANAGER" || user.role === "TELECALLER" || user.role === "SALES_EXECUTIVE";
+  const hasErpRole = allCompanyRoles.some((r) => ["BUILDER", "ADMIN", "SITE_SUPERVISOR", "ACCOUNTANT", "INVENTORY_MANAGER", "PROJECT_MANAGER", "WORKER"].includes(r)) || ["BUILDER", "ADMIN", "SITE_SUPERVISOR", "ACCOUNTANT", "INVENTORY_MANAGER", "PROJECT_MANAGER", "WORKER"].includes(user.role);
+
+  let activeCrmRole: "BUILDER" | "CRM_MANAGER" | "TELECALLER" | null = null;
+  if (hasBuilder) {
+    activeCrmRole = "BUILDER";
+  } else if (allCompanyRoles.includes("CRM_MANAGER") || user.role === "CRM_MANAGER") {
+    activeCrmRole = "CRM_MANAGER";
+  } else if (allCompanyRoles.includes("TELECALLER") || allCompanyRoles.includes("SALES_EXECUTIVE") || user.role === "TELECALLER" || user.role === "SALES_EXECUTIVE") {
+    activeCrmRole = "TELECALLER";
+  }
+
+  let activeRole = user.role;
+  if (hasBuilder) {
+    activeRole = "BUILDER" as any;
+  } else if (currentMembership && currentMembership.roles.length > 0) {
+    const erpRole = currentMembership.roles.find((r) => ["PROJECT_MANAGER", "SITE_SUPERVISOR", "ACCOUNTANT", "INVENTORY_MANAGER", "WORKER"].includes(r));
+    if (erpRole) {
+      activeRole = erpRole as any;
+    } else {
+      activeRole = currentMembership.roles[0] as any;
+    }
+  }
+
+  const canSwitchMode = hasBuilder || (hasErpRole && Boolean(activeCrmRole));
+
+  // Issue token with active company role and CRM role
+  const accessToken = signAccessToken({
+    sub: user.id,
+    email: user.email || user.username || "",
+    role: activeRole as Role,
+    crm_role: activeCrmRole,
+    company_id: user.company_id,
+  });
   const refreshToken = signRefreshToken(user.id);
 
   const tokenHash = await hashToken(refreshToken);
@@ -76,7 +111,10 @@ export async function loginUser(input: LoginInput) {
       id: user.id,
       name: user.name,
       email: user.email || user.username || "",
-      role: user.role as Role,
+      role: activeRole as Role,
+      crm_role: activeCrmRole,
+      company_roles: allCompanyRoles,
+      can_switch_mode: canSwitchMode,
       company_id: user.company_id,
       onboarded: user.onboarded,
       last_workspace_id: user.last_workspace_id,

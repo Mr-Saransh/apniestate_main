@@ -17,6 +17,8 @@ import {
 import { crmApi, type CrmLead, type CrmAnalytics, type CrmFollowup, type CrmProperty } from '@/api/crm';
 import { subscriptionApi, type CompanyEntitlements } from '@/api/subscription';
 import { useAppMode } from '@/context/AppModeContext';
+import { useAuth } from '@/context/AuthContext';
+import { getUserCrmRole } from '@/config/crm-permissions';
 
 // Tabs
 import CrmOverviewTab from '@/components/crm/CrmOverviewTab';
@@ -26,6 +28,9 @@ import CrmFollowupsTab from '@/components/crm/CrmFollowupsTab';
 import CrmCustomersTab from '@/components/crm/CrmCustomersTab';
 import CrmActivitiesTab from '@/components/crm/CrmActivitiesTab';
 import CrmPropertiesTab from '@/components/crm/CrmPropertiesTab';
+import CrmTeamTab from '@/components/crm/CrmTeamTab';
+import CrmReportsTab from '@/components/crm/CrmReportsTab';
+import CrmSettingsTab from '@/components/crm/CrmSettingsTab';
 
 // Modals
 import AddLeadModal from '@/components/crm/AddLeadModal';
@@ -38,13 +43,41 @@ import AddPropertyModal from '@/components/crm/AddPropertyModal';
 import SharePropertyModal from '@/components/crm/SharePropertyModal';
 import ImportLeadsModal from '@/components/crm/ImportLeadsModal';
 
-type CrmTab = 'overview' | 'leads' | 'pipeline' | 'followups' | 'customers' | 'activities' | 'properties';
+type CrmTab =
+  | 'overview'
+  | 'leads'
+  | 'pipeline'
+  | 'followups'
+  | 'customers'
+  | 'activities'
+  | 'properties'
+  | 'team'
+  | 'reports'
+  | 'settings'
+  | 'deals';
 
 export default function CrmWorkspace() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const { setMode } = useAppMode();
-  const tab = (searchParams.get('tab') || 'overview') as CrmTab;
+  const { user } = useAuth();
+  const crmRole = getUserCrmRole(user);
+
+  let rawTab = (searchParams.get('tab') || 'overview') as CrmTab;
+  if (rawTab === 'deals') rawTab = 'customers';
+
+  // Role tab authorization check
+  if (crmRole === 'TELECALLER' && ['team', 'reports', 'settings', 'customers', 'properties'].includes(rawTab)) {
+    if (rawTab === 'customers') {
+      // Allow deals view under personal workspace
+    } else {
+      rawTab = 'overview';
+    }
+  } else if (crmRole === 'CRM_MANAGER' && rawTab === 'settings') {
+    rawTab = 'overview';
+  }
+
+  const tab = rawTab;
 
   const [leads, setLeads] = useState<CrmLead[]>([]);
   const [followups, setFollowups] = useState<CrmFollowup[]>([]);
@@ -160,7 +193,7 @@ export default function CrmWorkspace() {
     );
   }
 
-  // Locked CRM View
+  // Locked CRM View (Subscription check)
   if (isCrmLocked) {
     return (
       <div className="p-6 md:p-12 max-w-4xl mx-auto space-y-8 animate-in fade-in duration-500">
@@ -231,13 +264,19 @@ export default function CrmWorkspace() {
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-300">
       {/* Workspace Header */}
-      <div className="border-b border-slate-200/80 pb-3">
-        <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight" style={{ fontFamily: 'var(--font-display)' }}>
-          Real Estate CRM
-        </h1>
-        <p className="text-xs md:text-sm text-slate-500 font-medium mt-0.5">
-          Manage your leads, sales pipeline, site visits, and property transactions
-        </p>
+      <div className="border-b border-slate-200/80 pb-3 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight" style={{ fontFamily: 'var(--font-display)' }}>
+            Real Estate CRM
+          </h1>
+          <p className="text-xs md:text-sm text-slate-500 font-medium mt-0.5">
+            {crmRole === 'TELECALLER'
+              ? 'Manage your assigned leads, sales follow-ups, and property bookings'
+              : crmRole === 'CRM_MANAGER'
+              ? 'Manage sales team leads, telecallers, pipeline funnel, and performance'
+              : 'Enterprise CRM Command Center: Leads, team hierarchy, and bookings'}
+          </p>
+        </div>
       </div>
 
       {/* Tab Contents */}
@@ -265,6 +304,7 @@ export default function CrmWorkspace() {
           onSelectLead={handleOpenLeadDetail}
           onOpenEditLead={handleOpenEditLead}
           onDeleteLead={handleDeleteLead}
+          onRefreshLeads={() => fetchCrmData(true)}
         />
       )}
 
@@ -308,6 +348,25 @@ export default function CrmWorkspace() {
           onOpenAddProperty={() => setIsAddPropertyOpen(true)}
           onOpenShareProperty={handleOpenShareProperty}
         />
+      )}
+
+      {tab === 'team' && (
+        <CrmTeamTab
+          onNavigateToLeads={(assignedToId) => {
+            handleTabChange('leads');
+          }}
+        />
+      )}
+
+      {tab === 'reports' && (
+        <CrmReportsTab
+          analytics={analytics}
+          leads={leads}
+        />
+      )}
+
+      {tab === 'settings' && (
+        <CrmSettingsTab />
       )}
 
       {/* Modals */}

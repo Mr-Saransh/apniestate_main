@@ -24,7 +24,8 @@ export interface CrmLead {
   last_contacted_at?: string | null;
   created_at: string;
   updated_at: string;
-  assignee?: { id: string; name: string } | null;
+  assignee?: { id: string; name: string; email?: string } | null;
+  creator?: { id: string; name: string; email?: string } | null;
   project?: { id: string; name: string } | null;
   _count?: { followups: number; deals: number };
   followups?: CrmFollowup[];
@@ -43,7 +44,7 @@ export interface CrmFollowup {
   completed_at?: string | null;
   outcome?: string | null;
   created_at: string;
-  lead?: Pick<CrmLead, 'id' | 'name' | 'initials' | 'avatar_color' | 'phone' | 'status'>;
+  lead?: Pick<CrmLead, 'id' | 'name' | 'initials' | 'avatar_color' | 'phone' | 'status' | 'assigned_to'>;
 }
 
 export interface CrmActivity {
@@ -60,7 +61,7 @@ export interface CrmActivity {
   completed_at?: string | null;
   priority: 'LOW' | 'MEDIUM' | 'HIGH';
   created_at: string;
-  lead?: Pick<CrmLead, 'id' | 'name' | 'initials' | 'avatar_color'> | null;
+  lead?: Pick<CrmLead, 'id' | 'name' | 'initials' | 'avatar_color' | 'assigned_to'> | null;
 }
 
 export interface CrmDeal {
@@ -79,7 +80,7 @@ export interface CrmDeal {
   deal_date: string;
   notes?: string | null;
   created_at: string;
-  lead?: Pick<CrmLead, 'id' | 'name' | 'initials' | 'avatar_color'>;
+  lead?: Pick<CrmLead, 'id' | 'name' | 'initials' | 'avatar_color' | 'assigned_to'>;
   project?: { id: string; name: string } | null;
 }
 
@@ -101,31 +102,84 @@ export interface CrmProperty {
   project?: { id: string; name: string } | null;
 }
 
+export interface CrmTeamMember {
+  id: string;
+  membership_id: string;
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  crm_role: 'BUILDER' | 'CRM_MANAGER' | 'TELECALLER';
+  roles: string[];
+  status: 'ACTIVE' | 'INACTIVE' | 'RESIGNED';
+  assigned_leads_count: number;
+  last_active_at?: string | null;
+  created_at: string;
+}
+
+export interface CrmPendingInvitation {
+  id: string;
+  email: string;
+  role: string;
+  status: string;
+  expires_at: string;
+  created_at: string;
+  invited_by: string;
+}
+
+export interface CrmTeamResponse {
+  members: CrmTeamMember[];
+  pendingInvitations: CrmPendingInvitation[];
+  userCrmRole: 'BUILDER' | 'CRM_MANAGER' | 'TELECALLER';
+}
+
 export interface CrmAnalytics {
-  totalLeads: number;
-  activeLeads: number;
-  totalDeals: number;
+  crmRole?: 'BUILDER' | 'CRM_MANAGER' | 'TELECALLER';
+  // Telecaller metrics
+  myLeads?: number;
+  myBookings?: number;
+  mySiteVisits?: number;
+  recentLeads?: any[];
+  todayFollowupList?: any[];
+  // Shared / Manager / Builder metrics
+  totalLeads?: number;
+  activeLeads?: number;
+  totalCustomers?: number;
+  totalDeals?: number;
   conversionRate: number;
-  totalRevenue: number;
-  totalCommission: number;
-  totalReceived: number;
-  pendingFollowups: number;
-  overdueFollowups: number;
-  todayFollowups: number;
-  pendingActivities: number;
+  totalRevenue?: number;
+  totalCommission?: number;
+  totalReceived?: number;
+  pendingFollowups?: number;
+  overdueFollowups?: number;
+  todayFollowups?: number;
+  pendingActivities?: number;
+  unassignedLeads?: number;
+  crmTeamCount?: number;
   pipeline: { stage: string; count: number }[];
-  sources: { name: string; value: number; color: string }[];
+  sources?: { name: string; value: number; color: string }[];
+  teamPerformance?: {
+    userId: string;
+    name: string;
+    email?: string;
+    phone?: string;
+    role: string;
+    assignedLeads: number;
+    bookedLeads: number;
+    conversionRate: number;
+  }[];
+  recentActivityLogs?: any[];
 }
 
 // ─── API Client ──────────────────────────────────────────────
 
 export const crmApi = {
   // Leads
-  getLeads: (params?: { search?: string; status?: string; project_id?: string }) => {
+  getLeads: (params?: { search?: string; status?: string; project_id?: string; assigned_to?: string }) => {
     const sp = new URLSearchParams();
     if (params?.search) sp.set('search', params.search);
     if (params?.status) sp.set('status', params.status);
     if (params?.project_id) sp.set('project_id', params.project_id);
+    if (params?.assigned_to) sp.set('assigned_to', params.assigned_to);
     const qs = sp.toString();
     return apiClient.get<CrmLead[]>(`/crm/leads${qs ? `?${qs}` : ''}`);
   },
@@ -174,4 +228,31 @@ export const crmApi = {
 
   // Analytics
   getAnalytics: () => apiClient.get<CrmAnalytics>('/crm/analytics'),
+
+  // Team Management
+  getTeam: () => apiClient.get<CrmTeamResponse>('/crm/team'),
+  createTeamMember: (data: { name: string; email: string; password: string; role: string; phone?: string }) =>
+    apiClient.post<any>('/crm/team', data),
+  inviteTeamMember: (data: { name?: string; email: string; password?: string; role: string; phone?: string }) =>
+    apiClient.post<any>('/crm/team', data),
+  updateTeamMember: (userId: string, data: { action: 'suspend' | 'activate' | 'remove'; reassignToUserId?: string }) =>
+    apiClient.patch<any>(`/crm/team/${userId}`, data),
+  reassignLeads: (data: { from_user_id?: string; to_user_id: string; lead_ids?: string[]; unassigned_only?: boolean }) =>
+    apiClient.post<any>('/crm/team/reassign', data),
+
+  // Smart Lead Distribution & Bulk Operations
+  distributeLeads: (data: {
+    lead_ids?: string[];
+    distribute_unassigned?: boolean;
+    strategy: 'ROUND_ROBIN' | 'LOAD_BALANCED' | 'CUSTOM';
+    target_user_ids?: string[];
+    custom_allocations?: { user_id: string; count: number }[];
+  }) => apiClient.post<{ success: boolean; total_distributed: number; summary: { userId: string; name: string; count: number }[]; message: string }>('/crm/leads/distribute', data),
+
+  bulkUpdateLeads: (data: {
+    lead_ids: string[];
+    action: 'ASSIGN' | 'UNASSIGN' | 'STATUS_CHANGE' | 'DELETE';
+    assigned_to?: string | null;
+    status?: string;
+  }) => apiClient.post<{ success: boolean; count: number; message: string }>('/crm/leads/bulk', data),
 };

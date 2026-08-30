@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { X, Edit, Phone, Mail, MapPin, IndianRupee, Tag, Building2 } from 'lucide-react';
-import { crmApi, type CrmLead } from '@/api/crm';
+import { X, Edit, Phone, Mail, MapPin, IndianRupee, Tag, Building2, UserCheck } from 'lucide-react';
+import { crmApi, type CrmLead, type CrmTeamMember } from '@/api/crm';
 import { useProject } from '@/context/ProjectContext';
+import { useAuth } from '@/context/AuthContext';
+import { getUserCrmRole } from '@/config/crm-permissions';
 
 interface EditLeadModalProps {
   lead: CrmLead | null;
@@ -12,8 +14,13 @@ interface EditLeadModalProps {
 
 export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: EditLeadModalProps) {
   const { projects } = useProject();
+  const { user } = useAuth();
+  const crmRole = getUserCrmRole(user);
+  const isManagerOrBuilder = crmRole === 'BUILDER' || crmRole === 'CRM_MANAGER' || user?.role === 'BUILDER' || user?.role === 'ADMIN';
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [teamMembers, setTeamMembers] = useState<CrmTeamMember[]>([]);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -26,10 +33,21 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
     city: '',
     source: 'Website',
     project_id: '',
+    assigned_to: '',
     tagInput: '',
     tags: [] as string[],
     notes: '',
   });
+
+  useEffect(() => {
+    if (isOpen && isManagerOrBuilder) {
+      crmApi.getTeam().then((res) => {
+        if (res.success && res.data) {
+          setTeamMembers(res.data.members.filter((m) => m.status === 'ACTIVE' && m.crm_role !== 'BUILDER'));
+        }
+      }).catch(() => {});
+    }
+  }, [isOpen, isManagerOrBuilder]);
 
   useEffect(() => {
     if (lead) {
@@ -44,6 +62,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
         city: lead.city || '',
         source: lead.source || 'Website',
         project_id: lead.project_id || '',
+        assigned_to: lead.assigned_to || '',
         tagInput: '',
         tags: lead.tags || [],
         notes: lead.notes || '',
@@ -80,65 +99,73 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
     try {
       setLoading(true);
       setError(null);
-      const res = await crmApi.updateLead(lead.id, {
-        name: formData.name.trim(),
-        phone: formData.phone.trim() || undefined,
-        email: formData.email.trim() || undefined,
+
+      const updatePayload: any = {
+        name: formData.name,
+        phone: formData.phone || null,
+        email: formData.email || null,
         type: formData.type,
         status: formData.status,
         priority: formData.priority,
-        budget: formData.budget.trim() || undefined,
-        city: formData.city.trim() || undefined,
+        budget: formData.budget || null,
+        city: formData.city || null,
         source: formData.source,
-        project_id: formData.project_id || undefined,
+        project_id: formData.project_id || null,
         tags: formData.tags,
-        notes: formData.notes.trim() || undefined,
-      });
+        notes: formData.notes || null,
+      };
+
+      if (isManagerOrBuilder) {
+        updatePayload.assigned_to = formData.assigned_to || null;
+      }
+
+      const res = await crmApi.updateLead(lead.id, updatePayload);
 
       if (res.success && res.data) {
         onSuccess(res.data);
-        onClose();
       } else {
-        setError(res.message || 'Failed to update lead');
+        setError(res.error?.message || 'Failed to update lead');
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to update lead');
+      setError(err.message || 'Something went wrong while updating the lead');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
-      <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-200">
-        <div className="px-6 py-4 bg-gradient-to-r from-[#2648E7] to-[#1e3bbd] text-white flex items-center justify-between">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
+        {/* Header */}
+        <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-white/10">
-              <Edit className="w-5 h-5 text-white" />
+            <div className="size-9 rounded-xl bg-[#2648E7] text-white flex items-center justify-center shadow-sm">
+              <Edit size={18} />
             </div>
             <div>
-              <h2 className="text-base font-bold">Edit Lead</h2>
-              <p className="text-xs text-white/80">Update lead details and stage</p>
+              <h3 className="text-sm font-bold text-slate-900">Edit Lead Details</h3>
+              <p className="text-[11px] text-slate-500">Update information and ownership for {lead.name}</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-white/10 text-white/80 hover:text-white transition-colors"
+            className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
           >
-            <X size={18} />
+            <X size={16} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto custom-scrollbar">
+        {/* Form Body */}
+        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-4">
           {error && (
-            <div className="p-3 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-xl">
+            <div className="p-3.5 rounded-xl bg-red-50 text-red-700 text-xs border border-red-200">
               {error}
             </div>
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Full Name</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Full Name *</label>
               <input
                 type="text"
                 required
@@ -147,37 +174,70 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
                 className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:border-[#2648E7]"
               />
             </div>
+
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">Phone Number</label>
-              <input
-                type="tel"
-                value={formData.phone}
-                onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:border-[#2648E7]"
-              />
+              <div className="relative">
+                <input
+                  type="tel"
+                  value={formData.phone}
+                  onChange={e => setFormData({ ...formData, phone: e.target.value })}
+                  className="w-full pl-9 pr-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:border-[#2648E7]"
+                />
+                <Phone size={14} className="absolute left-3 top-3.5 text-slate-400" />
+              </div>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">Email Address</label>
-              <input
-                type="email"
-                value={formData.email}
-                onChange={e => setFormData({ ...formData, email: e.target.value })}
-                className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:border-[#2648E7]"
-              />
+              <div className="relative">
+                <input
+                  type="email"
+                  value={formData.email}
+                  onChange={e => setFormData({ ...formData, email: e.target.value })}
+                  className="w-full pl-9 pr-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:border-[#2648E7]"
+                />
+                <Mail size={14} className="absolute left-3 top-3.5 text-slate-400" />
+              </div>
             </div>
+
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">City</label>
-              <input
-                type="text"
-                value={formData.city}
-                onChange={e => setFormData({ ...formData, city: e.target.value })}
-                className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:border-[#2648E7]"
-              />
+              <label className="block text-xs font-bold text-slate-700 mb-1">Location / City</label>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={formData.city}
+                  onChange={e => setFormData({ ...formData, city: e.target.value })}
+                  className="w-full pl-9 pr-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:border-[#2648E7]"
+                />
+                <MapPin size={14} className="absolute left-3 top-3.5 text-slate-400" />
+              </div>
             </div>
           </div>
+
+          {/* Assigned Telecaller (Builder / Manager Only) */}
+          {isManagerOrBuilder && (
+            <div className="p-3.5 rounded-2xl bg-blue-50/50 border border-blue-200/60">
+              <label className="block text-xs font-bold text-slate-800 mb-1 flex items-center gap-1.5">
+                <UserCheck size={14} className="text-[#2648E7]" />
+                <span>Assigned Telecaller / Sales Executive</span>
+              </label>
+              <select
+                value={formData.assigned_to}
+                onChange={e => setFormData({ ...formData, assigned_to: e.target.value })}
+                className="w-full px-3.5 py-2 text-xs font-semibold bg-white border border-blue-200 rounded-xl focus:outline-none focus:border-[#2648E7]"
+              >
+                <option value="">⚠️ Unassigned Pool (Anyone can claim / Smart Distribute)</option>
+                {teamMembers.map(m => (
+                  <option key={m.id} value={m.id}>
+                    {m.name} ({m.crm_role === 'CRM_MANAGER' ? 'Manager' : 'Executive'}) — {m.assigned_leads_count} current leads
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div className="grid grid-cols-3 gap-3">
             <div>
@@ -258,27 +318,37 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
                 type="text"
                 value={formData.tagInput}
                 onChange={e => setFormData({ ...formData, tagInput: e.target.value })}
-                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddTag(); } }}
-                placeholder="Add tag and press enter"
-                className="flex-1 px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-[#2648E7]"
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddTag();
+                  }
+                }}
+                placeholder="Type tag and press Add"
+                className="flex-1 px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-[#2648E7]"
               />
               <button
                 type="button"
                 onClick={handleAddTag}
-                className="px-3.5 py-2 text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-colors"
+                className="px-3 py-2 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
               >
                 Add
               </button>
             </div>
+
             {formData.tags.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
-                {formData.tags.map(tag => (
+                {formData.tags.map(t => (
                   <span
-                    key={tag}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-[#2648E7]/10 text-[#2648E7] rounded-lg"
+                    key={t}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-50 text-[#2648E7]"
                   >
-                    {tag}
-                    <button type="button" onClick={() => handleRemoveTag(tag)} className="hover:text-red-500">
+                    <span>#{t}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveTag(t)}
+                      className="hover:text-red-500"
+                    >
                       <X size={12} />
                     </button>
                   </span>
@@ -288,34 +358,29 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Notes</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Notes & Interaction Summary</label>
             <textarea
               rows={3}
               value={formData.notes}
               onChange={e => setFormData({ ...formData, notes: e.target.value })}
-              className="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-[#2648E7] resize-none"
+              className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-[#2648E7]"
             />
           </div>
 
-          <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+          <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+              className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-5 py-2 text-sm font-bold text-white bg-[#2648E7] hover:bg-[#1e3bbd] rounded-xl shadow-md transition-all disabled:opacity-50 flex items-center gap-2"
+              className="px-5 py-2 text-xs font-bold text-white bg-[#2648E7] hover:bg-[#1e3bbd] rounded-xl shadow-md shadow-[#2648E7]/20 disabled:opacity-50 transition-all flex items-center gap-1.5"
             >
-              {loading ? (
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <Edit size={16} />
-              )}
-              Save Changes
+              {loading ? 'Saving...' : 'Save Changes'}
             </button>
           </div>
         </form>

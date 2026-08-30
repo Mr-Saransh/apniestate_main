@@ -24,9 +24,10 @@ export async function submitResignation(data: {
   });
 
   // Notify builders
-  const builders = await prisma.companyMembership.findMany({
-    where: { company_id: data.company_id, roles: { has: "BUILDER" }, status: "ACTIVE" }
+  const memberships = await prisma.companyMembership.findMany({
+    where: { company_id: data.company_id, status: "ACTIVE" }
   });
+  const builders = memberships.filter(b => b.roles.includes("BUILDER") || b.roles.includes("ADMIN"));
   const user = await prisma.user.findUnique({ where: { id: data.user_id } });
   
   if (builders.length > 0 && user) {

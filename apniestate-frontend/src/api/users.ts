@@ -5,7 +5,20 @@ export interface User {
   name: string;
   email: string | null;
   username?: string | null;
-  role: 'ADMIN' | 'BUILDER' | 'SITE_SUPERVISOR' | 'ACCOUNTANT' | 'INVENTORY_MANAGER' | 'PROJECT_MANAGER';
+  role:
+    | 'ADMIN'
+    | 'BUILDER'
+    | 'SITE_SUPERVISOR'
+    | 'ACCOUNTANT'
+    | 'INVENTORY_MANAGER'
+    | 'PROJECT_MANAGER'
+    | 'CRM_MANAGER'
+    | 'TELECALLER'
+    | 'SALES_EXECUTIVE'
+    | 'WORKER';
+  crm_role?: 'CRM_MANAGER' | 'TELECALLER' | null;
+  company_roles?: string[];
+  has_crm_access?: boolean;
   phone: string | null;
   city?: string | null;
   state?: string | null;
@@ -20,6 +33,7 @@ export interface CreateUserData {
   username?: string;
   password: string;
   role?: User['role'];
+  crm_role?: 'CRM_MANAGER' | 'TELECALLER' | 'NONE';
   phone?: string;
   project_ids?: string[];
 }
@@ -28,6 +42,7 @@ export interface UpdateUserData {
   name?: string;
   email?: string;
   role?: User['role'];
+  crm_role?: 'CRM_MANAGER' | 'TELECALLER' | 'NONE';
   phone?: string;
   city?: string;
   state?: string;

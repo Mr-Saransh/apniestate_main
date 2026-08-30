@@ -78,6 +78,13 @@ export default function LoginPage() {
         return;
       }
 
+      const crmRole = user.crm_role || (user.role === 'CRM_MANAGER' ? 'CRM_MANAGER' : (user.role === 'TELECALLER' || user.role === 'SALES_EXECUTIVE') ? 'TELECALLER' : null);
+      if (crmRole === 'CRM_MANAGER' || crmRole === 'TELECALLER') {
+        localStorage.setItem('apniestate_app_mode', 'CRM');
+        navigate('/crm', { replace: true });
+        return;
+      }
+
       navigate('/dashboard', { replace: true });
       
     } catch (err) {

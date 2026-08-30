@@ -12,13 +12,28 @@ export interface SignupCredentials {
   otp?: string;
 }
 
-export type Role = 'ADMIN' | 'BUILDER' | 'SITE_SUPERVISOR' | 'ACCOUNTANT' | 'INVENTORY_MANAGER' | 'PROJECT_MANAGER' | 'WORKER';
+export type Role =
+  | 'ADMIN'
+  | 'BUILDER'
+  | 'SITE_SUPERVISOR'
+  | 'ACCOUNTANT'
+  | 'INVENTORY_MANAGER'
+  | 'PROJECT_MANAGER'
+  | 'WORKER'
+  | 'CRM_MANAGER'
+  | 'TELECALLER'
+  | 'SALES_EXECUTIVE';
+
+export type CrmRole = 'BUILDER' | 'CRM_MANAGER' | 'TELECALLER';
 
 export interface AuthUser {
   id: string;
   name: string;
   email: string;
   role: Role;
+  crm_role?: CrmRole | null;
+  company_roles?: string[];
+  can_switch_mode?: boolean;
   phone?: string | null;
   city?: string | null;
   state?: string | null;

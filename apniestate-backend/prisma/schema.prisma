@@ -20,6 +20,9 @@ enum Role {
   PROJECT_MANAGER
   WORKER
   VENDOR
+  CRM_MANAGER
+  TELECALLER
+  SALES_EXECUTIVE
 }
 
 enum ProjectStatus {

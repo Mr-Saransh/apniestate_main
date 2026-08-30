@@ -1,4 +1,4 @@
-import { Home, ShoppingCart, Wallet, Users, BarChart2, LayoutDashboard, GitCommit, Clock, IndianRupee } from 'lucide-react';
+import { Home, ShoppingCart, Wallet, Users, BarChart2, LayoutDashboard, GitCommit, Clock, IndianRupee, Calendar } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useAppMode } from '@/context/AppModeContext';
@@ -11,12 +11,20 @@ const ERP_BOTTOM_NAV = [
   { id: "progress", path: "/progress", Icon: BarChart2, label: "Progress" },
 ];
 
+const TELECALLER_BOTTOM_NAV = [
+  { id: "overview", path: "/crm?tab=overview", Icon: LayoutDashboard, label: "Overview" },
+  { id: "leads", path: "/crm?tab=leads", Icon: Users, label: "My Leads" },
+  { id: "followups", path: "/crm?tab=followups", Icon: Clock, label: "Follow-ups" },
+  { id: "activities", path: "/crm?tab=activities", Icon: Calendar, label: "Visits" },
+  { id: "deals", path: "/crm?tab=deals", Icon: IndianRupee, label: "Bookings" },
+];
+
 const CRM_BOTTOM_NAV = [
   { id: "overview", path: "/crm?tab=overview", Icon: LayoutDashboard, label: "Overview" },
   { id: "leads", path: "/crm?tab=leads", Icon: Users, label: "Leads" },
   { id: "pipeline", path: "/crm?tab=pipeline", Icon: GitCommit, label: "Pipeline" },
-  { id: "followups", path: "/crm?tab=followups", Icon: Clock, label: "Follow-ups" },
-  { id: "customers", path: "/crm?tab=customers", Icon: IndianRupee, label: "Deals" },
+  { id: "team", path: "/crm?tab=team", Icon: Users, label: "Team" },
+  { id: "deals", path: "/crm?tab=deals", Icon: IndianRupee, label: "Bookings" },
 ];
 
 export default function BottomNav() {
@@ -25,8 +33,11 @@ export default function BottomNav() {
   const { user } = useAuth();
   const { mode } = useAppMode();
   const role = user?.role || 'BUILDER';
+  const crmRole = user?.crm_role || (user?.role === 'CRM_MANAGER' ? 'CRM_MANAGER' : (user?.role === 'TELECALLER' || user?.role === 'SALES_EXECUTIVE') ? 'TELECALLER' : 'BUILDER');
 
-  let navItems = mode === 'CRM' ? [...CRM_BOTTOM_NAV] : [...ERP_BOTTOM_NAV];
+  let navItems = mode === 'CRM'
+    ? (crmRole === 'TELECALLER' ? [...TELECALLER_BOTTOM_NAV] : [...CRM_BOTTOM_NAV])
+    : [...ERP_BOTTOM_NAV];
 
   if (mode === 'ERP') {
     if (role === 'ACCOUNTANT') {
