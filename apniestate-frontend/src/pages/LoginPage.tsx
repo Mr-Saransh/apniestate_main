@@ -54,9 +54,29 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
+      const cleanIdentifier = identifier.trim();
+      const cleanPassword = password.trimEnd();
+      const cleanOtp = otp.trim();
+
+      if (!cleanIdentifier) {
+        setError('Please enter your email or username.');
+        setLoading(false);
+        return;
+      }
+      if (loginMethod === 'password' && !cleanPassword) {
+        setError('Please enter your password.');
+        setLoading(false);
+        return;
+      }
+      if (loginMethod === 'otp' && !cleanOtp) {
+        setError('Please enter the OTP sent to your email.');
+        setLoading(false);
+        return;
+      }
+
       const credentials = loginMethod === 'password' 
-        ? { identifier, password } 
-        : { identifier, otp };
+        ? { identifier: cleanIdentifier, password: cleanPassword } 
+        : { identifier: cleanIdentifier, otp: cleanOtp };
       
       const response = await login(credentials);
       
@@ -89,7 +109,8 @@ export default function LoginPage() {
       
     } catch (err) {
       if (err instanceof ApiError) {
-        setError(err.message);
+        const msg = err.message === 'Authentication required' ? 'Invalid ID or password' : err.message;
+        setError(msg);
       } else {
         setError('Unable to connect to server. Please try again.');
       }

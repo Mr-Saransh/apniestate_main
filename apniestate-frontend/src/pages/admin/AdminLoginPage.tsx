@@ -18,7 +18,7 @@ export default function AdminLoginPage() {
     setLoading(true);
 
     try {
-      const res = await adminPanelApi.login(username, password);
+      const res = await adminPanelApi.login(username.trim(), password.trimEnd());
       if (res.success && res.data) {
         localStorage.setItem('admin_panel_token', res.data.token);
         navigate('/apni-admin/dashboard', { replace: true });

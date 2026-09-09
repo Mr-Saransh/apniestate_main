@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
     return badRequest(error.message);
   }
   
-  if (!result) return unauthorized();
+  if (!result) return unauthorized("Invalid ID or password");
 
   const refreshCookie = serialize("refresh_token", result.refreshToken, {
     httpOnly: true,

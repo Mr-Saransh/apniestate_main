@@ -4,7 +4,7 @@ import { useProject } from '@/context/ProjectContext';
 import { useAuth } from '@/context/AuthContext';
 import {
   ShoppingCart, Plus, FileSpreadsheet, Package, ClipboardList,
-  CheckCircle2, Archive, Truck, X, Trash2, Download, UploadCloud, Edit3, ArrowRight
+  CheckCircle2, Archive, Truck, X, Trash2, Download, UploadCloud, Edit3, ArrowRight, PackageCheck
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { purchaseApi, type PurchaseSummaryResponse, type BOQItemSummary, type MaterialRequestSummary, type OrderSummary, type ReceivedSummary, type VendorSummary, type ConsumptionLog } from '@/api/purchase';
@@ -42,6 +42,7 @@ export default function PurchaseWorkspace() {
   const [loading, setLoading] = useState(true);
   const [activeModal, setActiveModal] = useState<string | null>(null);
   const [orderPrefill, setOrderPrefill] = useState<{ materialName: string; quantity: number } | null>(null);
+  const [receivePoId, setReceivePoId] = useState<string | null>(null);
 
   const refreshData = () => {
     if (!activeProjectId) return;
@@ -163,14 +164,30 @@ export default function PurchaseWorkspace() {
             />
           )}
           {tab === 'quotations' && <QuotationsTab quotations={data?.quotations || []} />}
-          {tab === 'orders' && <OrdersTab orders={data?.orders || []} />}
+          {tab === 'orders' && (
+            <OrdersTab 
+              orders={data?.orders || []} 
+              onReceiveOrder={(poId) => {
+                setReceivePoId(poId);
+                setActiveModal('received');
+              }}
+            />
+          )}
           {tab === 'received' && <ReceivedTab received={data?.received || []} />}
           {tab === 'inventory' && <InventoryTab items={data?.inventory || []} logs={data?.consumption_logs || []} />}
           {tab === 'vendors' && <VendorsPage />}
         </div>
       </div>
 
-      <PurchaseModals activeModal={activeModal} onClose={() => { setActiveModal(null); setOrderPrefill(null); }} onRefresh={refreshData} projectId={activeProjectId!} data={data} orderPrefill={orderPrefill} />
+      <PurchaseModals 
+        activeModal={activeModal} 
+        onClose={() => { setActiveModal(null); setOrderPrefill(null); setReceivePoId(null); }} 
+        onRefresh={refreshData} 
+        projectId={activeProjectId!} 
+        data={data} 
+        orderPrefill={orderPrefill} 
+        initialPoId={receivePoId}
+      />
     </div>
   );
 }
@@ -481,7 +498,13 @@ function QuotationsTab({ quotations }: { quotations: any[] }) {
   );
 }
 
-function OrdersTab({ orders }: { orders: OrderSummary[] }) {
+function OrdersTab({ 
+  orders, 
+  onReceiveOrder 
+}: { 
+  orders: OrderSummary[]; 
+  onReceiveOrder?: (poId: string) => void;
+}) {
   if (orders.length === 0) return <div className="text-center text-muted-foreground py-10">No orders found.</div>;
   return (
     <div className="space-y-3">
@@ -499,9 +522,20 @@ function OrdersTab({ orders }: { orders: OrderSummary[] }) {
               </span>
             </div>
           </div>
-          <div className="flex gap-4 text-xs text-muted-foreground">
-            <span>Ordered: {o.date}</span>
-            <span>ETA: {o.eta}</span>
+          <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t border-border/50">
+            <div className="flex gap-4">
+              <span>Ordered: {o.date}</span>
+              <span>ETA: {o.eta}</span>
+            </div>
+            {o.status !== "DELIVERED" && onReceiveOrder && (
+              <button
+                type="button"
+                onClick={() => onReceiveOrder(o.id)}
+                className="text-xs font-bold text-[#2648E7] hover:bg-[#2648E7]/10 flex items-center gap-1.5 px-2.5 py-1 rounded-lg transition-colors border border-[#2648E7]/20"
+              >
+                <PackageCheck size={13} /> Receive Goods
+              </button>
+            )}
           </div>
         </Card>
       ))}
@@ -714,34 +748,111 @@ function InventoryTab({ items, logs }: { items: any[], logs: ConsumptionLog[] })
 }
 
 
-function PurchaseModals({ activeModal, onClose, onRefresh, projectId, data, orderPrefill }: { 
+function PurchaseModals({ 
+  activeModal, 
+  onClose, 
+  onRefresh, 
+  projectId, 
+  data, 
+  orderPrefill,
+  initialPoId 
+}: { 
   activeModal: string | null; 
   onClose: () => void; 
   onRefresh: () => void; 
   projectId: string; 
   data: PurchaseSummaryResponse | null;
   orderPrefill?: { materialName: string; quantity: number } | null;
+  initialPoId?: string | null;
 }) {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<any>({});
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
-    if (activeModal && ['boq', 'quotations', 'orders', 'received'].includes(activeModal)) {
-      if (activeModal === 'orders' && orderPrefill) {
+    setErrorMsg(null);
+    if (!activeModal) {
+      setFormData({});
+      return;
+    }
+
+    if (activeModal === 'received') {
+      const orders = data?.orders || [];
+      const targetPo = (initialPoId ? orders.find(o => o.id === initialPoId) : null) || orders[0];
+      if (targetPo) {
+        const prefilledItems = (targetPo.items && targetPo.items.length > 0)
+          ? targetPo.items.map(it => ({
+              poItemId: it.id,
+              materialId: it.materialId,
+              materialName: it.materialName,
+              unit: it.unit,
+              orderedQty: it.orderedQty,
+              pendingQty: it.pendingQty,
+              receivedQty: it.pendingQty > 0 ? it.pendingQty : it.orderedQty
+            }))
+          : [{ poItemId: targetPo.id, materialName: targetPo.name, receivedQty: 1, unit: 'units' }];
+
         setFormData({
-          items: [{ materialName: orderPrefill.materialName, quantity: orderPrefill.quantity, unit: 'bags' }]
+          poId: targetPo.id,
+          quality: 'GOOD',
+          items: prefilledItems
         });
       } else {
-        setFormData({ items: [{}] });
+        setFormData({ quality: 'GOOD', items: [] });
       }
-    } else if (activeModal === 'inventory') {
-      setFormData({ items: [] });
-    } else {
-      setFormData({});
+      return;
     }
-  }, [activeModal, orderPrefill]);
+
+    if (activeModal === 'orders' && orderPrefill) {
+      setFormData({
+        items: [{ materialName: orderPrefill.materialName, quantity: orderPrefill.quantity, unit: 'bags' }]
+      });
+      return;
+    }
+
+    if (['boq', 'quotations', 'orders'].includes(activeModal)) {
+      setFormData({ items: [{}] });
+      return;
+    }
+
+    if (activeModal === 'inventory') {
+      setFormData({ items: [] });
+      return;
+    }
+
+    setFormData({});
+  }, [activeModal, orderPrefill, initialPoId, data]);
 
   if (!activeModal) return null;
+
+  const handlePoChange = (selectedPoId: string) => {
+    const selectedPo = data?.orders?.find(o => o.id === selectedPoId);
+    if (selectedPo) {
+      const prefilledItems = (selectedPo.items && selectedPo.items.length > 0)
+        ? selectedPo.items.map(it => ({
+            poItemId: it.id,
+            materialId: it.materialId,
+            materialName: it.materialName,
+            unit: it.unit,
+            orderedQty: it.orderedQty,
+            pendingQty: it.pendingQty,
+            receivedQty: it.pendingQty > 0 ? it.pendingQty : it.orderedQty
+          }))
+        : [{ poItemId: selectedPo.id, materialName: selectedPo.name, receivedQty: 1, unit: 'units' }];
+
+      setFormData((prev: any) => ({
+        ...prev,
+        poId: selectedPoId,
+        items: prefilledItems
+      }));
+    } else {
+      setFormData((prev: any) => ({
+        ...prev,
+        poId: selectedPoId,
+        items: []
+      }));
+    }
+  };
 
   const handleItemChange = (index: number, field: string, value: any) => {
     const newItems = [...(formData.items || [])];
@@ -749,7 +860,7 @@ function PurchaseModals({ activeModal, onClose, onRefresh, projectId, data, orde
     setFormData({ ...formData, items: newItems });
   };
 
-  const handleInventoryConsumeChange = (materialName: string, quantity: string) => {
+  const handleInventoryConsumeChange = (materialName: string, quantity: string, maxStock: number) => {
     const qty = parseInt(quantity, 10);
     const existingItems = formData.items || [];
     
@@ -758,15 +869,31 @@ function PurchaseModals({ activeModal, onClose, onRefresh, projectId, data, orde
         ...formData,
         items: existingItems.filter((i: any) => i.materialName !== materialName)
       });
+      return;
+    }
+
+    if (qty > maxStock) {
+      setErrorMsg(`Cannot consume ${qty} of "${materialName}". Available stock is only ${maxStock}.`);
     } else {
-      const idx = existingItems.findIndex((i: any) => i.materialName === materialName);
-      if (idx >= 0) {
-        const newItems = [...existingItems];
-        newItems[idx].quantity = qty;
-        setFormData({ ...formData, items: newItems });
-      } else {
-        setFormData({ ...formData, items: [...existingItems, { materialName, quantity: qty }] });
-      }
+      setErrorMsg(null);
+    }
+
+    const cappedQty = Math.min(qty, Math.max(0, maxStock));
+    if (cappedQty <= 0) {
+      setFormData({
+        ...formData,
+        items: existingItems.filter((i: any) => i.materialName !== materialName)
+      });
+      return;
+    }
+
+    const idx = existingItems.findIndex((i: any) => i.materialName === materialName);
+    if (idx >= 0) {
+      const newItems = [...existingItems];
+      newItems[idx].quantity = cappedQty;
+      setFormData({ ...formData, items: newItems });
+    } else {
+      setFormData({ ...formData, items: [...existingItems, { materialName, quantity: cappedQty }] });
     }
   };
 
@@ -784,6 +911,7 @@ function PurchaseModals({ activeModal, onClose, onRefresh, projectId, data, orde
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setErrorMsg(null);
     let action = '';
     if (activeModal === 'requests') action = 'CREATE_REQUEST';
     if (activeModal === 'boq') action = 'CREATE_BOQ_ITEM';
@@ -795,6 +923,52 @@ function PurchaseModals({ activeModal, onClose, onRefresh, projectId, data, orde
 
     try {
       let payload = { ...formData, projectId };
+
+      if (activeModal === 'received') {
+        if (!payload.poId) {
+          setErrorMsg('Please select a purchase order.');
+          setLoading(false);
+          return;
+        }
+        if (!payload.items || payload.items.length === 0) {
+          setErrorMsg('No items selected to receive.');
+          setLoading(false);
+          return;
+        }
+        const validItems = payload.items.filter((it: any) => Number(it.receivedQty) > 0);
+        if (validItems.length === 0) {
+          setErrorMsg('Please enter a received quantity greater than 0 for at least one item.');
+          setLoading(false);
+          return;
+        }
+        payload.items = validItems;
+      }
+
+      if (activeModal === 'inventory') {
+        const validItems = (payload.items || []).filter((it: any) => Number(it.quantity) > 0);
+        if (validItems.length === 0) {
+          setErrorMsg('Please specify at least one material with quantity greater than 0 to consume.');
+          setLoading(false);
+          return;
+        }
+
+        for (const it of validItems) {
+          const invItem = data?.inventory?.find(i => i.material === it.materialName);
+          const stock = invItem ? Number(invItem.stock) || 0 : 0;
+          if (stock <= 0) {
+            setErrorMsg(`Cannot consume "${it.materialName}". It is currently out of stock (0 available).`);
+            setLoading(false);
+            return;
+          }
+          if (Number(it.quantity) > stock) {
+            setErrorMsg(`Cannot consume ${it.quantity} of "${it.materialName}". Available stock is only ${stock}.`);
+            setLoading(false);
+            return;
+          }
+        }
+        payload.items = validItems;
+      }
+
       if (activeModal === 'received' && formData.billFile) {
         const uploadData = new FormData();
         uploadData.append('file', formData.billFile);
@@ -819,8 +993,10 @@ function PurchaseModals({ activeModal, onClose, onRefresh, projectId, data, orde
       onRefresh();
       onClose();
       setFormData({});
-    } catch (err) {
+      setErrorMsg(null);
+    } catch (err: any) {
       console.error(err);
+      setErrorMsg(err?.message || err?.error || 'An error occurred while saving details.');
     } finally {
       setLoading(false);
     }
@@ -847,6 +1023,14 @@ function PurchaseModals({ activeModal, onClose, onRefresh, projectId, data, orde
         </div>
 
         <div className="p-6 overflow-y-auto">
+          {errorMsg && (
+            <div className="p-3.5 bg-red-50 text-red-700 rounded-2xl text-xs font-semibold border border-red-200 mb-4 flex items-center justify-between">
+              <span>{errorMsg}</span>
+              <button type="button" onClick={() => setErrorMsg(null)} className="text-red-500 hover:text-red-800 p-1">
+                <X size={14} />
+              </button>
+            </div>
+          )}
           <form id="purchase-form" onSubmit={handleSubmit} className="space-y-4">
 
             {activeModal === 'requests' && (
@@ -992,47 +1176,152 @@ function PurchaseModals({ activeModal, onClose, onRefresh, projectId, data, orde
               <>
                 <div className="space-y-1.5">
                   <label className="text-sm font-bold text-foreground">Purchase Order</label>
-                  <select required className="w-full bg-white border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900" value={formData.poId || ''} onChange={e => {
-                    setFormData({ ...formData, poId: e.target.value, items: [{}] }); // Reset items when PO changes, in reality we should auto-populate
-                  }}>
-                    <option value="" disabled>Select Purchase Order</option>
-                    {data?.orders?.map(o => <option key={o.id} value={o.id}>{o.name} ({o.vendor})</option>)}
-                  </select>
+                  {(!data?.orders || data.orders.length === 0) ? (
+                    <div className="p-3 bg-amber-50 text-amber-800 rounded-xl text-xs border border-amber-200">
+                      No purchase orders found for this project. Please create a purchase order first.
+                    </div>
+                  ) : (
+                    <select
+                      required
+                      className="w-full bg-white border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900 font-medium"
+                      value={formData.poId || ''}
+                      onChange={e => handlePoChange(e.target.value)}
+                    >
+                      <option value="" disabled>Select Purchase Order</option>
+                      {data.orders.map(o => (
+                        <option key={o.id} value={o.id}>
+                          {o.name} ({o.vendor}) — {o.status}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
+
                 <div className="space-y-1.5">
                   <label className="text-sm font-bold text-foreground">Quality Status</label>
-                  <select className="w-full bg-white border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900" value={formData.quality || 'GOOD'} onChange={e => setFormData({ ...formData, quality: e.target.value })}>
+                  <select
+                    className="w-full bg-white border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900 font-medium"
+                    value={formData.quality || 'GOOD'}
+                    onChange={e => setFormData({ ...formData, quality: e.target.value })}
+                  >
                     <option value="GOOD">Good / Accepted</option>
-                    <option value="REJECTED">Rejected</option>
                     <option value="PARTIAL">Partial Damage</option>
+                    <option value="REJECTED">Rejected</option>
                   </select>
                 </div>
 
                 <div className="mt-4 mb-2 flex items-center justify-between">
-                  <label className="text-sm font-bold text-foreground">Items Received</label>
-                  <button type="button" onClick={addItemRow} className="text-xs font-bold text-[#2648E7] hover:underline flex items-center gap-1">
+                  <div>
+                    <label className="text-sm font-bold text-foreground">Items Received</label>
+                    <p className="text-[11px] text-muted-foreground">
+                      Auto-filled from order. Edit received quantities if partial delivery.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormData({
+                        ...formData,
+                        items: [
+                          ...(formData.items || []),
+                          { materialName: '', unit: 'units', orderedQty: 0, receivedQty: 1 }
+                        ]
+                      });
+                    }}
+                    className="text-xs font-bold text-[#2648E7] hover:underline flex items-center gap-1 shrink-0"
+                  >
                     <Plus size={12} /> Add Item Row
                   </button>
                 </div>
 
                 <div className="space-y-3">
-                  {formData.items?.map((item: any, idx: number) => (
-                    <div key={idx} className="p-3 bg-muted/50 border border-border rounded-xl relative group flex gap-3">
-                      <button type="button" onClick={() => removeItemRow(idx)} className="absolute -top-2 -right-2 bg-red-100 text-red-600 rounded-full p-1 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity">
-                        <X size={14} />
-                      </button>
-                      <input required type="text" className="w-full bg-white border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900" placeholder="Material Name from PO" value={item.poItemId || ''} onChange={e => handleItemChange(idx, 'poItemId', e.target.value)} />
-                      <input required type="number" min="0" className="w-32 shrink-0 bg-white border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900" placeholder="Recv Qty" value={item.receivedQty || ''} onChange={e => handleItemChange(idx, 'receivedQty', e.target.value)} />
+                  {(!formData.items || formData.items.length === 0) ? (
+                    <div className="text-center p-4 bg-muted/30 border border-dashed border-border rounded-xl text-xs text-muted-foreground">
+                      No items found in selected order. Click "+ Add Item Row" to enter manually.
                     </div>
-                  ))}
-                  <p className="text-[10px] text-muted-foreground leading-snug">
-                    * Normally this would auto-populate with the PO's items. For this demo, just enter the exact Material ID or Name corresponding to the PO item.
-                  </p>
+                  ) : (
+                    formData.items.map((item: any, idx: number) => {
+                      const isPrepopulated = !!item.poItemId;
+                      return (
+                        <div key={idx} className="p-3.5 bg-muted/40 border border-border rounded-2xl relative group hover:border-[#2648E7]/40 transition-colors">
+                          <button
+                            type="button"
+                            onClick={() => removeItemRow(idx)}
+                            className="absolute -top-2 -right-2 bg-red-100 text-red-600 rounded-full p-1 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-200"
+                            title="Remove this item"
+                          >
+                            <X size={14} />
+                          </button>
+
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+                            <div className="flex-1 min-w-0">
+                              {isPrepopulated ? (
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-bold text-sm text-foreground truncate">
+                                      {item.materialName || 'Material Item'}
+                                    </span>
+                                    {item.unit && (
+                                      <span className="text-[11px] px-2 py-0.5 rounded-md bg-blue-50 text-[#2648E7] font-semibold">
+                                        {item.unit}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground mt-0.5 flex gap-2">
+                                    <span>Ordered: <strong>{item.orderedQty ?? '-'} {item.unit || ''}</strong></span>
+                                    {item.pendingQty !== undefined && item.pendingQty !== item.orderedQty && (
+                                      <span>· Remaining: <strong>{item.pendingQty}</strong></span>
+                                    )}
+                                  </div>
+                                </div>
+                              ) : (
+                                <input
+                                  required
+                                  type="text"
+                                  className="w-full bg-white border border-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900"
+                                  placeholder="Material Name"
+                                  value={item.materialName || ''}
+                                  onChange={e => handleItemChange(idx, 'materialName', e.target.value)}
+                                />
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                              <label className="text-xs font-semibold text-muted-foreground whitespace-nowrap">
+                                Recv Qty:
+                              </label>
+                              <div className="relative flex items-center">
+                                <input
+                                  required
+                                  type="number"
+                                  min="0"
+                                  step="any"
+                                  className="w-24 bg-white border border-border rounded-xl px-3 py-2 text-sm font-bold text-foreground focus:outline-none focus:border-[#2648E7] text-right pr-2"
+                                  value={item.receivedQty !== undefined ? item.receivedQty : ''}
+                                  onChange={e => handleItemChange(idx, 'receivedQty', e.target.value)}
+                                />
+                                {item.unit && (
+                                  <span className="text-xs text-muted-foreground ml-1.5">
+                                    {item.unit}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
 
                 <div className="space-y-1.5 mt-4">
-                  <label className="text-sm font-bold text-foreground">Upload Bill (Optional)</label>
-                  <input type="file" accept="image/*,.pdf" className="w-full bg-white border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-bold file:bg-[#2648E7]/10 file:text-[#2648E7] hover:file:bg-[#2648E7]/20 transition-all cursor-pointer" onChange={e => setFormData({ ...formData, billFile: e.target.files?.[0] })} />
+                  <label className="text-sm font-bold text-foreground">Upload Bill / Challan (Optional)</label>
+                  <input
+                    type="file"
+                    accept="image/*,.pdf"
+                    className="w-full bg-white border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-bold file:bg-[#2648E7]/10 file:text-[#2648E7] hover:file:bg-[#2648E7]/20 transition-all cursor-pointer"
+                    onChange={e => setFormData({ ...formData, billFile: e.target.files?.[0] })}
+                  />
                 </div>
               </>
             )}
@@ -1041,33 +1330,52 @@ function PurchaseModals({ activeModal, onClose, onRefresh, projectId, data, orde
               <>
                 <div className="mt-4 mb-2">
                   <label className="text-sm font-bold text-foreground">Materials Consumed</label>
-                  <p className="text-xs text-muted-foreground mt-1">Specify what you have consumed and how much. Only items with quantity &gt; 0 will be logged.</p>
+                  <p className="text-xs text-muted-foreground mt-1">Specify what you have consumed and how much. Only items with available stock can be consumed.</p>
                 </div>
                 <div className="space-y-2 mt-4 max-h-[350px] overflow-y-auto pr-2">
-                  {data?.inventory?.length === 0 ? (
+                  {(!data?.inventory || data.inventory.length === 0) ? (
                     <p className="text-sm text-muted-foreground py-4">No inventory available to consume.</p>
                   ) : (
-                    data?.inventory?.map(i => {
+                    data.inventory.map(i => {
+                      const stock = Number(i.stock) || 0;
+                      const isOutOfStock = stock <= 0;
                       const selected = formData.items?.find((item: any) => item.materialName === i.material) || {};
                       return (
-                        <div key={i.id} className="flex items-center justify-between p-3 bg-muted/50 border border-border rounded-xl">
+                        <div key={i.id} className={`flex items-center justify-between p-3.5 border rounded-2xl transition-colors ${isOutOfStock ? 'bg-muted/30 border-border/60 opacity-60' : 'bg-white border-border hover:border-[#2648E7]/40'}`}>
                           <div>
-                            <p className="text-sm font-bold text-foreground">{i.material}</p>
-                            <p className="text-xs text-muted-foreground">Available Stock: {i.stock}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-bold text-foreground">{i.material}</p>
+                              {isOutOfStock && (
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 border border-rose-200">
+                                  Out of Stock
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              Available Stock: <strong className={isOutOfStock ? 'text-rose-600' : 'text-foreground'}>{i.stock}</strong>
+                            </p>
                           </div>
                           <div className="flex items-center gap-2">
-                            <input 
-                              type="number" 
-                              min="0" 
-                              max={i.stock}
-                              placeholder="Qty Consumed"
-                              className="w-32 bg-white border border-border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900" 
-                              value={selected.quantity || ''}
-                              onChange={e => handleInventoryConsumeChange(i.material, e.target.value)}
-                            />
+                            {isOutOfStock ? (
+                              <span className="text-xs font-semibold text-muted-foreground italic px-3 py-1.5 bg-muted rounded-xl">
+                                0 Available
+                              </span>
+                            ) : (
+                              <div className="relative flex items-center">
+                                <input 
+                                  type="number" 
+                                  min="1" 
+                                  max={stock}
+                                  placeholder="Qty to use"
+                                  className="w-28 bg-white border border-border rounded-xl px-3 py-2 text-sm font-bold text-foreground focus:outline-none focus:border-[#2648E7] text-right" 
+                                  value={selected.quantity || ''}
+                                  onChange={e => handleInventoryConsumeChange(i.material, e.target.value, stock)}
+                                />
+                              </div>
+                            )}
                           </div>
                         </div>
-                      )
+                      );
                     })
                   )}
                 </div>
@@ -1082,7 +1390,7 @@ function PurchaseModals({ activeModal, onClose, onRefresh, projectId, data, orde
             Cancel
           </button>
           <button type="submit" form="purchase-form" disabled={loading} className="flex-1 py-3 rounded-2xl font-bold text-sm text-white shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: "#2648E7" }}>
-            {loading ? 'Saving...' : 'Save Details'}
+            {loading ? 'Saving...' : activeModal === 'received' ? 'Receive Goods' : activeModal === 'inventory' ? 'Consume Material' : 'Save Details'}
           </button>
         </div>
       </div>

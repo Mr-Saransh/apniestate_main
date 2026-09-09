@@ -12,9 +12,9 @@ export const badRequest = (message: string, details?: unknown) =>
     { status: 400 }
   );
 
-export const unauthorized = () =>
+export const unauthorized = (message = "Invalid ID or password") =>
   Response.json(
-    { success: false, error: { code: "UNAUTHORIZED", message: "Authentication required" } },
+    { success: false, error: { code: "UNAUTHORIZED", message } },
     { status: 401 }
   );
 

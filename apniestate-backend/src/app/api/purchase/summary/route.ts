@@ -79,6 +79,16 @@ export const GET = withAuth(async (request: Request, user: any) => {
       status: o.status,
       date: new Date(o.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
       eta: o.delivery_date ? new Date(o.delivery_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : 'Pending',
+      items: o.items.map(i => ({
+        id: i.id,
+        materialId: i.material_id,
+        materialName: i.material.name,
+        unit: i.material.unit,
+        orderedQty: i.quantity,
+        receivedQty: i.received_quantity || 0,
+        pendingQty: Math.max(0, i.quantity - (i.received_quantity || 0)) || i.quantity,
+        unitPrice: i.unit_price
+      }))
     }));
 
     // Vendors

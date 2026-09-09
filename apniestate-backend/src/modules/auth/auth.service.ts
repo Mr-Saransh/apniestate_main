@@ -6,26 +6,34 @@ import { hashToken } from "./token.util";
 import type { LoginInput } from "./auth.schema";
 
 export async function loginUser(input: LoginInput) {
+  const cleanIdentifier = (input.identifier || "").trim();
   const user = await prisma.user.findFirst({
     where: {
       OR: [
-        { email: input.identifier },
-        { username: input.identifier }
+        { email: { equals: cleanIdentifier, mode: "insensitive" } },
+        { username: { equals: cleanIdentifier, mode: "insensitive" } }
       ]
     }
   });
   if (!user || !user.is_active) return null;
 
   if (input.otp) {
+    const cleanOtp = input.otp.trim();
     const otpRecord = await prisma.otpVerification.findFirst({
-      where: { email: user.email!, otp: input.otp }
+      where: { email: user.email!, otp: cleanOtp }
     });
     if (!otpRecord || otpRecord.expires_at < new Date()) {
       throw new Error("Invalid or expired OTP");
     }
     await prisma.otpVerification.delete({ where: { id: otpRecord.id } });
   } else if (input.password) {
-    const valid = await bcrypt.compare(input.password, user.password_hash);
+    let valid = await bcrypt.compare(input.password, user.password_hash);
+    if (!valid && input.password.trim() !== input.password) {
+      valid = await bcrypt.compare(input.password.trim(), user.password_hash);
+    }
+    if (!valid && input.password.trimEnd() !== input.password) {
+      valid = await bcrypt.compare(input.password.trimEnd(), user.password_hash);
+    }
     if (!valid) return null;
   } else {
     return null;

@@ -16,6 +16,17 @@ export interface MaterialRequestSummary {
   date: string;
 }
 
+export interface OrderItemSummary {
+  id: string;
+  materialId: string;
+  materialName: string;
+  unit: string;
+  orderedQty: number;
+  receivedQty: number;
+  pendingQty: number;
+  unitPrice?: number;
+}
+
 export interface OrderSummary {
   id: string;
   name: string;
@@ -24,6 +35,7 @@ export interface OrderSummary {
   status: string;
   date: string;
   eta: string;
+  items?: OrderItemSummary[];
 }
 
 export interface VendorSummary {

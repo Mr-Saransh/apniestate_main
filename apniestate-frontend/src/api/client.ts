@@ -58,13 +58,18 @@ class ApiClient {
       }
 
       if (!response.ok) {
-        if (response.status === 401) {
+        if (response.status === 401 && !endpoint.includes('/auth/login')) {
           window.dispatchEvent(new CustomEvent('auth:unauthorized'));
         }
+        const errorMsg =
+          (typeof json?.error === 'string' ? json.error : json?.error?.message) ||
+          json?.message ||
+          'Something went wrong';
+
         throw new ApiError(
-          json.error?.message || 'Something went wrong',
+          errorMsg,
           response.status,
-          json.error?.code
+          typeof json?.error === 'object' ? json.error?.code : undefined
         );
       }
 

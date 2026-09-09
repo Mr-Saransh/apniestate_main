@@ -253,22 +253,74 @@ export const POST = withAuth(async (request: Request, user: any) => {
       });
       if (!po) return NextResponse.json({ error: 'Purchase Order not found' }, { status: 400 });
       let siteId = po.site_id;
-      if (!siteId) return NextResponse.json({ error: 'PO has no site' }, { status: 400 });
+      if (!siteId) {
+        const site = await prisma.site.findFirst({ where: { project_id: po.project_id || projectId } });
+        if (site) {
+          siteId = site.id;
+        } else {
+          const newSite = await prisma.site.create({
+            data: {
+              project_id: po.project_id || projectId,
+              company_id: user.company_id,
+              name: "Main Site",
+              location: "Main Location",
+              status: "IN_PROGRESS"
+            }
+          });
+          siteId = newSite.id;
+        }
+      }
 
       const result = await prisma.$transaction(async (tx) => {
         const grnItemsData = [];
-        for (const item of items) {
+        for (const item of (items || [])) {
           const parsedQty = Number(item.receivedQty) || 0;
           if (parsedQty <= 0) continue;
           
-          const searchVal = String(item.poItemId || "").toLowerCase();
-          const poItem = po.items.find(i => 
-            i.id === searchVal || 
-            i.material_id === searchVal || 
-            i.material?.name.toLowerCase() === searchVal
-          );
+          const searchVal = String(item.poItemId || item.id || "").trim().toLowerCase();
+          const matSearch = String(item.materialName || "").trim().toLowerCase();
           
-          if (!poItem) continue;
+          let poItem = po.items.find(i => 
+            i.id === item.poItemId || 
+            i.material_id === item.materialId ||
+            (searchVal && (i.id.toLowerCase() === searchVal || i.material_id.toLowerCase() === searchVal)) ||
+            (matSearch && i.material?.name.toLowerCase() === matSearch) ||
+            (searchVal && i.material?.name.toLowerCase() === searchVal)
+          );
+
+          if (!poItem && po.items.length === 1 && !matSearch) {
+            poItem = po.items[0];
+          }
+          
+          if (!poItem) {
+            const rawName = item.materialName || item.poItemId;
+            if (rawName) {
+              let material = await tx.material.findFirst({
+                where: {
+                  company_id: user.company_id,
+                  name: { equals: rawName, mode: 'insensitive' }
+                }
+              });
+              if (!material) {
+                material = await tx.material.create({
+                  data: {
+                    name: rawName,
+                    unit: item.unit || 'units',
+                    company_id: user.company_id
+                  }
+                });
+              }
+              if (material) {
+                grnItemsData.push({
+                  material_id: material.id,
+                  ordered_qty: parsedQty,
+                  received_qty: parsedQty
+                });
+              }
+            }
+            continue;
+          }
+
           grnItemsData.push({
             material_id: poItem.material_id,
             ordered_qty: poItem.quantity,
@@ -276,7 +328,7 @@ export const POST = withAuth(async (request: Request, user: any) => {
           });
         }
         
-        if (grnItemsData.length === 0) throw new Error("No valid items to receive");
+        if (grnItemsData.length === 0) throw new Error("No valid items to receive or received quantity is 0");
 
         const newGrn = await tx.goodsReceiptNote.create({
           data: {
@@ -329,6 +381,17 @@ export const POST = withAuth(async (request: Request, user: any) => {
             data: { item_id: invItem.id, type: 'GRN_RECEIPT', quantity: item.received_qty, user_id: user.sub }
           });
         }
+
+        // Check if all items in the PO have been fully received
+        const updatedPoItems = await tx.purchaseOrderItem.findMany({
+          where: { purchase_order_id: poId }
+        });
+        const allReceived = updatedPoItems.length > 0 && updatedPoItems.every(pi => (pi.received_quantity || 0) >= pi.quantity);
+        await tx.purchaseOrder.update({
+          where: { id: poId },
+          data: { status: allReceived ? 'DELIVERED' : 'PARTIAL' }
+        });
+
         return newGrn;
       });
 
@@ -344,21 +407,67 @@ export const POST = withAuth(async (request: Request, user: any) => {
         });
       }
       
+      const validItems = (items || []).filter((i: any) => Number(i.quantity) > 0);
+      if (validItems.length === 0) {
+        return NextResponse.json({ error: 'Please specify at least one material with quantity > 0 to consume' }, { status: 400 });
+      }
+
+      // Pre-check stock levels to provide clear, actionable feedback
+      for (const item of validItems) {
+        const parsedQty = Number(item.quantity) || 0;
+        const material = await prisma.material.findFirst({
+          where: {
+            company_id: user.company_id,
+            name: { equals: item.materialName, mode: 'insensitive' }
+          }
+        });
+
+        if (!material) {
+          return NextResponse.json({
+            error: `Material "${item.materialName}" is not registered in site inventory (0 available).`
+          }, { status: 400 });
+        }
+
+        const invItem = await prisma.inventoryItem.findFirst({
+          where: { site_id: site.id, material_id: material.id }
+        });
+
+        const currentStock = invItem ? invItem.quantity : 0;
+        if (currentStock <= 0) {
+          return NextResponse.json({
+            error: `Cannot consume "${item.materialName}". It is currently out of stock (0 available).`
+          }, { status: 400 });
+        }
+        if (currentStock < parsedQty) {
+          return NextResponse.json({
+            error: `Cannot consume ${parsedQty} of "${item.materialName}". Available stock is only ${currentStock}.`
+          }, { status: 400 });
+        }
+      }
+
       const result = await prisma.$transaction(async (tx) => {
         const consumptions = [];
-        for (const item of items) {
+        for (const item of validItems) {
           const parsedQty = Number(item.quantity) || 0;
-          if (parsedQty <= 0) continue;
           
-          let material = await tx.material.findFirst({ where: { name: item.materialName } });
+          let material = await tx.material.findFirst({
+            where: {
+              company_id: user.company_id,
+              name: { equals: item.materialName, mode: 'insensitive' }
+            }
+          });
           if (!material) {
-            material = await tx.material.create({ data: { name: item.materialName, company_id: user.company_id, unit: item.unit || 'pcs' } });
+            material = await tx.material.create({
+              data: { name: item.materialName, company_id: user.company_id, unit: item.unit || 'pcs' }
+            });
           }
           
-          let invItem = await tx.inventoryItem.findFirst({
+          const invItem = await tx.inventoryItem.findFirst({
             where: { site_id: site.id, material_id: material.id }
           });
-          if (!invItem || invItem.quantity < parsedQty) throw new Error(`Insufficient inventory for ${item.materialName}`);
+          if (!invItem || invItem.quantity < parsedQty) {
+            throw new Error(`Insufficient stock for "${item.materialName}". Available: ${invItem ? invItem.quantity : 0}`);
+          }
 
           await tx.inventoryItem.update({
             where: { id: invItem.id },
@@ -399,6 +508,6 @@ export const POST = withAuth(async (request: Request, user: any) => {
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
   } catch (error: any) {
     console.error('Purchase Actions API Error:', error);
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 400 });
   }
 });
