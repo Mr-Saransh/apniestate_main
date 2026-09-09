@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useProject } from '@/context/ProjectContext';
 import { useAuth } from '@/context/AuthContext';
@@ -505,40 +505,115 @@ function OrdersTab({
   orders: OrderSummary[]; 
   onReceiveOrder?: (poId: string) => void;
 }) {
+  const [filter, setFilter] = useState<'pending' | 'delivered' | 'all'>('pending');
+
+  const pendingOrders = orders.filter(o => o.status !== 'DELIVERED' && (!o.items || o.items.length === 0 || o.items.some(i => (i.pendingQty ?? i.orderedQty) > 0)));
+  const deliveredOrders = orders.filter(o => o.status === 'DELIVERED' || (o.items && o.items.length > 0 && o.items.every(i => (i.pendingQty ?? 0) <= 0)));
+
+  const displayedOrders = filter === 'pending' ? pendingOrders : filter === 'delivered' ? deliveredOrders : orders;
+
   if (orders.length === 0) return <div className="text-center text-muted-foreground py-10">No orders found.</div>;
+
   return (
-    <div className="space-y-3">
-      {orders.map((o) => (
-        <Card key={o.id} className="p-4">
-          <div className="flex items-start justify-between mb-3">
-            <div className="flex-1 min-w-0 pr-3">
-              <p className="font-bold text-foreground">{o.name}</p>
-              <p className="text-sm text-muted-foreground">{o.vendor}</p>
-            </div>
-            <div className="text-right shrink-0">
-              <p className="font-bold text-foreground">{o.amount}</p>
-              <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${o.status === "DELIVERED" ? "bg-emerald-50 text-emerald-700" : "bg-blue-50 text-[#2648E7]"}`}>
-                {o.status}
-              </span>
-            </div>
-          </div>
-          <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t border-border/50">
-            <div className="flex gap-4">
-              <span>Ordered: {o.date}</span>
-              <span>ETA: {o.eta}</span>
-            </div>
-            {o.status !== "DELIVERED" && onReceiveOrder && (
-              <button
-                type="button"
-                onClick={() => onReceiveOrder(o.id)}
-                className="text-xs font-bold text-[#2648E7] hover:bg-[#2648E7]/10 flex items-center gap-1.5 px-2.5 py-1 rounded-lg transition-colors border border-[#2648E7]/20"
-              >
-                <PackageCheck size={13} /> Receive Goods
-              </button>
-            )}
-          </div>
-        </Card>
-      ))}
+    <div className="space-y-4">
+      <div className="flex p-1 bg-muted rounded-xl gap-1">
+        <button
+          type="button"
+          onClick={() => setFilter('pending')}
+          className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 ${filter === 'pending' ? 'bg-background shadow text-[#2648E7]' : 'text-muted-foreground hover:text-foreground'}`}
+        >
+          <span>Active Orders</span>
+          <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${filter === 'pending' ? 'bg-[#2648E7]/10 text-[#2648E7]' : 'bg-muted-foreground/20'}`}>
+            {pendingOrders.length}
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setFilter('delivered')}
+          className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 ${filter === 'delivered' ? 'bg-background shadow text-emerald-700' : 'text-muted-foreground hover:text-foreground'}`}
+        >
+          <span>Delivered / Received</span>
+          <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${filter === 'delivered' ? 'bg-emerald-100 text-emerald-800' : 'bg-muted-foreground/20'}`}>
+            {deliveredOrders.length}
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setFilter('all')}
+          className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 ${filter === 'all' ? 'bg-background shadow text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+        >
+          <span>All</span>
+          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted-foreground/20">
+            {orders.length}
+          </span>
+        </button>
+      </div>
+
+      {displayedOrders.length === 0 ? (
+        <div className="text-center text-muted-foreground py-12 bg-white rounded-2xl border border-border p-6">
+          <CheckCircle2 size={36} className="mx-auto text-emerald-500 mb-2" />
+          <p className="font-bold text-foreground">
+            {filter === 'pending' ? 'No pending orders waiting to be received!' : 'No orders in this view.'}
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            {filter === 'pending' ? 'All received items have moved to the Received & Inventory tabs.' : ''}
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {displayedOrders.map((o) => {
+            const isDelivered = o.status === "DELIVERED" || (o.items && o.items.length > 0 && o.items.every(i => (i.pendingQty ?? 0) <= 0));
+            return (
+              <Card key={o.id} className="p-4">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex-1 min-w-0 pr-3">
+                    <p className="font-bold text-foreground">{o.name}</p>
+                    <p className="text-sm text-muted-foreground">{o.vendor}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="font-bold text-foreground">{o.amount}</p>
+                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${isDelivered ? "bg-emerald-50 text-emerald-700" : "bg-blue-50 text-[#2648E7]"}`}>
+                      {isDelivered ? "DELIVERED" : o.status}
+                    </span>
+                  </div>
+                </div>
+
+                {o.items && o.items.length > 0 && (
+                  <div className="mb-3 p-2.5 bg-muted/40 rounded-xl space-y-1.5 border border-border/50">
+                    {o.items.map((it, idx) => {
+                      const itReceived = (it.receivedQty || 0) >= it.orderedQty || (it.pendingQty !== undefined && it.pendingQty <= 0);
+                      return (
+                        <div key={idx} className="flex items-center justify-between text-xs">
+                          <span className="font-medium text-foreground">{it.materialName}</span>
+                          <span className={`font-bold text-[11px] px-2 py-0.5 rounded-md ${itReceived ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
+                            {itReceived ? `✓ Received (${it.receivedQty} ${it.unit})` : `Pending: ${it.pendingQty ?? it.orderedQty} ${it.unit}`}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t border-border/50">
+                  <div className="flex gap-4">
+                    <span>Ordered: {o.date}</span>
+                    <span>ETA: {o.eta}</span>
+                  </div>
+                  {!isDelivered && onReceiveOrder && (
+                    <button
+                      type="button"
+                      onClick={() => onReceiveOrder(o.id)}
+                      className="text-xs font-bold text-[#2648E7] hover:bg-[#2648E7]/10 flex items-center gap-1.5 px-2.5 py-1 rounded-lg transition-colors border border-[#2648E7]/20"
+                    >
+                      <PackageCheck size={13} /> Receive Goods
+                    </button>
+                  )}
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -769,6 +844,16 @@ function PurchaseModals({
   const [formData, setFormData] = useState<any>({});
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  const eligibleOrders = useMemo(() => {
+    return (data?.orders || []).filter(o => {
+      if (o.status === 'DELIVERED') return false;
+      if (o.items && o.items.length > 0) {
+        return o.items.some(it => (it.pendingQty !== undefined ? it.pendingQty > 0 : (it.orderedQty - (it.receivedQty || 0)) > 0));
+      }
+      return true;
+    });
+  }, [data]);
+
   useEffect(() => {
     setErrorMsg(null);
     if (!activeModal) {
@@ -777,20 +862,26 @@ function PurchaseModals({
     }
 
     if (activeModal === 'received') {
-      const orders = data?.orders || [];
-      const targetPo = (initialPoId ? orders.find(o => o.id === initialPoId) : null) || orders[0];
+      const allOrders = data?.orders || [];
+      const targetPo = (initialPoId ? allOrders.find(o => o.id === initialPoId) : null) || eligibleOrders[0];
       if (targetPo) {
-        const prefilledItems = (targetPo.items && targetPo.items.length > 0)
-          ? targetPo.items.map(it => ({
+        const pendingItems = (targetPo.items && targetPo.items.length > 0)
+          ? targetPo.items.filter(it => (it.pendingQty !== undefined ? it.pendingQty > 0 : (it.orderedQty - (it.receivedQty || 0)) > 0))
+          : [];
+
+        const prefilledItems = pendingItems.length > 0
+          ? pendingItems.map(it => ({
               poItemId: it.id,
               materialId: it.materialId,
               materialName: it.materialName,
               unit: it.unit,
               orderedQty: it.orderedQty,
               pendingQty: it.pendingQty,
-              receivedQty: it.pendingQty > 0 ? it.pendingQty : it.orderedQty
+              receivedQty: it.pendingQty
             }))
-          : [{ poItemId: targetPo.id, materialName: targetPo.name, receivedQty: 1, unit: 'units' }];
+          : (targetPo.status === 'DELIVERED' || (targetPo.items && targetPo.items.length > 0))
+            ? []
+            : [{ poItemId: targetPo.id, materialName: targetPo.name, receivedQty: 1, unit: 'units' }];
 
         setFormData({
           poId: targetPo.id,
@@ -821,24 +912,30 @@ function PurchaseModals({
     }
 
     setFormData({});
-  }, [activeModal, orderPrefill, initialPoId, data]);
+  }, [activeModal, orderPrefill, initialPoId, data, eligibleOrders]);
 
   if (!activeModal) return null;
 
   const handlePoChange = (selectedPoId: string) => {
     const selectedPo = data?.orders?.find(o => o.id === selectedPoId);
     if (selectedPo) {
-      const prefilledItems = (selectedPo.items && selectedPo.items.length > 0)
-        ? selectedPo.items.map(it => ({
+      const pendingItems = (selectedPo.items && selectedPo.items.length > 0)
+        ? selectedPo.items.filter(it => (it.pendingQty !== undefined ? it.pendingQty > 0 : (it.orderedQty - (it.receivedQty || 0)) > 0))
+        : [];
+
+      const prefilledItems = pendingItems.length > 0
+        ? pendingItems.map(it => ({
             poItemId: it.id,
             materialId: it.materialId,
             materialName: it.materialName,
             unit: it.unit,
             orderedQty: it.orderedQty,
             pendingQty: it.pendingQty,
-            receivedQty: it.pendingQty > 0 ? it.pendingQty : it.orderedQty
+            receivedQty: it.pendingQty
           }))
-        : [{ poItemId: selectedPo.id, materialName: selectedPo.name, receivedQty: 1, unit: 'units' }];
+        : (selectedPo.status === 'DELIVERED' || (selectedPo.items && selectedPo.items.length > 0))
+          ? []
+          : [{ poItemId: selectedPo.id, materialName: selectedPo.name, receivedQty: 1, unit: 'units' }];
 
       setFormData((prev: any) => ({
         ...prev,
@@ -860,14 +957,25 @@ function PurchaseModals({
     setFormData({ ...formData, items: newItems });
   };
 
-  const handleInventoryConsumeChange = (materialName: string, quantity: string, maxStock: number) => {
+  const getAvailableStock = (item: any): number => {
+    if (!item) return 0;
+    if (typeof item.availableQuantity === 'number') return item.availableQuantity;
+    if (typeof item.stock === 'number') return item.stock;
+    if (typeof item.stock === 'string') {
+      const match = item.stock.match(/[\d.]+/);
+      return match ? parseFloat(match[0]) : 0;
+    }
+    return 0;
+  };
+
+  const handleInventoryConsumeChange = (inventoryItemId: string, materialName: string, quantity: string, maxStock: number) => {
     const qty = parseInt(quantity, 10);
     const existingItems = formData.items || [];
     
     if (!quantity || isNaN(qty) || qty <= 0) {
       setFormData({
         ...formData,
-        items: existingItems.filter((i: any) => i.materialName !== materialName)
+        items: existingItems.filter((i: any) => (i.inventoryItemId ? i.inventoryItemId !== inventoryItemId : i.materialName !== materialName))
       });
       return;
     }
@@ -882,18 +990,20 @@ function PurchaseModals({
     if (cappedQty <= 0) {
       setFormData({
         ...formData,
-        items: existingItems.filter((i: any) => i.materialName !== materialName)
+        items: existingItems.filter((i: any) => (i.inventoryItemId ? i.inventoryItemId !== inventoryItemId : i.materialName !== materialName))
       });
       return;
     }
 
-    const idx = existingItems.findIndex((i: any) => i.materialName === materialName);
+    const idx = existingItems.findIndex((i: any) => (i.inventoryItemId ? i.inventoryItemId === inventoryItemId : i.materialName === materialName));
     if (idx >= 0) {
       const newItems = [...existingItems];
       newItems[idx].quantity = cappedQty;
+      newItems[idx].inventoryItemId = inventoryItemId;
+      newItems[idx].materialName = materialName;
       setFormData({ ...formData, items: newItems });
     } else {
-      setFormData({ ...formData, items: [...existingItems, { materialName, quantity: cappedQty }] });
+      setFormData({ ...formData, items: [...existingItems, { inventoryItemId, materialName, quantity: cappedQty }] });
     }
   };
 
@@ -953,20 +1063,25 @@ function PurchaseModals({
         }
 
         for (const it of validItems) {
-          const invItem = data?.inventory?.find(i => i.material === it.materialName);
-          const stock = invItem ? Number(invItem.stock) || 0 : 0;
+          const invItem = data?.inventory?.find(i => (it.inventoryItemId ? i.id === it.inventoryItemId : i.material === it.materialName));
+          const stock = getAvailableStock(invItem);
+          const label = invItem?.material || it.materialName || 'Material';
           if (stock <= 0) {
-            setErrorMsg(`Cannot consume "${it.materialName}". It is currently out of stock (0 available).`);
+            setErrorMsg(`Cannot consume "${label}". It is currently out of stock (0 available).`);
             setLoading(false);
             return;
           }
           if (Number(it.quantity) > stock) {
-            setErrorMsg(`Cannot consume ${it.quantity} of "${it.materialName}". Available stock is only ${stock}.`);
+            setErrorMsg(`Cannot consume ${it.quantity} of "${label}". Available stock is only ${stock}.`);
             setLoading(false);
             return;
           }
         }
-        payload.items = validItems;
+        payload.items = validItems.map((it: any) => ({
+          inventoryItemId: it.inventoryItemId,
+          materialName: it.materialName,
+          quantity: Number(it.quantity)
+        }));
       }
 
       if (activeModal === 'received' && formData.billFile) {
@@ -1180,6 +1295,11 @@ function PurchaseModals({
                     <div className="p-3 bg-amber-50 text-amber-800 rounded-xl text-xs border border-amber-200">
                       No purchase orders found for this project. Please create a purchase order first.
                     </div>
+                  ) : eligibleOrders.length === 0 ? (
+                    <div className="p-3.5 bg-emerald-50 text-emerald-800 rounded-xl text-xs border border-emerald-200 font-semibold flex items-center gap-2">
+                      <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                      <span>All purchase orders for this project have already been received!</span>
+                    </div>
                   ) : (
                     <select
                       required
@@ -1188,7 +1308,7 @@ function PurchaseModals({
                       onChange={e => handlePoChange(e.target.value)}
                     >
                       <option value="" disabled>Select Purchase Order</option>
-                      {data.orders.map(o => (
+                      {eligibleOrders.map(o => (
                         <option key={o.id} value={o.id}>
                           {o.name} ({o.vendor}) — {o.status}
                         </option>
@@ -1237,7 +1357,9 @@ function PurchaseModals({
                 <div className="space-y-3">
                   {(!formData.items || formData.items.length === 0) ? (
                     <div className="text-center p-4 bg-muted/30 border border-dashed border-border rounded-xl text-xs text-muted-foreground">
-                      No items found in selected order. Click "+ Add Item Row" to enter manually.
+                      {formData.poId 
+                        ? 'All items in this order have already been received! Click "+ Add Item Row" if you want to add an unlisted item.' 
+                        : 'No pending items found in selected order.'}
                     </div>
                   ) : (
                     formData.items.map((item: any, idx: number) => {
@@ -1337,9 +1459,9 @@ function PurchaseModals({
                     <p className="text-sm text-muted-foreground py-4">No inventory available to consume.</p>
                   ) : (
                     data.inventory.map(i => {
-                      const stock = Number(i.stock) || 0;
+                      const stock = getAvailableStock(i);
                       const isOutOfStock = stock <= 0;
-                      const selected = formData.items?.find((item: any) => item.materialName === i.material) || {};
+                      const selected = formData.items?.find((item: any) => item.inventoryItemId ? item.inventoryItemId === i.id : item.materialName === i.material) || {};
                       return (
                         <div key={i.id} className={`flex items-center justify-between p-3.5 border rounded-2xl transition-colors ${isOutOfStock ? 'bg-muted/30 border-border/60 opacity-60' : 'bg-white border-border hover:border-[#2648E7]/40'}`}>
                           <div>
@@ -1352,7 +1474,7 @@ function PurchaseModals({
                               )}
                             </div>
                             <p className="text-xs text-muted-foreground mt-0.5">
-                              Available Stock: <strong className={isOutOfStock ? 'text-rose-600' : 'text-foreground'}>{i.stock}</strong>
+                              Available Stock: <strong className={isOutOfStock ? 'text-rose-600' : 'text-emerald-700'}>{i.stock}</strong>
                             </p>
                           </div>
                           <div className="flex items-center gap-2">
@@ -1369,7 +1491,7 @@ function PurchaseModals({
                                   placeholder="Qty to use"
                                   className="w-28 bg-white border border-border rounded-xl px-3 py-2 text-sm font-bold text-foreground focus:outline-none focus:border-[#2648E7] text-right" 
                                   value={selected.quantity || ''}
-                                  onChange={e => handleInventoryConsumeChange(i.material, e.target.value, stock)}
+                                  onChange={e => handleInventoryConsumeChange(i.id, i.material, e.target.value, stock)}
                                 />
                               </div>
                             )}
@@ -1389,7 +1511,13 @@ function PurchaseModals({
           <button type="button" onClick={onClose} className="flex-1 py-3 rounded-2xl font-bold text-sm text-foreground bg-white border border-border shadow-sm hover:bg-gray-50 transition-colors">
             Cancel
           </button>
-          <button type="submit" form="purchase-form" disabled={loading} className="flex-1 py-3 rounded-2xl font-bold text-sm text-white shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: "#2648E7" }}>
+          <button 
+            type="submit" 
+            form="purchase-form" 
+            disabled={loading || (activeModal === 'received' && (!formData.poId || !formData.items || formData.items.length === 0))} 
+            className="flex-1 py-3 rounded-2xl font-bold text-sm text-white shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50" 
+            style={{ backgroundColor: "#2648E7" }}
+          >
             {loading ? 'Saving...' : activeModal === 'received' ? 'Receive Goods' : activeModal === 'inventory' ? 'Consume Material' : 'Save Details'}
           </button>
         </div>

@@ -400,11 +400,15 @@ export const POST = withAuth(async (request: Request, user: any) => {
 
     if (action === 'CONSUME_MATERIAL') {
       const { projectId, items } = payload;
-      let site = await prisma.site.findFirst({ where: { project_id: projectId } });
-      if (!site) {
-        site = await prisma.site.create({
+      const sites = await prisma.site.findMany({ where: { project_id: projectId }, select: { id: true } });
+      let siteIds = sites.map(s => s.id);
+      
+      let defaultSite = sites.length > 0 ? sites[0] : null;
+      if (!defaultSite) {
+        defaultSite = await prisma.site.create({
           data: { project_id: projectId, company_id: user.company_id, name: "Main Site", location: "Main Location", status: "IN_PROGRESS" }
         });
+        siteIds = [defaultSite.id];
       }
       
       const validItems = (items || []).filter((i: any) => Number(i.quantity) > 0);
@@ -415,32 +419,55 @@ export const POST = withAuth(async (request: Request, user: any) => {
       // Pre-check stock levels to provide clear, actionable feedback
       for (const item of validItems) {
         const parsedQty = Number(item.quantity) || 0;
-        const material = await prisma.material.findFirst({
-          where: {
-            company_id: user.company_id,
-            name: { equals: item.materialName, mode: 'insensitive' }
+        
+        let invItem = null;
+        if (item.inventoryItemId) {
+          invItem = await prisma.inventoryItem.findFirst({
+            where: { id: item.inventoryItemId, site_id: { in: siteIds } },
+            include: { material: true }
+          });
+        }
+        
+        if (!invItem && item.materialName) {
+          // Find inventory item for this project matching material name with available stock
+          invItem = await prisma.inventoryItem.findFirst({
+            where: {
+              site_id: { in: siteIds },
+              material: { name: { equals: item.materialName.trim(), mode: 'insensitive' } },
+              quantity: { gt: 0 }
+            },
+            include: { material: true }
+          });
+          
+          if (!invItem) {
+            // Find any inventory item matching the name to check its stock
+            invItem = await prisma.inventoryItem.findFirst({
+              where: {
+                site_id: { in: siteIds },
+                material: { name: { equals: item.materialName.trim(), mode: 'insensitive' } }
+              },
+              include: { material: true }
+            });
           }
-        });
+        }
 
-        if (!material) {
+        const materialLabel = invItem?.material?.name || item.materialName || 'Material';
+
+        if (!invItem) {
           return NextResponse.json({
-            error: `Material "${item.materialName}" is not registered in site inventory (0 available).`
+            error: `Material "${materialLabel}" is not registered in site inventory (0 available).`
           }, { status: 400 });
         }
 
-        const invItem = await prisma.inventoryItem.findFirst({
-          where: { site_id: site.id, material_id: material.id }
-        });
-
-        const currentStock = invItem ? invItem.quantity : 0;
+        const currentStock = invItem.quantity || 0;
         if (currentStock <= 0) {
           return NextResponse.json({
-            error: `Cannot consume "${item.materialName}". It is currently out of stock (0 available).`
+            error: `Cannot consume "${materialLabel}". It is currently out of stock (0 available).`
           }, { status: 400 });
         }
         if (currentStock < parsedQty) {
           return NextResponse.json({
-            error: `Cannot consume ${parsedQty} of "${item.materialName}". Available stock is only ${currentStock}.`
+            error: `Cannot consume ${parsedQty} of "${materialLabel}". Available stock is only ${currentStock}.`
           }, { status: 400 });
         }
       }
@@ -450,44 +477,67 @@ export const POST = withAuth(async (request: Request, user: any) => {
         for (const item of validItems) {
           const parsedQty = Number(item.quantity) || 0;
           
-          let material = await tx.material.findFirst({
-            where: {
-              company_id: user.company_id,
-              name: { equals: item.materialName, mode: 'insensitive' }
-            }
-          });
-          if (!material) {
-            material = await tx.material.create({
-              data: { name: item.materialName, company_id: user.company_id, unit: item.unit || 'pcs' }
+          let invItem = null;
+          if (item.inventoryItemId) {
+            invItem = await tx.inventoryItem.findFirst({
+              where: { id: item.inventoryItemId, site_id: { in: siteIds } },
+              include: { material: true }
             });
           }
           
-          const invItem = await tx.inventoryItem.findFirst({
-            where: { site_id: site.id, material_id: material.id }
-          });
-          if (!invItem || invItem.quantity < parsedQty) {
-            throw new Error(`Insufficient stock for "${item.materialName}". Available: ${invItem ? invItem.quantity : 0}`);
+          if (!invItem && item.materialName) {
+            invItem = await tx.inventoryItem.findFirst({
+              where: {
+                site_id: { in: siteIds },
+                material: { name: { equals: item.materialName.trim(), mode: 'insensitive' } },
+                quantity: { gte: parsedQty }
+              },
+              include: { material: true }
+            });
+            if (!invItem) {
+              invItem = await tx.inventoryItem.findFirst({
+                where: {
+                  site_id: { in: siteIds },
+                  material: { name: { equals: item.materialName.trim(), mode: 'insensitive' } }
+                },
+                include: { material: true }
+              });
+            }
           }
 
+          if (!invItem || (invItem.quantity || 0) < parsedQty) {
+            const materialLabel = invItem?.material?.name || item.materialName || 'Material';
+            throw new Error(`Insufficient stock for "${materialLabel}". Available: ${invItem ? invItem.quantity : 0}`);
+          }
+
+          // Decrement exact inventory item
           await tx.inventoryItem.update({
             where: { id: invItem.id },
             data: { quantity: { decrement: parsedQty } }
           });
 
+          // Create inventory transaction
           await tx.inventoryTransaction.create({
             data: { item_id: invItem.id, type: 'MATERIAL_ISSUE', quantity: parsedQty, user_id: user.sub }
           });
 
+          // Create consumption record
           const consumption = await tx.materialConsumption.create({
-            data: { site_id: site.id, material_id: material.id, quantity: parsedQty, date: new Date() }
+            data: { 
+              site_id: invItem.site_id, 
+              material_id: invItem.material_id, 
+              quantity: parsedQty, 
+              date: new Date() 
+            }
           });
           consumptions.push(consumption);
 
+          // Update BOQ item if matched
           const boqItems = await tx.bOQItem.findMany({
             where: { 
               OR: [
-                { material_id: material.id },
-                { description: material.name }
+                { material_id: invItem.material_id },
+                { description: { equals: invItem.material.name, mode: 'insensitive' } }
               ],
               category: { boq: { project_id: projectId } }
             }

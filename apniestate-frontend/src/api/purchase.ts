@@ -71,6 +71,8 @@ export interface InventorySummary {
   id: string;
   material: string;
   stock: string;
+  availableQuantity?: number;
+  unit?: string;
   reorderLevel: string;
 }
 

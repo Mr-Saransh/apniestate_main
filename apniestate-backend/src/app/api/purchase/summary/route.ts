@@ -71,25 +71,37 @@ export const GET = withAuth(async (request: Request, user: any) => {
       orderBy: { created_at: 'desc' },
     });
 
-    const formattedOrders = orders.map(o => ({
-      id: o.id,
-      name: o.items.length > 0 ? `${o.items[0].material.name} — ${o.items[0].quantity} ${o.items[0].material.unit}${o.items.length > 1 ? ` +${o.items.length - 1} more` : ''}` : o.po_number,
-      vendor: o.vendor.name,
-      amount: `₹${o.total_amount.toLocaleString()}`,
-      status: o.status,
-      date: new Date(o.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
-      eta: o.delivery_date ? new Date(o.delivery_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : 'Pending',
-      items: o.items.map(i => ({
-        id: i.id,
-        materialId: i.material_id,
-        materialName: i.material.name,
-        unit: i.material.unit,
-        orderedQty: i.quantity,
-        receivedQty: i.received_quantity || 0,
-        pendingQty: Math.max(0, i.quantity - (i.received_quantity || 0)) || i.quantity,
-        unitPrice: i.unit_price
-      }))
-    }));
+    const formattedOrders = orders.map(o => {
+      const items = o.items.map(i => {
+        const received = i.received_quantity || 0;
+        const pending = Math.max(0, i.quantity - received);
+        return {
+          id: i.id,
+          materialId: i.material_id,
+          materialName: i.material.name,
+          unit: i.material.unit,
+          orderedQty: i.quantity,
+          receivedQty: received,
+          pendingQty: pending,
+          unitPrice: i.unit_price
+        };
+      });
+
+      const pendingItems = items.filter(i => i.pendingQty > 0);
+      const isDelivered = o.status === 'DELIVERED' || (items.length > 0 && pendingItems.length === 0);
+
+      return {
+        id: o.id,
+        name: o.items.length > 0 ? `${o.items[0].material.name} — ${o.items[0].quantity} ${o.items[0].material.unit}${o.items.length > 1 ? ` +${o.items.length - 1} more` : ''}` : o.po_number,
+        vendor: o.vendor.name,
+        amount: `₹${o.total_amount.toLocaleString()}`,
+        status: isDelivered ? 'DELIVERED' : o.status,
+        date: new Date(o.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
+        eta: o.delivery_date ? new Date(o.delivery_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : 'Pending',
+        items,
+        pendingItemsCount: pendingItems.length
+      };
+    });
 
     // Vendors
     const vendors = await prisma.vendor.findMany({
@@ -174,6 +186,8 @@ export const GET = withAuth(async (request: Request, user: any) => {
       id: i.id,
       material: i.material.name,
       stock: `${i.quantity} ${i.material.unit}`,
+      availableQuantity: i.quantity,
+      unit: i.material.unit,
       reorderLevel: `${i.min_quantity || 0} ${i.material.unit}`
     }));
 
