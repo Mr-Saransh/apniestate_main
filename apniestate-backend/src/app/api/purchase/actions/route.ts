@@ -45,10 +45,35 @@ export const POST = withAuth(async (request: Request, user: any) => {
     }
 
     if (action === 'UPDATE_REQUEST_STATUS') {
-      const { requestId, status } = payload;
+      const { requestId, status, approvedQuantity, notes } = payload;
+      const dataToUpdate: any = { status };
+      if (status === 'APPROVED') {
+        dataToUpdate.approved_by = user.sub;
+        if (approvedQuantity !== undefined) dataToUpdate.approved_quantity = Number(approvedQuantity);
+      }
+      if (notes) dataToUpdate.notes = notes;
+
       const req = await prisma.materialRequest.update({
         where: { id: requestId },
-        data: { status }
+        data: dataToUpdate
+      });
+      return NextResponse.json({ success: true, request: req });
+    }
+
+    if (action === 'MODIFY_REQUEST') {
+      const { requestId, quantity, approvedQuantity, status, notes } = payload;
+      const dataToUpdate: any = {};
+      if (quantity !== undefined) dataToUpdate.quantity = Number(quantity);
+      if (approvedQuantity !== undefined) dataToUpdate.approved_quantity = Number(approvedQuantity);
+      if (status) {
+        dataToUpdate.status = status;
+        if (status === 'APPROVED') dataToUpdate.approved_by = user.sub;
+      }
+      if (notes !== undefined) dataToUpdate.notes = notes;
+
+      const req = await prisma.materialRequest.update({
+        where: { id: requestId },
+        data: dataToUpdate
       });
       return NextResponse.json({ success: true, request: req });
     }

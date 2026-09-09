@@ -1,6 +1,6 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { PH, Card, Chip, SrchBar } from '@/components/shared/FigmaComponents';
-import { Truck, Plus, User, Phone, Mail, MapPin, X } from 'lucide-react';
+import { Truck, Plus, User, Phone, Mail, MapPin, X, Edit2, Trash2 } from 'lucide-react';
 import { apiClient } from '@/api/client';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 
@@ -21,6 +21,7 @@ export default function VendorsPage() {
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
   const [saving, setSaving] = useState(false);
   const [activeCategory, setActiveCategory] = useState('All');
 
@@ -83,6 +84,63 @@ export default function VendorsPage() {
     }
   };
 
+  const handleOpenEdit = (v: Vendor) => {
+    setEditingVendor(v);
+    setName(v.name);
+    setContactPerson(v.contact_person || '');
+    setPhone(v.phone || '');
+    setEmail(v.email || '');
+    setAddress(v.address || '');
+    setCategory(v.category || 'Suppliers');
+  };
+
+  const handleUpdateVendor = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!editingVendor || !name) return;
+
+    setSaving(true);
+    try {
+      const res = await apiClient.patch<Vendor>(`/vendors/${editingVendor.id}`, {
+        name,
+        contact_person: contactPerson || null,
+        phone: phone || null,
+        email: email || null,
+        address: address || null,
+        category
+      });
+
+      if (res.data) {
+        setVendors(prev => prev.map(v => v.id === editingVendor.id ? { ...v, ...res.data! } : v));
+        setEditingVendor(null);
+        // Reset form
+        setName('');
+        setContactPerson('');
+        setPhone('');
+        setEmail('');
+        setAddress('');
+        setCategory('Suppliers');
+      }
+    } catch (err) {
+      console.error('Failed to update vendor', err);
+      alert('Error updating vendor.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteVendor = async (vendorId: string, vendorName: string) => {
+    const confirmed = confirm(`Are you sure you want to remove ${vendorName}? This will safely archive the vendor while preserving all historical purchase orders, invoices, and payments.`);
+    if (!confirmed) return;
+
+    try {
+      await apiClient.delete(`/vendors/${vendorId}`);
+      setVendors(prev => prev.filter(v => v.id !== vendorId));
+    } catch (err) {
+      console.error('Failed to delete vendor', err);
+      alert('Failed to remove vendor. Please try again.');
+    }
+  };
+
   const filtered = activeCategory === 'All'
     ? vendors
     : vendors.filter(v => v.category === activeCategory);
@@ -138,9 +196,23 @@ export default function VendorsPage() {
                     <User size={12} /> <span className="truncate">{vendor.contact_person} (Rep)</span>
                   </div>
                 )}
-                {vendor.phone && (
-                  <div className="flex items-center gap-2 text-[11px] font-medium text-muted-foreground">
-                    <Phone size={12} /> <a href={`tel:${vendor.phone}`} className="hover:text-primary transition-colors truncate">{vendor.phone}</a>
+                {vendor.phone ? (
+                  <div className="flex items-center justify-between gap-2 text-[11px] font-medium text-muted-foreground">
+                    <div className="flex items-center gap-2 truncate">
+                      <Phone size={12} />
+                      <span className="truncate">{vendor.phone}</span>
+                    </div>
+                    <a
+                      href={`tel:${vendor.phone}`}
+                      className="shrink-0 flex items-center gap-1 px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs rounded-lg transition-colors shadow-sm"
+                      title="Call vendor directly"
+                    >
+                      <Phone size={11} /> Call
+                    </a>
+                  </div>
+                ) : (
+                  <div className="text-[11px] text-muted-foreground italic flex items-center gap-1.5">
+                    <Phone size={11} className="opacity-40" /> No phone saved
                   </div>
                 )}
                 {vendor.email && (
@@ -153,6 +225,21 @@ export default function VendorsPage() {
                     <MapPin size={12} className="mt-0.5 shrink-0" /> <span className="line-clamp-2">{vendor.address}</span>
                   </div>
                 )}
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-border/50">
+                  <button
+                    onClick={() => handleOpenEdit(vendor)}
+                    className="p-1.5 text-muted-foreground hover:text-[#2648E7] hover:bg-[#2648E7]/10 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors"
+                  >
+                    <Edit2 size={12} /> Edit
+                  </button>
+                  <button
+                    onClick={() => handleDeleteVendor(vendor.id, vendor.name)}
+                    className="p-1.5 text-muted-foreground hover:text-red-600 hover:bg-red-50 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors"
+                  >
+                    <Trash2 size={12} /> Delete
+                  </button>
+                </div>
               </div>
             </div>
           ))
@@ -213,6 +300,67 @@ export default function VendorsPage() {
                 <button type="submit" disabled={saving} className="px-4 py-2 text-sm font-semibold bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2">
                   {saving && <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
                   Register Vendor
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {editingVendor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
+          <div className="bg-card w-full max-w-lg rounded-xl border border-border shadow-xl max-h-[90vh] overflow-y-auto custom-scrollbar">
+            <div className="flex justify-between items-center p-4 border-b border-border">
+              <h2 className="font-bold text-foreground">Edit Vendor details</h2>
+              <button onClick={() => setEditingVendor(null)} className="p-1 hover:bg-muted rounded-md transition-colors"><X size={18} className="text-muted-foreground" /></button>
+            </div>
+            
+            <form onSubmit={handleUpdateVendor} className="p-4">
+              <div className="space-y-3">
+                <div>
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Vendor Name *</label>
+                  <input type="text" required className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary" value={name} onChange={e => setName(e.target.value)} />
+                </div>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Representative Name</label>
+                    <input type="text" className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary" value={contactPerson} onChange={e => setContactPerson(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Category</label>
+                    <select className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary" value={category} onChange={e => setCategory(e.target.value)}>
+                      <option value="Suppliers">Suppliers</option>
+                      <option value="Subcontractors">Subcontractors</option>
+                      <option value="Consultants">Consultants</option>
+                      <option value="Logistics">Logistics</option>
+                      <option value="Services">Services</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Phone Number</label>
+                    <input type="tel" className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary" value={phone} onChange={e => setPhone(e.target.value)} placeholder="+91 9876543210" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Email Address</label>
+                    <input type="email" className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary" value={email} onChange={e => setEmail(e.target.value)} />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Company Address</label>
+                  <input type="text" className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary" value={address} onChange={e => setAddress(e.target.value)} />
+                </div>
+              </div>
+
+              <div className="mt-6 flex justify-end gap-3 pt-4 border-t border-border">
+                <button type="button" onClick={() => setEditingVendor(null)} className="px-4 py-2 text-sm font-semibold text-muted-foreground hover:bg-muted rounded-lg transition-colors">Cancel</button>
+                <button type="submit" disabled={saving} className="px-4 py-2 text-sm font-semibold bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2">
+                  {saving && <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                  Save Changes
                 </button>
               </div>
             </form>

@@ -78,11 +78,16 @@ export const POST = withAuth(async (request: any, user) => {
         for (const entry of entries) {
             if (entry.present_count > 0 || entry.half_day_count > 0 || entry.ot_hours > 0) {
                 const cat = categoryMap[entry.category_id];
-                if (cat) {
-                    const regularCost = (entry.present_count || 0) * cat.daily_wage;
-                    const halfCost = (entry.half_day_count || 0) * (cat.daily_wage * cat.half_day_multiplier);
-                    const otCost = (entry.ot_hours || 0) * ((cat.daily_wage / 8) * cat.ot_multiplier);
-                    totalComputedCost += (regularCost + halfCost + otCost);
+                let regularCost = 0;
+                let halfCost = 0;
+                let otCost = 0;
+                let rowCost = 0;
+                if (cat && cat.daily_wage > 0) {
+                    regularCost = (entry.present_count || 0) * cat.daily_wage;
+                    halfCost = (entry.half_day_count || 0) * (cat.daily_wage * (cat.half_day_multiplier || 0.5));
+                    otCost = (entry.ot_hours || 0) * ((cat.daily_wage / 8) * (cat.ot_multiplier || 1.5));
+                    rowCost = regularCost + halfCost + otCost;
+                    totalComputedCost += rowCost;
                 }
 
                 ops.push(
@@ -93,7 +98,12 @@ export const POST = withAuth(async (request: any, user) => {
                             date: targetDate,
                             present_count: Number(entry.present_count) || 0,
                             half_day_count: Number(entry.half_day_count) || 0,
-                            ot_hours: Number(entry.ot_hours) || 0
+                            ot_hours: Number(entry.ot_hours) || 0,
+                            regular_cost: regularCost,
+                            half_day_cost: halfCost,
+                            ot_cost: otCost,
+                            total_cost: rowCost,
+                            marked_by: user.sub
                         }
                     })
                 );

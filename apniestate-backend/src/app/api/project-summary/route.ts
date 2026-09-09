@@ -44,14 +44,22 @@ export const GET = withAuth(async (req: NextRequest, user) => {
       where: {
         site_id: { in: siteIds },
         date: { gte: today, lt: tomorrow }
-      }
+      },
+      include: { category: true }
     });
     
     let labourCount = 0;
     let labourCost = 0;
     for (const log of todayLabourLogs) {
-      labourCount += log.present_count + log.half_day_count;
-      labourCost += log.total_cost;
+      labourCount += (log.present_count || 0) + (log.half_day_count || 0);
+      if (log.total_cost && log.total_cost > 0) {
+        labourCost += log.total_cost;
+      } else if (log.category && log.category.daily_wage > 0) {
+        const regularCost = (log.present_count || 0) * log.category.daily_wage;
+        const halfCost = (log.half_day_count || 0) * (log.category.daily_wage * (log.category.half_day_multiplier || 0.5));
+        const otCost = (log.ot_hours || 0) * ((log.category.daily_wage / 8) * (log.category.ot_multiplier || 1.5));
+        labourCost += regularCost + halfCost + otCost;
+      }
     }
 
     // Today's expense
@@ -81,13 +89,15 @@ export const GET = withAuth(async (req: NextRequest, user) => {
       }
     });
 
-    // Pending vendor payments (invoices that are not paid)
-    const pendingVendorPayments = await prisma.invoice.count({
+    // Pending vendor payments (unpaid invoices)
+    const unpaidInvoices = await prisma.invoice.findMany({
       where: {
         company_id: project.company_id,
         status: { in: ["DRAFT", "SENT"] }
       }
     });
+    const pendingVendorPayments = unpaidInvoices.length;
+    const pendingVendorPaymentAmount = unpaidInvoices.reduce((sum, inv) => sum + (inv.total || inv.amount || 0), 0);
 
     // Materials received today (inventory transactions IN today)
     // Avoid missing model errors if inventoryTransaction is removed, but for now we keep it
@@ -269,6 +279,51 @@ export const GET = withAuth(async (req: NextRequest, user) => {
 
 
 
+    // Overdue Milestones check
+    const overdueMilestones = milestones.filter(m => m.status !== "COMPLETED" && new Date(m.target_date) < today);
+    if (overdueMilestones.length > 0) {
+      alerts.push({
+        type: "MILESTONE_OVERDUE",
+        message: `${overdueMilestones.length} milestone${overdueMilestones.length > 1 ? 's are' : ' is'} overdue`,
+        link: "/progress?tab=timeline",
+        severity: "error"
+      });
+    }
+
+    // Delayed Procurement POs check
+    const delayedPOs = await prisma.purchaseOrder.findMany({
+      where: {
+        project_id: projectId,
+        status: { in: ['APPROVED', 'SENT', 'PENDING'] },
+        delivery_date: { lt: today }
+      }
+    });
+    if (delayedPOs.length > 0) {
+      alerts.push({
+        type: "PROCUREMENT_DELAY",
+        message: `${delayedPOs.length} purchase order${delayedPOs.length > 1 ? 's' : ''} past expected delivery date`,
+        link: "/purchase?tab=orders",
+        severity: "warning"
+      });
+    }
+
+    // BOQ Material Variances
+    const boqItems = await prisma.bOQItem.findMany({
+      where: {
+        category: { boq: { project_id: projectId } }
+      },
+      take: 6
+    });
+    const materialVariances = boqItems.map(item => ({
+      id: item.id,
+      name: item.description,
+      unit: item.unit,
+      planned: item.quantity,
+      used: item.used_quantity,
+      remaining: Math.max(0, item.quantity - item.used_quantity),
+      percentUsed: item.quantity > 0 ? Math.round((item.used_quantity / item.quantity) * 100) : 0
+    }));
+
     return ok({
       project: {
         id: project.id,
@@ -290,8 +345,32 @@ export const GET = withAuth(async (req: NextRequest, user) => {
         todayExpense: todayExpenseTotal + labourCost + equipmentCost + todayPOCost,
         pendingMaterialRequests,
         pendingVendorPayments,
+        pendingVendorPaymentAmount,
         materialsReceivedToday,
         equipmentRunning,
+      },
+      projectIntelligence: {
+        budget: project.budget || 0,
+        actualSpend: calculatedTotalSpent,
+        remainingBudget: Math.max(0, (project.budget || 0) - calculatedTotalSpent),
+        todayLabourCost: labourCost,
+        pendingPaymentExposure: pendingVendorPaymentAmount,
+        pendingPaymentCount: pendingVendorPayments,
+        lowStockCount: actualLowStock.length,
+        lowStockItems: actualLowStock.slice(0, 5).map(item => ({
+          name: item.material.name,
+          unit: item.material.unit,
+          quantity: item.quantity,
+          minQuantity: item.min_quantity,
+          site: item.site.name
+        })),
+        procurementDelayCount: delayedPOs.length,
+        overdueMilestoneCount: overdueMilestones.length,
+        overdueMilestones: overdueMilestones.map(m => ({
+          name: m.name,
+          targetDate: m.target_date
+        })),
+        materialVariances
       },
       alerts,
       progress: {

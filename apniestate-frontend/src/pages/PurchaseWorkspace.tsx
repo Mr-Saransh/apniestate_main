@@ -2,9 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useProject } from '@/context/ProjectContext';
 import { useAuth } from '@/context/AuthContext';
-import { ShoppingCart, Plus, FileSpreadsheet, Package, ClipboardList, CheckCircle2, Archive, Truck, X, Trash2, Download } from 'lucide-react';
+import {
+  ShoppingCart, Plus, FileSpreadsheet, Package, ClipboardList,
+  CheckCircle2, Archive, Truck, X, Trash2, Download, UploadCloud, Edit3, ArrowRight
+} from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { purchaseApi, type PurchaseSummaryResponse, type BOQItemSummary, type MaterialRequestSummary, type OrderSummary, type ReceivedSummary, type VendorSummary, type ConsumptionLog } from '@/api/purchase';
+import ImportBOQModal from '@/components/purchase/ImportBOQModal';
+import VendorsPage from './VendorsPage';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -20,12 +25,12 @@ type PurchaseTab = "boq" | "requests" | "quotations" | "orders" | "received" | "
 
 const PURCHASE_TABS: { id: PurchaseTab; label: string; icon: React.ReactNode }[] = [
   { id: "boq", label: "BOQ", icon: <FileSpreadsheet size={14} /> },
-  { id: "requests", label: "Requests", icon: <Package size={14} /> },
-  { id: "quotations", label: "Quotations", icon: <ClipboardList size={14} /> },
+  { id: "requests", label: "Requirements", icon: <Package size={14} /> },
   { id: "orders", label: "Orders", icon: <ShoppingCart size={14} /> },
   { id: "received", label: "Received", icon: <CheckCircle2 size={14} /> },
   { id: "inventory", label: "Inventory", icon: <Archive size={14} /> },
   { id: "vendors", label: "Vendors", icon: <Truck size={14} /> },
+  { id: "quotations", label: "Quotations", icon: <ClipboardList size={14} /> },
 ];
 
 export default function PurchaseWorkspace() {
@@ -36,6 +41,7 @@ export default function PurchaseWorkspace() {
   const [data, setData] = useState<PurchaseSummaryResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeModal, setActiveModal] = useState<string | null>(null);
+  const [orderPrefill, setOrderPrefill] = useState<{ materialName: string; quantity: number } | null>(null);
 
   const refreshData = () => {
     if (!activeProjectId) return;
@@ -88,13 +94,43 @@ export default function PurchaseWorkspace() {
 
   return (
     <div className="flex flex-col h-full bg-background relative">
+      {/* Visual Workflow Progression: Site Engg -> PM Review -> Order -> Received -> Inventory */}
+      <div className="bg-white border-b border-border px-4 py-2 overflow-x-auto hide-scrollbar shrink-0">
+        <div className="flex items-center gap-1 text-xs max-w-2xl mx-auto justify-between min-w-[500px]">
+          {[
+            { step: '1', title: 'Requirement', sub: 'Site Supervisor', tabKey: 'requests' },
+            { step: '2', title: 'PM Review', sub: 'Approve / Modify', tabKey: 'requests' },
+            { step: '3', title: 'Order', sub: 'Purchase Order', tabKey: 'orders' },
+            { step: '4', title: 'Received', sub: 'GRN Inspection', tabKey: 'received' },
+            { step: '5', title: 'Inventory', sub: 'Site Stock', tabKey: 'inventory' },
+          ].map((s, idx) => (
+            <React.Fragment key={s.step}>
+              <button
+                onClick={() => setSearchParams({ tab: s.tabKey }, { replace: true })}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl transition-all ${
+                  tab === s.tabKey ? 'bg-[#2648E7]/10 text-[#2648E7] font-bold' : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <span className={`size-4 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                  tab === s.tabKey ? 'bg-[#2648E7] text-white' : 'bg-muted text-muted-foreground'
+                }`}>
+                  {s.step}
+                </span>
+                <span className="text-[11px] font-semibold">{s.title}</span>
+              </button>
+              {idx < 4 && <span className="text-muted-foreground/30 text-xs">→</span>}
+            </React.Fragment>
+          ))}
+        </div>
+      </div>
+
       {/* Tab strip */}
-      <div className="bg-white border-b border-border px-4 pt-4 pb-0 shrink-0 sticky top-0 z-10">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-base font-bold text-foreground" style={{ fontFamily: "var(--font-display)" }}>Purchase</h2>
+      <div className="bg-white border-b border-border px-4 pt-3 pb-0 shrink-0 sticky top-0 z-10">
+        <div className="flex items-center justify-between mb-2.5">
+          <h2 className="text-base font-bold text-foreground" style={{ fontFamily: "var(--font-display)" }}>Procurement</h2>
           <button
             onClick={() => setActiveModal(tab)}
-            className="flex items-center gap-1.5 text-sm font-bold text-white px-3 py-1.5 rounded-xl transition-opacity hover:opacity-90" style={{ backgroundColor: "#2648E7" }}>
+            className="flex items-center gap-1.5 text-xs font-bold text-white px-3 py-1.5 rounded-xl transition-opacity hover:opacity-90" style={{ backgroundColor: "#2648E7" }}>
             <Plus size={14} />{getNewButtonLabel()}
           </button>
         </div>
@@ -103,7 +139,7 @@ export default function PurchaseWorkspace() {
             <button
               key={t.id}
               onClick={() => setSearchParams({ tab: t.id }, { replace: true })}
-              className={`flex items-center gap-1.5 px-3.5 py-2.5 text-sm font-semibold border-b-2 shrink-0 transition-colors whitespace-nowrap ${tab === t.id ? "border-[#2648E7] text-[#2648E7]" : "border-transparent text-muted-foreground hover:text-foreground"
+              className={`flex items-center gap-1.5 px-3.5 py-2 text-sm font-semibold border-b-2 shrink-0 transition-colors whitespace-nowrap ${tab === t.id ? "border-[#2648E7] text-[#2648E7]" : "border-transparent text-muted-foreground hover:text-foreground"
                 }`}
             >
               {t.icon}{t.label}
@@ -115,22 +151,33 @@ export default function PurchaseWorkspace() {
       {/* Tab content */}
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-2xl mx-auto px-4 py-5">
-          {tab === 'boq' && <BOQTab items={data?.boq_items || []} projectName={activeProject.name} onRefresh={refreshData} />}
-          {tab === 'requests' && <RequestsTab requests={data?.material_requests || []} onRefresh={refreshData} />}
+          {tab === 'boq' && <BOQTab items={data?.boq_items || []} projectName={activeProject.name} onRefresh={refreshData} projectId={activeProjectId!} />}
+          {tab === 'requests' && (
+            <RequestsTab 
+              requests={data?.material_requests || []} 
+              onRefresh={refreshData}
+              onConvertToOrder={(materialName, quantity) => {
+                setOrderPrefill({ materialName, quantity });
+                setActiveModal('orders');
+              }}
+            />
+          )}
           {tab === 'quotations' && <QuotationsTab quotations={data?.quotations || []} />}
           {tab === 'orders' && <OrdersTab orders={data?.orders || []} />}
           {tab === 'received' && <ReceivedTab received={data?.received || []} />}
           {tab === 'inventory' && <InventoryTab items={data?.inventory || []} logs={data?.consumption_logs || []} />}
-          {tab === 'vendors' && <VendorsTab vendors={data?.vendors || []} />}
+          {tab === 'vendors' && <VendorsPage />}
         </div>
       </div>
 
-      <PurchaseModals activeModal={activeModal} onClose={() => setActiveModal(null)} onRefresh={refreshData} projectId={activeProjectId!} data={data} />
+      <PurchaseModals activeModal={activeModal} onClose={() => { setActiveModal(null); setOrderPrefill(null); }} onRefresh={refreshData} projectId={activeProjectId!} data={data} orderPrefill={orderPrefill} />
     </div>
   );
 }
 
-function BOQTab({ items, projectName, onRefresh }: { items: BOQItemSummary[], projectName: string, onRefresh: () => void }) {
+function BOQTab({ items, projectName, onRefresh, projectId }: { items: BOQItemSummary[], projectName: string, onRefresh: () => void, projectId: string }) {
+  const [showImport, setShowImport] = useState(false);
+
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this BOQ item?")) return;
     try {
@@ -141,50 +188,91 @@ function BOQTab({ items, projectName, onRefresh }: { items: BOQItemSummary[], pr
     }
   };
 
-  if (items.length === 0) return <div className="text-center text-muted-foreground py-10">No BOQ items found.</div>;
   return (
     <div className="space-y-4">
-      <SectionLabel>Bill of Quantities — {projectName}</SectionLabel>
-      <Card className="overflow-hidden">
-        <div className="grid grid-cols-[1fr_80px_80px_80px_80px_40px] gap-0">
-          {/* Header */}
-          <div className="contents">
-            {["Material", "Unit", "Planned", "Used", "Left", ""].map((h, idx) => (
-              <div key={idx} className="bg-muted px-3 py-2.5 text-[11px] font-bold text-muted-foreground uppercase border-b border-border">
-                {h}
-              </div>
-            ))}
-          </div>
-          {/* Rows */}
-          {items.map((item, i) => {
-            const remaining = item.planned - item.used;
-            const pct = item.planned > 0 ? (item.used / item.planned) * 100 : 0;
-            const low = pct > 80;
-            const border = i > 0 ? "border-t border-border" : "";
-            return (
-              <div key={item.id} className="contents group">
-                <div className={`px-3 py-3 text-sm font-semibold text-foreground flex items-center ${border}`}>{item.name}</div>
-                <div className={`px-3 py-3 text-sm text-muted-foreground flex items-center ${border}`}>{item.unit}</div>
-                <div className={`px-3 py-3 text-sm text-foreground flex items-center ${border}`}>{item.planned.toLocaleString()}</div>
-                <div className={`px-3 py-3 text-sm flex items-center ${low ? "text-amber-600 font-semibold" : "text-foreground"} ${border}`}>{item.used.toLocaleString()}</div>
-                <div className={`px-3 py-3 text-sm font-bold flex items-center ${remaining <= 0 ? "text-red-600" : "text-emerald-600"} ${border}`}>{remaining.toLocaleString()}</div>
-                <div className={`px-3 py-3 flex items-center justify-center ${border}`}>
-                  <button onClick={() => handleDelete(item.id)} className="text-muted-foreground hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              </div>
-            );
-          })}
+      <div className="flex items-center justify-between">
+        <SectionLabel>Bill of Quantities — {projectName}</SectionLabel>
+        <button 
+          onClick={() => setShowImport(true)} 
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-[#2648E7]/10 hover:bg-[#2648E7]/20 text-[#2648E7] text-xs font-bold rounded-xl transition-colors mb-3 shadow-sm"
+        >
+          <UploadCloud size={14} /> Import BOQ (Revit / Excel)
+        </button>
+      </div>
+
+      {items.length === 0 ? (
+        <div className="text-center text-muted-foreground py-12 bg-white rounded-2xl border border-border p-6">
+          <FileSpreadsheet size={40} className="mx-auto text-muted-foreground/40 mb-3" />
+          <p className="font-bold text-foreground">No BOQ items added yet</p>
+          <p className="text-xs text-muted-foreground mt-1 mb-4">Import an existing schedule from Revit/Tekla or add items manually.</p>
+          <button 
+            onClick={() => setShowImport(true)} 
+            className="px-4 py-2 bg-[#2648E7] hover:bg-[#2648E7]/90 text-white text-xs font-bold rounded-xl transition-colors shadow-sm inline-flex items-center gap-1.5"
+          >
+            <UploadCloud size={14} /> Import BOQ File
+          </button>
         </div>
-      </Card>
+      ) : (
+        <Card className="overflow-hidden">
+          <div className="grid grid-cols-[1fr_80px_80px_80px_80px_40px] gap-0">
+            {/* Header */}
+            <div className="contents">
+              {["Material", "Unit", "Planned", "Used", "Left", ""].map((h, idx) => (
+                <div key={idx} className="bg-muted px-3 py-2.5 text-[11px] font-bold text-muted-foreground uppercase border-b border-border">
+                  {h}
+                </div>
+              ))}
+            </div>
+            {/* Rows */}
+            {items.map((item, i) => {
+              const remaining = item.planned - item.used;
+              const pct = item.planned > 0 ? (item.used / item.planned) * 100 : 0;
+              const low = pct > 80;
+              const border = i > 0 ? "border-t border-border" : "";
+              return (
+                <div key={item.id} className="contents group">
+                  <div className={`px-3 py-3 text-sm font-semibold text-foreground flex items-center ${border}`}>{item.name}</div>
+                  <div className={`px-3 py-3 text-sm text-muted-foreground flex items-center ${border}`}>{item.unit}</div>
+                  <div className={`px-3 py-3 text-sm text-foreground flex items-center ${border}`}>{item.planned.toLocaleString()}</div>
+                  <div className={`px-3 py-3 text-sm flex items-center ${low ? "text-amber-600 font-semibold" : "text-foreground"} ${border}`}>{item.used.toLocaleString()}</div>
+                  <div className={`px-3 py-3 text-sm font-bold flex items-center ${remaining <= 0 ? "text-red-600" : "text-emerald-600"} ${border}`}>{remaining.toLocaleString()}</div>
+                  <div className={`px-3 py-3 flex items-center justify-center ${border}`}>
+                    <button onClick={() => handleDelete(item.id)} className="text-muted-foreground hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
+
+      <ImportBOQModal 
+        isOpen={showImport} 
+        onClose={() => setShowImport(false)} 
+        onSuccess={onRefresh} 
+        projectId={projectId} 
+      />
     </div>
   );
 }
 
-function RequestsTab({ requests, onRefresh }: { requests: MaterialRequestSummary[], onRefresh: () => void }) {
+function RequestsTab({ 
+  requests, 
+  onRefresh, 
+  onConvertToOrder 
+}: { 
+  requests: MaterialRequestSummary[], 
+  onRefresh: () => void, 
+  onConvertToOrder: (materialName: string, quantity: number) => void 
+}) {
   const { user } = useAuth();
   const role = user?.role || 'BUILDER';
+  const [modifyingReq, setModifyingReq] = useState<MaterialRequestSummary | null>(null);
+  const [newQty, setNewQty] = useState<string>('');
+  const [modifyNotes, setModifyNotes] = useState<string>('');
+  const [submitting, setSubmitting] = useState(false);
   
   const handleApprove = async (id: string, approve: boolean) => {
     try {
@@ -192,6 +280,33 @@ function RequestsTab({ requests, onRefresh }: { requests: MaterialRequestSummary
       onRefresh();
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const handleOpenModify = (req: MaterialRequestSummary) => {
+    setModifyingReq(req);
+    setNewQty(String(req.qty));
+    setModifyNotes('');
+  };
+
+  const handleSaveModification = async (approveAlso: boolean) => {
+    if (!modifyingReq) return;
+    setSubmitting(true);
+    try {
+      await purchaseApi.performAction('MODIFY_REQUEST', {
+        requestId: modifyingReq.id,
+        quantity: parseFloat(newQty) || modifyingReq.qty,
+        approvedQuantity: parseFloat(newQty) || modifyingReq.qty,
+        status: approveAlso ? 'APPROVED' : undefined,
+        notes: modifyNotes || undefined
+      });
+      setModifyingReq(null);
+      onRefresh();
+    } catch (err) {
+      console.error(err);
+      alert('Failed to update requirement');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -206,56 +321,135 @@ function RequestsTab({ requests, onRefresh }: { requests: MaterialRequestSummary
 
   const stageBadge = (stage: string) => {
     const map: Record<string, { label: string; cls: string }> = {
-      PENDING_APPROVAL: { label: "Needs Approval", cls: "bg-amber-50 text-amber-700" },
-      QUOTATION: { label: "Getting Quotes", cls: "bg-blue-50 text-[#2648E7]" },
-      DRAFT: { label: "Draft", cls: "bg-gray-100 text-gray-600" },
-      ORDERED: { label: "Ordered", cls: "bg-emerald-50 text-emerald-700" },
-      APPROVED: { label: "Approved", cls: "bg-emerald-50 text-emerald-700" },
+      PENDING_APPROVAL: { label: "Pending PM Review", cls: "bg-amber-50 text-amber-700 border border-amber-200" },
+      QUOTATION: { label: "Getting Quotes", cls: "bg-blue-50 text-[#2648E7] border border-blue-200" },
+      DRAFT: { label: "Draft", cls: "bg-gray-100 text-gray-600 border border-gray-200" },
+      ORDERED: { label: "Order Placed", cls: "bg-emerald-50 text-emerald-700 border border-emerald-200" },
+      APPROVED: { label: "Approved", cls: "bg-emerald-50 text-emerald-700 border border-emerald-200" },
     };
     const s = map[stage] ?? { label: stage, cls: "bg-gray-100 text-gray-600" };
     return <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${s.cls}`}>{s.label}</span>;
   };
 
-  if (requests.length === 0) return <div className="text-center text-muted-foreground py-10">No requests found.</div>;
+  if (requests.length === 0) return <div className="text-center text-muted-foreground py-10">No material requirements found.</div>;
 
   return (
     <div className="space-y-3">
       {requests.map((m) => (
         <Card key={m.id} className="p-4">
           <div className="flex items-start gap-3">
-            <div className="size-10 rounded-xl bg-muted flex items-center justify-center shrink-0">
-              <Package size={18} className="text-muted-foreground" />
+            <div className="size-10 rounded-xl bg-[#2648E7]/10 flex items-center justify-center shrink-0">
+              <Package size={18} className="text-[#2648E7]" />
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-start justify-between gap-2 mb-1">
                 <p className="font-bold text-sm text-foreground">{m.name}</p>
                 {stageBadge(m.stage)}
               </div>
-              <p className="text-sm text-muted-foreground">Quantity: {m.qty}</p>
+              <p className="text-sm text-muted-foreground">Quantity: <strong className="text-foreground">{m.qty}</strong></p>
               <p className="text-xs text-muted-foreground mt-0.5">{m.date}</p>
             </div>
           </div>
-          <div className="mt-3 pt-3 border-t border-border flex gap-2">
+          
+          <div className="mt-3 pt-3 border-t border-border flex flex-wrap gap-2">
             {m.stage === "PENDING_APPROVAL" && role !== "SITE_SUPERVISOR" && (
               <>
-                <button onClick={() => handleApprove(m.id, true)} className="flex-1 py-2 rounded-xl text-sm font-bold text-white transition-opacity hover:opacity-90" style={{ backgroundColor: "#2648E7" }}>Approve</button>
-                <button onClick={() => handleApprove(m.id, false)} className="flex-1 py-2 rounded-xl text-sm font-bold text-red-600 bg-red-50 hover:bg-red-100 transition-colors">Reject</button>
+                <button onClick={() => handleApprove(m.id, true)} className="flex-1 py-2 px-3 rounded-xl text-xs font-bold text-white transition-opacity hover:opacity-90 shadow-sm" style={{ backgroundColor: "#2648E7" }}>
+                  Approve
+                </button>
+                <button onClick={() => handleOpenModify(m)} className="px-3 py-2 rounded-xl text-xs font-bold text-foreground bg-muted hover:bg-muted/80 transition-colors flex items-center gap-1">
+                  <Edit3 size={13} /> Modify
+                </button>
+                <button onClick={() => handleApprove(m.id, false)} className="px-3 py-2 rounded-xl text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 transition-colors">
+                  Reject
+                </button>
               </>
             )}
-            {m.stage === "QUOTATION" && (
-              <button className="flex-1 py-2 rounded-xl text-sm font-bold text-white transition-opacity hover:opacity-90" style={{ backgroundColor: "#2648E7" }}>View Quotations</button>
+
+            {m.stage === "APPROVED" && (
+              <div className="flex items-center justify-between w-full">
+                <span className="flex items-center gap-1.5 text-xs text-emerald-600 font-bold">
+                  <CheckCircle2 size={15} /> Approved
+                </span>
+                <button
+                  onClick={() => onConvertToOrder(m.name, parseInt(m.qty, 10) || 1)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-[#2648E7] hover:bg-[#2648E7]/90 text-white text-xs font-bold rounded-xl transition-colors shadow-sm"
+                >
+                  <ShoppingCart size={13} /> Create Order
+                </button>
+              </div>
             )}
-            {(m.stage === "ORDERED" || m.stage === "APPROVED") && (
-              <span className="flex items-center gap-1.5 text-sm text-emerald-600 font-semibold">
-                <CheckCircle2 size={15} />{m.stage === "ORDERED" ? "Order placed" : "Approved"}
+
+            {m.stage === "ORDERED" && (
+              <span className="flex items-center gap-1.5 text-xs text-emerald-600 font-bold">
+                <CheckCircle2 size={15} /> Purchase order generated
               </span>
             )}
+
             {m.stage === "DRAFT" && (
-              <button onClick={() => handleSubmit(m.id)} className="flex-1 py-2 rounded-xl text-sm font-bold text-white transition-opacity hover:opacity-90" style={{ backgroundColor: "#2648E7" }}>Submit for Approval</button>
+              <button onClick={() => handleSubmit(m.id)} className="flex-1 py-2 rounded-xl text-xs font-bold text-white transition-opacity hover:opacity-90" style={{ backgroundColor: "#2648E7" }}>
+                Submit for Approval
+              </button>
             )}
           </div>
         </Card>
       ))}
+
+      {/* Modify Requirement Dialog */}
+      {modifyingReq && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white w-full max-w-sm rounded-2xl border border-border shadow-2xl p-5">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-bold text-sm text-foreground">Modify Requirement</h3>
+              <button onClick={() => setModifyingReq(null)} className="p-1 hover:bg-muted rounded-lg"><X size={16} /></button>
+            </div>
+            <div className="space-y-3 mb-4">
+              <div>
+                <p className="text-xs text-muted-foreground font-semibold">Material</p>
+                <p className="text-sm font-bold text-foreground mt-0.5">{modifyingReq.name}</p>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-1">Approved Quantity</label>
+                <input 
+                  type="number" 
+                  min="0.1" 
+                  step="any"
+                  value={newQty} 
+                  onChange={e => setNewQty(e.target.value)} 
+                  className="w-full text-sm font-bold bg-muted/40 border border-border rounded-xl px-3 py-2 focus:outline-none focus:border-[#2648E7]" 
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-1">PM Notes / Remarks</label>
+                <input 
+                  type="text" 
+                  placeholder="Optional review note..."
+                  value={modifyNotes} 
+                  onChange={e => setModifyNotes(e.target.value)} 
+                  className="w-full text-xs font-medium bg-muted/40 border border-border rounded-xl px-3 py-2 focus:outline-none focus:border-[#2648E7]" 
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-2 border-t border-border">
+              <button onClick={() => setModifyingReq(null)} className="px-3 py-2 text-xs font-bold text-muted-foreground hover:bg-muted rounded-xl">Cancel</button>
+              <button 
+                disabled={submitting}
+                onClick={() => handleSaveModification(false)} 
+                className="px-3 py-2 text-xs font-bold bg-muted hover:bg-muted/80 text-foreground rounded-xl"
+              >
+                Save Changes
+              </button>
+              <button 
+                disabled={submitting}
+                onClick={() => handleSaveModification(true)} 
+                className="px-3 py-2 text-xs font-bold bg-[#2648E7] hover:bg-[#2648E7]/90 text-white rounded-xl shadow-sm"
+              >
+                Save & Approve
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -519,44 +713,33 @@ function InventoryTab({ items, logs }: { items: any[], logs: ConsumptionLog[] })
   );
 }
 
-function VendorsTab({ vendors }: { vendors: VendorSummary[] }) {
-  if (vendors.length === 0) return <div className="text-center text-muted-foreground py-10">No vendors found.</div>;
-  return (
-    <div className="space-y-3">
-      {vendors.map((v) => (
-        <Card key={v.id} className="p-4 flex items-center gap-3">
-          <div className="size-11 rounded-xl bg-[#2648E7]/8 flex items-center justify-center shrink-0">
-            <Truck size={18} className="text-[#2648E7]" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="font-bold text-sm text-foreground">{v.name}</p>
-            <p className="text-xs text-muted-foreground">{v.category} · {v.gst} · {v.orders} orders</p>
-          </div>
-          {v.due !== "₹0" && (
-            <div className="text-right shrink-0">
-              <p className="text-sm font-bold text-red-600">{v.due}</p>
-              <p className="text-[10px] text-muted-foreground">due</p>
-            </div>
-          )}
-        </Card>
-      ))}
-    </div>
-  );
-}
 
-function PurchaseModals({ activeModal, onClose, onRefresh, projectId, data }: { activeModal: string | null, onClose: () => void, onRefresh: () => void, projectId: string, data: PurchaseSummaryResponse | null }) {
+function PurchaseModals({ activeModal, onClose, onRefresh, projectId, data, orderPrefill }: { 
+  activeModal: string | null; 
+  onClose: () => void; 
+  onRefresh: () => void; 
+  projectId: string; 
+  data: PurchaseSummaryResponse | null;
+  orderPrefill?: { materialName: string; quantity: number } | null;
+}) {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<any>({});
 
   useEffect(() => {
     if (activeModal && ['boq', 'quotations', 'orders', 'received'].includes(activeModal)) {
-      setFormData({ items: [{}] });
+      if (activeModal === 'orders' && orderPrefill) {
+        setFormData({
+          items: [{ materialName: orderPrefill.materialName, quantity: orderPrefill.quantity, unit: 'bags' }]
+        });
+      } else {
+        setFormData({ items: [{}] });
+      }
     } else if (activeModal === 'inventory') {
       setFormData({ items: [] });
     } else {
       setFormData({});
     }
-  }, [activeModal]);
+  }, [activeModal, orderPrefill]);
 
   if (!activeModal) return null;
 

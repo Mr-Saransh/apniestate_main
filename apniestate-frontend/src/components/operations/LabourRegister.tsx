@@ -266,9 +266,11 @@ export default function LabourRegister() {
             className="text-sm font-bold text-foreground focus:outline-none bg-transparent"
           />
         </div>
-        <div className="flex items-center gap-3">
-          <p className="text-xs font-bold text-muted-foreground">Total: {totalMen} workers</p>
-          <button onClick={handleDownloadPDF} className="text-[#2648E7] hover:text-blue-800 flex items-center gap-1 text-xs font-semibold bg-[#2648E7]/10 px-2 py-1.5 rounded-lg transition-colors">
+        <div className="flex items-center gap-2">
+          <p className="text-xs font-bold text-muted-foreground">
+            Total: {totalMen} workers · <span className="text-foreground font-bold">₹{Math.round(totalCost).toLocaleString('en-IN')}</span>
+          </p>
+          <button onClick={handleDownloadPDF} className="text-[#2648E7] hover:text-blue-800 flex items-center gap-1 text-xs font-semibold bg-[#2648E7]/10 px-2.5 py-1.5 rounded-lg transition-colors">
             <Download size={14} /> PDF
           </button>
         </div>
@@ -278,6 +280,8 @@ export default function LabourRegister() {
         {Object.values(entries).map(entry => {
           const cat = categories.find(c => c.id === entry.category_id);
           if (!cat) return null;
+          const hasWage = cat.daily_wage && cat.daily_wage > 0;
+          const hasAttendance = entry.present_count > 0 || entry.half_day_count > 0 || entry.ot_hours > 0;
           const cost = calculateRowTotal(cat.id);
           const emoji = Object.entries(EMOJI_MAP).find(([key]) => key.toLowerCase() === cat.name.toLowerCase())?.[1] || "👷";
 
@@ -290,23 +294,31 @@ export default function LabourRegister() {
                   <div>
                     <div className="flex items-center gap-2">
                       <p className="font-bold text-foreground leading-tight text-sm">{cat.name}</p>
-                      <button onClick={() => handleOpenCatModal(cat)} className="text-muted-foreground hover:text-[#2648E7] transition-colors p-1 rounded-md hover:bg-muted">
+                      <button onClick={() => handleOpenCatModal(cat)} className="text-muted-foreground hover:text-[#2648E7] transition-colors p-1 rounded-md hover:bg-muted" title="Configure Wage">
                         <Edit2 size={12} />
                       </button>
                     </div>
-                    {cat.daily_wage > 0 ? (
-                      <p className="text-xs font-semibold text-muted-foreground mt-0.5">₨{cat.daily_wage} per day</p>
+                    {hasWage ? (
+                      <p className="text-xs font-semibold text-muted-foreground mt-0.5">₹{cat.daily_wage} per day</p>
                     ) : (
-                      <button onClick={() => handleOpenCatModal(cat)} className="text-xs font-bold text-[#2648E7] mt-0.5">Set daily wage →</button>
+                      <button onClick={() => handleOpenCatModal(cat)} className="text-xs font-bold text-amber-600 hover:text-amber-700 mt-0.5 flex items-center gap-1">
+                        Wage Not Configured <span className="underline">Set →</span>
+                      </button>
                     )}
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  {cost > 0 && (
-                    <div className="text-right">
-                      <p className="text-sm font-bold text-foreground leading-tight">₨{Math.round(cost).toLocaleString()}</p>
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mt-0.5">Cost</p>
-                    </div>
+                  {hasAttendance && (
+                    hasWage ? (
+                      <div className="text-right">
+                        <p className="text-sm font-bold text-foreground leading-tight">₹{Math.round(cost).toLocaleString('en-IN')}</p>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mt-0.5">Labour Cost</p>
+                      </div>
+                    ) : (
+                      <span className="px-2 py-1 rounded-lg bg-amber-50 text-amber-700 text-[11px] font-bold border border-amber-200">
+                        Wage Not Configured
+                      </span>
+                    )
                   )}
                   <button
                     onClick={() => {

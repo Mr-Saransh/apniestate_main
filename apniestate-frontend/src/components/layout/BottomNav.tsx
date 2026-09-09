@@ -5,7 +5,7 @@ import { useAppMode } from '@/context/AppModeContext';
 
 const ERP_BOTTOM_NAV = [
   { id: "dashboard", path: "/dashboard", Icon: Home, label: "Home" },
-  { id: "purchase", path: "/purchase", Icon: ShoppingCart, label: "Purchase" },
+  { id: "purchase", path: "/purchase", Icon: ShoppingCart, label: "Procurement" },
   { id: "finance", path: "/finance", Icon: Wallet, label: "Finance" },
   { id: "operations", path: "/operations", Icon: Users, label: "Labour" },
   { id: "progress", path: "/progress", Icon: BarChart2, label: "Progress" },

@@ -142,7 +142,7 @@ export default function App() {
                       <Route path="/material-requests" element={<Navigate to="/purchase?tab=requests" replace />} />
                       <Route path="/purchase-orders" element={<Navigate to="/purchase?tab=orders" replace />} />
                       <Route path="/inventory" element={<Navigate to="/purchase?tab=inventory" replace />} />
-                      <Route path="/materials" element={<Navigate to="/purchase?tab=materials" replace />} />
+                      <Route path="/materials" element={<Navigate to="/purchase?tab=requests" replace />} />
                       <Route path="/vendors" element={<Navigate to="/purchase?tab=vendors" replace />} />
                     </Route>
 

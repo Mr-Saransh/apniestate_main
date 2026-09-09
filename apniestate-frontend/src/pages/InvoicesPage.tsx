@@ -1,8 +1,9 @@
 import React, { useState, useEffect, type FormEvent } from 'react';
-import { Plus, X, Clock, Edit2 } from 'lucide-react';
+import { Plus, X, Clock, Edit2, Paperclip, UploadCloud } from 'lucide-react';
 import { invoicesApi, type Invoice } from '@/api/invoices';
 import { vendorsApi, type Vendor } from '@/api/vendors';
 import { PH, Card, Chip, SrchBar } from '@/components/shared/FigmaComponents';
+import UploadInvoiceModal from '@/components/finance/UploadInvoiceModal';
 
 export default function InvoicesPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -13,6 +14,8 @@ export default function InvoicesPage() {
   // Modals
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploadInvoiceId, setUploadInvoiceId] = useState<string | undefined>(undefined);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
 
   const [submitting, setSubmitting] = useState(false);
@@ -170,12 +173,20 @@ export default function InvoicesPage() {
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex justify-between items-start">
         <PH title="Invoices" sub={`${pendingCount} invoices pending executive clearance`} />
-        <button 
-          onClick={openCreateModal}
-          className="px-3 py-2 bg-primary text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 hover:bg-primary/90 transition-colors shadow-sm"
-        >
-          <Plus className="w-3 h-3" /> New Invoice
-        </button>
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={() => { setUploadInvoiceId(undefined); setShowUploadModal(true); }}
+            className="px-3 py-2 bg-white border border-border text-foreground hover:border-primary text-xs font-semibold flex items-center gap-1.5 rounded-lg shadow-sm transition-colors"
+          >
+            <UploadCloud className="w-3.5 h-3.5 text-primary" /> Upload Invoice
+          </button>
+          <button 
+            onClick={openCreateModal}
+            className="px-3 py-2 bg-primary text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 hover:bg-primary/90 transition-colors shadow-sm"
+          >
+            <Plus className="w-3 h-3" /> New Invoice
+          </button>
+        </div>
       </div>
 
       {pendingCount > 0 && (
@@ -201,6 +212,8 @@ export default function InvoicesPage() {
           filteredInvoices.map((inv, i) => {
             const dueDate = inv.due_date ? new Date(inv.due_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A';
             const displayStatus = (inv.status as string) === 'PENDING' ? 'Pending Approval' : inv.status;
+            const hasAttachment = (inv as any).attachments?.length > 0;
+            const attachmentUrl = hasAttachment ? (inv as any).attachments[0].secure_url : null;
             
             return (
               <div key={inv.id || i} className={`px-4 py-3 ${i < filteredInvoices.length - 1 ? "border-b border-border" : ""}`}>
@@ -219,6 +232,29 @@ export default function InvoicesPage() {
                 <div className="flex items-center gap-2 flex-wrap">
                   <Chip color={statusColor[inv.status] || "gray"}>{displayStatus}</Chip>
                   <span className="text-[10px] text-muted-foreground">Due: {dueDate}</span>
+                  {hasAttachment ? (
+                    <a
+                      href={attachmentUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[10px] font-bold text-primary hover:underline inline-flex items-center gap-1 bg-primary/10 px-2 py-0.5 rounded-md"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Paperclip className="w-3 h-3" /> View Doc
+                    </a>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setUploadInvoiceId(inv.id);
+                        setShowUploadModal(true);
+                      }}
+                      className="text-[10px] text-muted-foreground hover:text-primary inline-flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-muted"
+                    >
+                      <UploadCloud className="w-3 h-3" /> Attach Doc
+                    </button>
+                  )}
                   {((inv.status as string) === "PENDING" || inv.status === "DRAFT") && (
                     <button 
                       onClick={() => approveInvoice(inv.id)}
@@ -250,42 +286,42 @@ export default function InvoicesPage() {
               
               <div className="space-y-3">
                 <div>
-                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Invoice Number *</label>
-                  <input type="text" required className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary" value={formNumber} onChange={e => setFormNumber(e.target.value)} placeholder="INV-0001" />
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Invoice Number</label>
+                  <input required className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary" value={formNumber} onChange={e => setFormNumber(e.target.value)} placeholder="INV-2024-001" />
                 </div>
-
+                
                 <div>
-                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Vendor *</label>
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Vendor</label>
                   <select required className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary" value={formVendorId} onChange={e => setFormVendorId(e.target.value)}>
-                    <option value="">Select Vendor</option>
+                    <option value="" disabled>Select Vendor</option>
                     {vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
                   </select>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Amount (₨) *</label>
-                    <input type="number" required min="0" step="0.01" className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary font-medium" value={formAmount || ''} onChange={e => setFormAmount(Number(e.target.value))} placeholder="0.00" />
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Amount (Excl. Tax)</label>
+                    <input required type="number" min="0" step="0.01" className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary" value={formAmount || ''} onChange={e => setFormAmount(Number(e.target.value))} placeholder="0.00" />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Tax Amount (₨)</label>
-                    <input type="number" min="0" step="0.01" className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary font-medium" value={formTaxAmount || ''} onChange={e => setFormTaxAmount(Number(e.target.value))} placeholder="0.00" />
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Tax Amount</label>
+                    <input type="number" min="0" step="0.01" className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary" value={formTaxAmount || ''} onChange={e => setFormTaxAmount(Number(e.target.value))} placeholder="0.00" />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Due Date *</label>
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Due Date</label>
                     <input type="date" required className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary" value={formDueDate} onChange={e => setFormDueDate(e.target.value)} />
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Status *</label>
-                    <select required className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary" value={formStatus} onChange={e => setFormStatus(e.target.value as any)}>
-                      <option value="DRAFT">Draft</option>
-                      <option value="PENDING">Pending Approval</option>
-                      <option value="APPROVED">Approved</option>
-                      <option value="PAID">Paid</option>
-                      <option value="CANCELLED">Cancelled</option>
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Status</label>
+                    <select className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary" value={formStatus} onChange={e => setFormStatus(e.target.value as any)}>
+                      <option value="DRAFT">DRAFT</option>
+                      <option value="PENDING">PENDING</option>
+                      <option value="APPROVED">APPROVED</option>
+                      <option value="PAID">PAID</option>
+                      <option value="CANCELLED">CANCELLED</option>
                     </select>
                   </div>
                 </div>
@@ -308,6 +344,13 @@ export default function InvoicesPage() {
           </div>
         </div>
       )}
+
+      <UploadInvoiceModal 
+        isOpen={showUploadModal} 
+        onClose={() => { setShowUploadModal(false); setUploadInvoiceId(undefined); }} 
+        onSuccess={fetchData} 
+        preselectedInvoiceId={uploadInvoiceId} 
+      />
     </div>
   );
 }

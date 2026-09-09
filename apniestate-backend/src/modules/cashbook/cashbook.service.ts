@@ -41,6 +41,7 @@ export async function getCashbook(startDate?: string, endDate?: string, siteId?:
 }
 
 export async function createCashbookEntry(data: any, userId: string) {
+  const dbUser = await prisma.user.findUnique({ where: { id: userId }, select: { company_id: true } });
   const entry = await prisma.cashbook.create({
     data: {
       amount: data.amount,
@@ -49,7 +50,11 @@ export async function createCashbookEntry(data: any, userId: string) {
       category: data.category,
       description: data.description,
       reference: data.reference,
-      recorded_by: userId
+      project_id: data.project_id || data.projectId || null,
+      site_id: data.site_id || data.siteId || null,
+      vendor_id: data.vendor_id || data.vendorId || null,
+      recorded_by: userId,
+      company_id: dbUser?.company_id || null
     }
   });
 

@@ -1,9 +1,10 @@
 import React, { useState, useEffect, type FormEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Plus, X, Truck, FileText, TrendingUp, IndianRupee } from 'lucide-react';
+import { Plus, X, Truck, FileText, TrendingUp, IndianRupee, ArrowDownLeft, ArrowUpRight, Wallet, PieChart } from 'lucide-react';
 import { apiClient } from '@/api/client';
 import { expensesApi, type Expense } from '@/api/expenses';
 import { useProject } from '@/context/ProjectContext';
+import UploadInvoiceModal from '@/components/finance/UploadInvoiceModal';
 
 interface CashbookEntry {
   id: string;
@@ -21,6 +22,7 @@ interface CashbookData {
   cashReceived: number;
   cashSpent: number;
   currentBalance: number;
+  categoryBreakdown?: Record<string, number>;
   entries: CashbookEntry[];
 }
 
@@ -29,6 +31,14 @@ interface FinanceSummary {
   total_spent: number;
   budget_variance: number;
   cash_flow: number;
+  cash_in?: number;
+  cash_out?: number;
+  breakdown?: {
+    materials: number;
+    labour: number;
+    equipment: number;
+    directExpenses: number;
+  };
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -57,6 +67,7 @@ export default function FinancePage() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
   
@@ -150,6 +161,22 @@ export default function FinancePage() {
   const budget = summary?.total_budget || 0;
   const spend = summary?.total_spent || 0;
   const available = summary?.budget_variance || 0;
+  const moneyIn = data?.cashReceived ?? (summary?.cash_in || 0);
+  const moneyOut = data?.cashSpent ?? (summary?.cash_out || 0);
+  const netBalance = data?.currentBalance ?? (summary?.cash_flow || 0);
+
+  // Category outflow breakdown
+  const materialsCost = summary?.breakdown?.materials || 0;
+  const labourCost = summary?.breakdown?.labour || 0;
+  const equipmentCost = summary?.breakdown?.equipment || 0;
+  const directExpensesCost = summary?.breakdown?.directExpenses || expenses.reduce((s, e) => s + e.amount, 0);
+  const totalOutflow = materialsCost + labourCost + equipmentCost + directExpensesCost || (moneyOut > 0 ? moneyOut : 1);
+  const categories = [
+    { label: "Materials & Procurement", amount: materialsCost, color: "bg-blue-600", dotColor: "bg-blue-600" },
+    { label: "Labour & Wages", amount: labourCost, color: "bg-amber-500", dotColor: "bg-amber-500" },
+    { label: "Equipment & Machinery", amount: equipmentCost, color: "bg-purple-600", dotColor: "bg-purple-600" },
+    { label: "Direct & Site Expenses", amount: directExpensesCost, color: "bg-emerald-600", dotColor: "bg-emerald-600" },
+  ];
 
   return (
     <div className="flex flex-col h-full bg-background">
@@ -184,21 +211,118 @@ export default function FinancePage() {
 
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-2xl mx-auto px-4 py-5 space-y-6">
+          {/* Prominent Money In, Money Out, Net Balance */}
+          <div>
+            <SectionLabel>Cash Flow Overview</SectionLabel>
+            <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
+              <div className="bg-emerald-50/80 border border-emerald-200/80 rounded-2xl p-3.5 flex flex-col justify-between shadow-sm">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-emerald-700">Money In</span>
+                  <div className="size-6 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700">
+                    <ArrowDownLeft size={13} />
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm sm:text-base font-bold text-emerald-800" style={{ fontFamily: "var(--font-display)" }}>
+                    +{fmt(moneyIn)}
+                  </p>
+                  <p className="text-[10px] text-emerald-600 font-medium">Credits / Receipts</p>
+                </div>
+              </div>
+
+              <div className="bg-red-50/80 border border-red-200/80 rounded-2xl p-3.5 flex flex-col justify-between shadow-sm">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-red-700">Money Out</span>
+                  <div className="size-6 rounded-full bg-red-100 flex items-center justify-center text-red-700">
+                    <ArrowUpRight size={13} />
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm sm:text-base font-bold text-red-800" style={{ fontFamily: "var(--font-display)" }}>
+                    -{fmt(moneyOut)}
+                  </p>
+                  <p className="text-[10px] text-red-600 font-medium">Debits / Outflow</p>
+                </div>
+              </div>
+
+              <div className="bg-blue-50/80 border border-blue-200/80 rounded-2xl p-3.5 flex flex-col justify-between shadow-sm">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-[#2648E7]">Balance</span>
+                  <div className="size-6 rounded-full bg-blue-100 flex items-center justify-center text-[#2648E7]">
+                    <Wallet size={13} />
+                  </div>
+                </div>
+                <div>
+                  <p className={`text-sm sm:text-base font-bold ${netBalance >= 0 ? 'text-[#2648E7]' : 'text-red-600'}`} style={{ fontFamily: "var(--font-display)" }}>
+                    {fmt(netBalance)}
+                  </p>
+                  <p className="text-[10px] text-blue-600 font-medium">Net Available</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Actions */}
           <div className="grid grid-cols-2 gap-3">
-            {[
-              { icon: <Plus size={20} />, label: "Add Entry", style: { backgroundColor: "#2648E7" }, textClass: "text-white", onClick: () => setShowModal(true) },
-              { icon: <FileText size={20} />, label: "Upload Invoice", cls: "bg-white border border-border opacity-50", textClass: "text-foreground", onClick: () => {} },
-            ].map(({ icon, label, style, cls, textClass, onClick }) => (
-              <button
-                key={label}
-                onClick={onClick}
-                className={`rounded-2xl p-4 flex justify-center items-center gap-2 font-bold text-sm text-center shadow-sm hover:shadow-md transition-shadow ${cls ?? ""} ${textClass}`}
-                style={style}
-              >
-                {icon}{label}
-              </button>
-            ))}
+            <button
+              onClick={() => setShowModal(true)}
+              className="rounded-2xl p-4 flex justify-center items-center gap-2 font-bold text-sm text-center shadow-sm hover:shadow-md transition-shadow text-white"
+              style={{ backgroundColor: "#2648E7" }}
+            >
+              <Plus size={20} /> Add Entry
+            </button>
+            <button
+              onClick={() => setShowUploadModal(true)}
+              className="rounded-2xl p-4 flex justify-center items-center gap-2 font-bold text-sm text-center shadow-sm hover:shadow-md transition-shadow bg-white border border-border hover:border-[#2648E7] text-[#2648E7]"
+            >
+              <FileText size={20} /> Upload Invoice
+            </button>
+          </div>
+
+          {/* Where Did The Money Go? Category Outflow Breakdown */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <SectionLabel>Category Outflow Breakdown</SectionLabel>
+              <span className="text-[11px] font-semibold text-muted-foreground">
+                Total: {fmt(totalOutflow > 1 ? totalOutflow : 0)}
+              </span>
+            </div>
+            <Card className="p-4 space-y-3">
+              {/* Multi-segment stacked bar */}
+              <div className="h-2.5 w-full bg-muted rounded-full overflow-hidden flex">
+                {categories.map((cat, i) => {
+                  const pct = totalOutflow > 1 ? (cat.amount / totalOutflow) * 100 : 0;
+                  if (pct <= 0) return null;
+                  return (
+                    <div
+                      key={i}
+                      className={`${cat.color} transition-all duration-300`}
+                      style={{ width: `${pct}%` }}
+                      title={`${cat.label}: ${pct.toFixed(1)}%`}
+                    />
+                  );
+                })}
+              </div>
+
+              {/* Category list items */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                {categories.map((cat, i) => {
+                  const pct = totalOutflow > 1 ? Math.round((cat.amount / totalOutflow) * 100) : 0;
+                  return (
+                    <div key={i} className="flex items-center justify-between p-2.5 rounded-xl bg-muted/40 border border-border/50">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className={`size-2 rounded-full ${cat.dotColor} shrink-0`} />
+                        <span className="text-xs font-semibold text-foreground truncate">{cat.label}</span>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <span className="text-xs font-bold text-foreground">{fmt(cat.amount)}</span>
+                        <span className="text-[10px] text-muted-foreground ml-1">({pct}%)</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
           </div>
 
           {/* Transactions */}
@@ -306,6 +430,12 @@ export default function FinancePage() {
           </div>
         </div>
       )}
+
+      <UploadInvoiceModal
+        isOpen={showUploadModal}
+        onClose={() => setShowUploadModal(false)}
+        onSuccess={() => { loadData(); }}
+      />
     </div>
   );
 }

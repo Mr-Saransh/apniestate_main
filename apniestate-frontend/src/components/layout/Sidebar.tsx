@@ -56,19 +56,10 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
     },
     {
       label: "Daily Work", hideOnMobile: true, items: [
-        { id: "/purchase", label: t('sidebar.procurement', 'Purchase'), icon: ShoppingCart },
+        { id: "/purchase", label: t('sidebar.procurement', 'Procurement'), icon: ShoppingCart },
         { id: "/finance", label: t('sidebar.finance', 'Finance'), icon: Wallet },
         { id: "/operations", label: t('sidebar.operations', 'Operations'), icon: Users },
         { id: "/progress", label: t('sidebar.progress', 'Progress'), icon: BarChart2 },
-      ]
-    },
-    {
-      label: "Purchase Detail", items: [
-        { id: "/boq", label: "BOQ", icon: FileSpreadsheet },
-        { id: "/material-requests", label: "Material Requests", icon: Package },
-        { id: "/purchase-orders", label: "Purchase Orders", icon: ClipboardList },
-        { id: "/inventory", label: "Inventory", icon: Archive },
-        { id: "/vendors", label: "Vendors", icon: Truck },
       ]
     },
     {

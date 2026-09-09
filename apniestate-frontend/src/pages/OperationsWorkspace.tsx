@@ -62,12 +62,15 @@ export default function OperationsWorkspace() {
       <div className="bg-white border-b border-border px-4 pt-4 pb-0 shrink-0 sticky top-0 z-10">
         <h2 className="text-base font-bold text-foreground mb-3" style={{ fontFamily: "var(--font-display)" }}>Operations</h2>
         <div className="flex gap-0">
-          {[{ id: "labour", label: "Labour Register" }, { id: "equipment", label: "Equipment" }].map(({ id, label }) => (
+          {[
+            { id: "labour", label: "Labour Register" },
+            { id: "equipment", label: "Equipment" }
+          ].map(({ id, label }) => (
             <button
               key={id}
               onClick={() => setSearchParams({ tab: id }, { replace: true })}
               className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
-                tab === id ? "border-[#2648E7] text-[#2648E7]" : "border-transparent text-muted-foreground"
+                tab === id ? "border-[#2648E7] text-[#2648E7]" : "border-transparent text-muted-foreground hover:text-foreground"
               }`}
             >
               {label}
@@ -76,11 +79,10 @@ export default function OperationsWorkspace() {
         </div>
       </div>
 
-      {tab === "labour" ? (
-        <LabourRegister />
-      ) : (
-        <EquipmentRegister />
-      )}
+      <div className="flex-1 overflow-y-auto">
+        {tab === "labour" && <LabourRegister />}
+        {tab === "equipment" && <EquipmentRegister />}
+      </div>
     </div>
   );
 }

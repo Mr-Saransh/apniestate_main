@@ -4,8 +4,24 @@ import { useProject } from '@/context/ProjectContext';
 import { apiClient } from '@/api/client';
 import {
   Users, IndianRupee, Package, CloudSun,
-  ChevronRight, Calendar, TrendingUp, ShoppingCart, Wallet, HardHat
+  ChevronRight, Calendar, TrendingUp, ShoppingCart, Wallet, HardHat,
+  AlertTriangle, Clock
 } from 'lucide-react';
+
+interface ProjectIntelligence {
+  budget: number;
+  actualSpend: number;
+  remainingBudget: number;
+  todayLabourCost: number;
+  pendingPaymentExposure: number;
+  pendingPaymentCount: number;
+  lowStockCount: number;
+  lowStockItems: { name: string; unit: string; quantity: number; minQuantity: number; site: string }[];
+  procurementDelayCount: number;
+  overdueMilestoneCount: number;
+  overdueMilestones: { name: string; targetDate: string }[];
+  materialVariances: { id: string; name: string; unit: string; planned: number; used: number; remaining: number; percentUsed: number }[];
+}
 
 interface ProjectSummary {
   project: {
@@ -16,8 +32,10 @@ interface ProjectSummary {
   todaySummary: {
     labourCount: number; labourCost: number; todayExpense: number;
     pendingMaterialRequests: number; pendingVendorPayments: number;
+    pendingVendorPaymentAmount?: number;
     materialsReceivedToday: number; equipmentRunning: number;
   };
+  projectIntelligence?: ProjectIntelligence;
   alerts: { type: string; message: string; link: string; severity: string }[];
   progress: {
     currentMilestone: { name: string; targetDate: string; status: string } | null;
@@ -89,6 +107,13 @@ export default function ProjectCommandCenter() {
   const project = data?.project;
   const summary = data?.todaySummary;
   const progress = data?.progress;
+  const intel = data?.projectIntelligence;
+
+  const budgetNum = project?.budget || 0;
+  const actualSpendNum = project?.actual_cost || 0;
+  const remainingBudget = intel?.remainingBudget ?? Math.max(0, budgetNum - actualSpendNum);
+  const todayLabourCost = intel?.todayLabourCost ?? (summary?.labourCost || 0);
+  const paymentExposure = intel?.pendingPaymentExposure ?? (summary?.pendingVendorPaymentAmount || 0);
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
@@ -98,7 +123,14 @@ export default function ProjectCommandCenter() {
           <div>
             <p className="text-sm text-blue-200 font-medium">Project Progress</p>
             <p className="text-3xl font-bold mt-0.5" style={{ fontFamily: "var(--font-display)" }}>{project?.progress_percentage || 0}%</p>
-            <p className="text-sm text-blue-200 mt-0.5">Budget used: {fmt(project?.actual_cost)} of {fmt(project?.budget)}</p>
+            <p className="text-sm text-blue-200 mt-0.5">
+              Budget used: {fmt(project?.actual_cost)} of {fmt(project?.budget)}
+              {budgetNum > 0 && (
+                <span className="ml-2 px-2 py-0.5 text-xs font-bold bg-white/20 rounded-full inline-block">
+                  Rem: {fmt(remainingBudget)}
+                </span>
+              )}
+            </p>
           </div>
           <div className="text-right">
             <div className="flex items-center gap-1.5 justify-end mb-1">
@@ -129,6 +161,139 @@ export default function ProjectCommandCenter() {
             <p className="text-xs text-muted-foreground mt-0.5 leading-tight">{s.label}</p>
           </Card>
         ))}
+      </div>
+
+      {/* Practical Project Intelligence */}
+      <div>
+        <SectionLabel>Project Intelligence</SectionLabel>
+        <div className="grid grid-cols-3 gap-3">
+          <Card className="p-3.5 flex flex-col justify-between">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Remaining</span>
+              <span className="size-5 rounded-md bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-[10px]">₹</span>
+            </div>
+            <p className="text-base font-bold text-foreground truncate">{fmt(remainingBudget)}</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">Budget Balance</p>
+          </Card>
+
+          <Card className="p-3.5 flex flex-col justify-between">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Labour Cost</span>
+              <span className="size-5 rounded-md bg-purple-50 text-purple-600 flex items-center justify-center">
+                <Users size={10} />
+              </span>
+            </div>
+            <p className="text-base font-bold text-foreground truncate">{fmt(todayLabourCost)}</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">Today's Wage Cost</p>
+          </Card>
+
+          <Card className="p-3.5 flex flex-col justify-between">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Payments Due</span>
+              <span className="size-5 rounded-md bg-red-50 text-red-600 flex items-center justify-center">
+                <IndianRupee size={10} />
+              </span>
+            </div>
+            <p className="text-base font-bold text-foreground truncate">{fmt(paymentExposure)}</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">{intel?.pendingPaymentCount || summary?.pendingVendorPayments || 0} Invoices</p>
+          </Card>
+        </div>
+
+        {/* Real Warnings: Low stock / Delay */}
+        {((intel?.lowStockCount && intel.lowStockCount > 0) || (intel?.procurementDelayCount && intel.procurementDelayCount > 0) || (intel?.overdueMilestoneCount && intel.overdueMilestoneCount > 0)) && (
+          <div className="mt-2.5 space-y-2">
+            {intel.lowStockCount > 0 && (
+              <div 
+                onClick={() => navigate('/purchase?tab=inventory')}
+                className="cursor-pointer bg-amber-50/90 hover:bg-amber-100 border border-amber-200 rounded-xl p-3 flex items-center justify-between transition-colors"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="size-7 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+                    <AlertTriangle size={14} />
+                  </span>
+                  <div className="truncate">
+                    <p className="text-xs font-bold text-amber-900">Low Stock Reorder Warning ({intel.lowStockCount} items)</p>
+                    <p className="text-[11px] text-amber-700 truncate">
+                      {intel.lowStockItems?.[0]?.name ? `${intel.lowStockItems[0].name} (${intel.lowStockItems[0].quantity} ${intel.lowStockItems[0].unit} left)` : 'Stock below minimum threshold'}
+                    </p>
+                  </div>
+                </div>
+                <ChevronRight size={14} className="text-amber-600 shrink-0" />
+              </div>
+            )}
+
+            {intel.procurementDelayCount > 0 && (
+              <div 
+                onClick={() => navigate('/purchase?tab=orders')}
+                className="cursor-pointer bg-red-50/90 hover:bg-red-100 border border-red-200 rounded-xl p-3 flex items-center justify-between transition-colors"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="size-7 rounded-lg bg-red-100 text-red-700 flex items-center justify-center shrink-0">
+                    <Clock size={14} />
+                  </span>
+                  <div className="truncate">
+                    <p className="text-xs font-bold text-red-900">Procurement Delay Warning ({intel.procurementDelayCount} orders)</p>
+                    <p className="text-[11px] text-red-700 truncate">Purchase orders past expected delivery date</p>
+                  </div>
+                </div>
+                <ChevronRight size={14} className="text-red-600 shrink-0" />
+              </div>
+            )}
+
+            {intel.overdueMilestoneCount > 0 && (
+              <div 
+                onClick={() => navigate('/progress?tab=timeline')}
+                className="cursor-pointer bg-rose-50/90 hover:bg-rose-100 border border-rose-200 rounded-xl p-3 flex items-center justify-between transition-colors"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="size-7 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
+                    <Calendar size={14} />
+                  </span>
+                  <div className="truncate">
+                    <p className="text-xs font-bold text-rose-900">Milestone Delay Warning ({intel.overdueMilestoneCount} overdue)</p>
+                    <p className="text-[11px] text-rose-700 truncate">
+                      {intel.overdueMilestones?.[0]?.name || 'Milestone target date exceeded'}
+                    </p>
+                  </div>
+                </div>
+                <ChevronRight size={14} className="text-rose-600 shrink-0" />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Material Usage Variance where BOQ data exists */}
+        {intel?.materialVariances && intel.materialVariances.length > 0 && (
+          <Card className="mt-2.5 p-3.5">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold text-foreground">Material Usage vs BOQ Planned</span>
+              <button 
+                onClick={() => navigate('/purchase?tab=boq')}
+                className="text-[11px] font-bold text-[#2648E7] hover:underline"
+              >
+                View BOQ →
+              </button>
+            </div>
+            <div className="space-y-2">
+              {intel.materialVariances.slice(0, 3).map((item) => (
+                <div key={item.id} className="text-xs">
+                  <div className="flex justify-between font-medium text-foreground mb-0.5">
+                    <span className="truncate pr-2">{item.name}</span>
+                    <span className="shrink-0 text-muted-foreground text-[11px]">
+                      {item.used} / {item.planned} {item.unit} ({item.percentUsed}%)
+                    </span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                    <div 
+                      className={`h-full rounded-full transition-all ${item.percentUsed > 90 ? 'bg-red-500' : item.percentUsed > 70 ? 'bg-amber-500' : 'bg-[#2648E7]'}`}
+                      style={{ width: `${Math.min(100, item.percentUsed)}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
       </div>
 
       {/* Needs attention */}

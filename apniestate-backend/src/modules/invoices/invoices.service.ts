@@ -15,7 +15,7 @@ export async function getInvoices(filters?: { vendor_id?: string; status?: strin
   if (filters?.vendor_id) where.vendor_id = filters.vendor_id;
   if (filters?.status) where.status = filters.status;
 
-  return prisma.invoice.findMany({
+  const invoices = await prisma.invoice.findMany({
     where,
     include: {
       vendor: { select: { id: true, name: true } },
@@ -23,16 +23,57 @@ export async function getInvoices(filters?: { vendor_id?: string; status?: strin
     },
     orderBy: { created_at: "desc" },
   });
+
+  const invoiceIds = invoices.map(i => i.id);
+  if (invoiceIds.length > 0) {
+    const attachments = await prisma.attachment.findMany({
+      where: {
+        entity_type: 'INVOICE',
+        entity_id: { in: invoiceIds },
+        deleted_at: null,
+      },
+      select: {
+        id: true,
+        entity_id: true,
+        file_name: true,
+        secure_url: true,
+        mime_type: true
+      }
+    });
+
+    const attMap = new Map<string, any[]>();
+    attachments.forEach(att => {
+      const list = attMap.get(att.entity_id) || [];
+      list.push(att);
+      attMap.set(att.entity_id, list);
+    });
+
+    return invoices.map(inv => ({
+      ...inv,
+      attachments: attMap.get(inv.id) || []
+    }));
+  }
+
+  return invoices;
 }
 
 export async function getInvoiceById(id: string) {
-  return prisma.invoice.findUnique({
+  const invoice = await prisma.invoice.findUnique({
     where: { id },
     include: {
       vendor: { select: { id: true, name: true, phone: true, email: true } },
       payments: { orderBy: { date: "desc" } },
     },
   });
+
+  if (!invoice) return null;
+
+  const attachments = await prisma.attachment.findMany({
+    where: { entity_type: 'INVOICE', entity_id: id, deleted_at: null },
+    select: { id: true, file_name: true, secure_url: true, mime_type: true }
+  });
+
+  return { ...invoice, attachments };
 }
 
 export async function createInvoice(data: z.infer<typeof CreateInvoiceSchema>) {
