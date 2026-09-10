@@ -161,7 +161,7 @@ export default function ProfilePage() {
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div className="flex items-center gap-3.5">
                 <div className="size-12 rounded-2xl bg-gradient-to-tr from-[#2648E7] to-[#4F6DFF] flex items-center justify-center shadow-lg shadow-[#2648E7]/30 shrink-0">
-                  {entitlements.plan_id === 'PLAN_100K' ? (
+                  {entitlements.plan_id === 'ENTERPRISE' || entitlements.plan_id === 'PLAN_100K' || entitlements.has_crm ? (
                     <Sparkles size={24} className="text-[#FCC300]" />
                   ) : (
                     <Zap size={24} className="text-white" />

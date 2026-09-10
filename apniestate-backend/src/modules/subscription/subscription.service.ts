@@ -23,13 +23,15 @@ const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || "";
 // ─── Create Razorpay Order ────────────────────────────────
 
 export async function createRazorpayOrder(params?: {
-  plan_id?: CommercialPlanId;
+  plan_id?: string;
   duration_months?: number;
+  is_renewal?: boolean;
 }) {
-  const planId = params?.plan_id || "PLAN_30K";
-  const durationMonths = params?.duration_months || 4;
+  const planId = params?.plan_id || "BASIC";
+  const durationMonths = params?.duration_months || 1;
+  const isRenewal = !!params?.is_renewal;
 
-  const totalAmountINR = calculateSubscriptionPrice(planId, durationMonths);
+  const totalAmountINR = calculateSubscriptionPrice(planId, durationMonths, { isRenewal });
   const amountInPaise = totalAmountINR * 100;
 
   if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
@@ -41,6 +43,7 @@ export async function createRazorpayOrder(params?: {
       receipt: `rcpt_${Date.now()}`,
       plan_id: planId,
       duration_months: durationMonths,
+      is_renewal: isRenewal,
     };
   }
 
@@ -62,6 +65,7 @@ export async function createRazorpayOrder(params?: {
         product: "Apni Estate Subscription",
         plan: planId,
         duration_months: durationMonths,
+        is_renewal: isRenewal ? "true" : "false",
       },
     }),
   });
@@ -76,6 +80,7 @@ export async function createRazorpayOrder(params?: {
     ...data,
     plan_id: planId,
     duration_months: durationMonths,
+    is_renewal: isRenewal,
   };
 }
 
@@ -89,12 +94,13 @@ export async function verifyAndActivateSubscription(
     razorpay_payment_id,
     razorpay_order_id,
     razorpay_signature,
-    plan_id = "PLAN_30K",
-    duration_months = 4,
+    plan_id = "BASIC",
+    duration_months = 1,
+    is_renewal = false,
   } = input;
 
   const planId = plan_id as CommercialPlanId;
-  const durationMonths = Number(duration_months) || 4;
+  const durationMonths = Number(duration_months) || 1;
 
   // 1. Verify signature
   if (RAZORPAY_KEY_SECRET) {
@@ -109,7 +115,7 @@ export async function verifyAndActivateSubscription(
     }
   }
 
-  const totalAmountINR = calculateSubscriptionPrice(planId, durationMonths);
+  const totalAmountINR = calculateSubscriptionPrice(planId, durationMonths, { isRenewal: is_renewal });
   const now = new Date();
   const expiresAt = new Date(now);
   expiresAt.setMonth(expiresAt.getMonth() + durationMonths);
@@ -224,12 +230,12 @@ export async function renewSubscription(
     razorpay_payment_id,
     razorpay_order_id,
     razorpay_signature,
-    plan_id = "PLAN_30K",
-    duration_months = 4,
+    plan_id = "BASIC",
+    duration_months = 1,
   } = input;
 
   const planId = plan_id as CommercialPlanId;
-  const durationMonths = Number(duration_months) || 4;
+  const durationMonths = Number(duration_months) || 1;
 
   if (RAZORPAY_KEY_SECRET) {
     const body = `${razorpay_order_id}|${razorpay_payment_id}`;
@@ -243,7 +249,8 @@ export async function renewSubscription(
     }
   }
 
-  const totalAmountINR = calculateSubscriptionPrice(planId, durationMonths);
+  // Renewal only pays the recurring monthly plan (one-time setup cost is ₹0)
+  const totalAmountINR = calculateSubscriptionPrice(planId, durationMonths, { isRenewal: true });
   const now = new Date();
   const expiresAt = new Date(now);
   expiresAt.setMonth(expiresAt.getMonth() + durationMonths);
@@ -401,9 +408,9 @@ export async function checkExpiringSubscriptions() {
 // ─── Select Plan (Manual/Direct selection) ───────────────
 
 export async function selectPlan(userId: string, input: SelectPlanInput) {
-  const { plan_id, duration_months = 4 } = input;
+  const { plan_id, duration_months = 1 } = input;
   const planId = plan_id as CommercialPlanId;
-  const durationMonths = Number(duration_months) || 4;
+  const durationMonths = Number(duration_months) || 1;
 
   const totalAmountINR = calculateSubscriptionPrice(planId, durationMonths);
   const now = new Date();
@@ -499,7 +506,7 @@ export async function requestTrial(userId: string) {
       company_id: companyId,
       user_id: userId,
       type: "TRIAL",
-      plan: "PLAN_30K",
+      plan: "BASIC",
       duration_months: 1,
       status: "PENDING_TRIAL",
       price: 0,

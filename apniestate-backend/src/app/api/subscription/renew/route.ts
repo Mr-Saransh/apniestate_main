@@ -9,12 +9,13 @@ import { ok, badRequest, serverError } from "@/lib/response";
 export const GET = withAuth(async (req: NextRequest, _user) => {
   try {
     const url = new URL(req.url);
-    const planId = (url.searchParams.get("plan_id") as any) || "PLAN_30K";
-    const durationMonths = parseInt(url.searchParams.get("duration_months") || "4", 10);
+    const planId = (url.searchParams.get("plan_id") as any) || "BASIC";
+    const durationMonths = parseInt(url.searchParams.get("duration_months") || "1", 10);
 
     const order = await createRazorpayOrder({
       plan_id: planId,
       duration_months: durationMonths,
+      is_renewal: true,
     });
     return ok(order, "Renewal order created");
   } catch (err: any) {

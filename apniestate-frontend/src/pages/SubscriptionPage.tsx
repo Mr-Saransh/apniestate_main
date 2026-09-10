@@ -27,14 +27,15 @@ declare global {
 
 const RAZORPAY_KEY = import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_live_S5I6BaqdNg0Tjk';
 
-type PlanTier = 'PLAN_30K' | 'PLAN_50K' | 'PLAN_100K';
-type DurationOption = 4 | 6 | 12;
+type PlanTier = 'BASIC' | 'PROFESSIONAL' | 'ENTERPRISE';
+type DurationOption = 1 | 4 | 6 | 12;
 
 interface PlanDefinition {
   id: PlanTier;
   name: string;
   badge: string;
-  basePrice: number;
+  setupCost: number;
+  monthlyPrice: number;
   maxProjects: string;
   hasCrm: boolean;
   isRecommended: boolean;
@@ -44,17 +45,18 @@ interface PlanDefinition {
 
 const PLANS: PlanDefinition[] = [
   {
-    id: 'PLAN_30K',
-    name: 'Starter',
-    badge: '₹30,000 Base',
-    basePrice: 30000,
+    id: 'BASIC',
+    name: 'Basic',
+    badge: '₹1,00,000 Setup',
+    setupCost: 100000,
+    monthlyPrice: 10000,
     maxProjects: '1 Active Project',
     hasCrm: false,
     isRecommended: false,
-    description: 'Perfect for individual builders managing a single active site.',
+    description: 'Essential construction management for single-site builders & individual developers.',
     features: [
       { text: '1 Active Project limit', included: true, highlight: true },
-      { text: 'Construction Management', included: true },
+      { text: 'Full Construction Management', included: true },
       { text: 'BOQ, DPR & Site Attendance', included: true },
       { text: 'Finance, Expenses & Cashbook', included: true },
       { text: 'Material Requests & Inventory', included: true },
@@ -62,35 +64,38 @@ const PLANS: PlanDefinition[] = [
     ],
   },
   {
-    id: 'PLAN_50K',
-    name: 'Growth',
-    badge: '₹50,000 Base',
-    basePrice: 50000,
+    id: 'PROFESSIONAL',
+    name: 'Professional',
+    badge: '₹1,50,000 Setup',
+    setupCost: 150000,
+    monthlyPrice: 20000,
     maxProjects: '3 Active Projects',
     hasCrm: false,
     isRecommended: false,
-    description: 'Designed for expanding developers overseeing up to 3 projects.',
+    description: 'Designed for expanding contractors overseeing up to 3 active construction sites.',
     features: [
       { text: '3 Active Projects limit', included: true, highlight: true },
-      { text: 'Construction Management', included: true },
+      { text: 'Full Construction Management', included: true },
       { text: 'BOQ, DPR & Site Attendance', included: true },
       { text: 'Finance, Expenses & Cashbook', included: true },
       { text: 'Material Requests & Inventory', included: true },
+      { text: 'Multi-site Supervision', included: true },
       { text: 'CRM Sales & Leads Workspace', included: false },
     ],
   },
   {
-    id: 'PLAN_100K',
+    id: 'ENTERPRISE',
     name: 'Enterprise',
-    badge: '₹1,00,000 Base',
-    basePrice: 100000,
+    badge: '₹2,00,000 Setup',
+    setupCost: 200000,
+    monthlyPrice: 40000,
     maxProjects: 'Unlimited Projects',
     hasCrm: true,
     isRecommended: true,
-    description: 'All-in-one ERP + CRM suite for established real estate leaders.',
+    description: 'Complete Construction ERP + CRM suite for established real estate companies.',
     features: [
       { text: 'Unlimited Active Projects (∞)', included: true, highlight: true },
-      { text: 'Construction Management', included: true },
+      { text: 'Full Construction Management', included: true },
       { text: 'Full CRM Suite Included', included: true, highlight: true },
       { text: 'Leads, Pipeline, Followups & Deals', included: true },
       { text: 'BOQ, DPR, Finance & Inventory', included: true },
@@ -99,11 +104,18 @@ const PLANS: PlanDefinition[] = [
   },
 ];
 
+const DURATION_PACKAGES: Record<DurationOption, { discountRate: number; label: string; badge?: string }> = {
+  1: { discountRate: 0, label: '1 Month' },
+  4: { discountRate: 0.10, label: '4 Months', badge: '10% OFF' },
+  6: { discountRate: 0.20, label: '6 Months', badge: '20% OFF' },
+  12: { discountRate: 0.35, label: '12 Months', badge: '35% OFF • Best Value' },
+};
+
 export default function SubscriptionPage() {
   const navigate = useNavigate();
   const { user, setAuthSession, logout } = useAuth();
 
-  const [selectedPlan, setSelectedPlan] = useState<PlanTier>('PLAN_100K');
+  const [selectedPlan, setSelectedPlan] = useState<PlanTier>('ENTERPRISE');
   const [selectedDuration, setSelectedDuration] = useState<DurationOption>(4);
   const [paying, setPaying] = useState(false);
   const [requestingTrial, setRequestingTrial] = useState(false);
@@ -120,21 +132,31 @@ export default function SubscriptionPage() {
     return null;
   }
 
-  const currentPlan = useMemo(
-    () => PLANS.find((p) => p.id === selectedPlan) || PLANS[2],
-    [selectedPlan]
-  );
-
-  const calculateTotal = (basePrice: number, duration: number) => {
-    return basePrice * duration;
-  };
-
   const formatINR = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
       currency: 'INR',
       maximumFractionDigits: 0,
     }).format(amount);
+  };
+
+  const getPlanCalculation = (plan: PlanDefinition, duration: DurationOption) => {
+    const pkg = DURATION_PACKAGES[duration];
+    const grossSubscription = plan.monthlyPrice * duration;
+    const discountAmount = Math.round(grossSubscription * pkg.discountRate);
+    const subscriptionAmount = grossSubscription - discountAmount;
+    const setupCost = plan.setupCost;
+    const totalToday = setupCost + subscriptionAmount;
+
+    return {
+      grossSubscription,
+      discountRate: pkg.discountRate,
+      discountPercent: Math.round(pkg.discountRate * 100),
+      discountAmount,
+      subscriptionAmount,
+      setupCost,
+      totalToday,
+    };
   };
 
   const loadRazorpayScript = (): Promise<boolean> => {
@@ -180,7 +202,7 @@ export default function SubscriptionPage() {
         amount: order.amount,
         currency: order.currency || 'INR',
         name: 'Apni Estate',
-        description: `${targetPlan.name} Subscription (${selectedDuration} Months)`,
+        description: `${targetPlan.name} Plan (Setup + ${selectedDuration} Mo Subscription)`,
         order_id: order.id,
         handler: async (response: any) => {
           try {
@@ -256,40 +278,52 @@ export default function SubscriptionPage() {
       <div className="absolute top-0 left-1/4 w-96 h-96 bg-[#2648E7]/20 rounded-full blur-3xl pointer-events-none -translate-y-1/2" />
       <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-[#FCC300]/10 rounded-full blur-3xl pointer-events-none translate-y-1/2" />
 
-      <div className="max-w-6xl mx-auto relative z-10">
+      <div className="max-w-7xl mx-auto relative z-10">
         {/* Top Header */}
         <div className="text-center mb-10">
           <div className="flex justify-center mb-6">
             <Logo size="xl" variant="light" />
           </div>
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-100 to-slate-300">
-            Select Your Business Plan
+            Construction Management Software
           </h1>
-          <p className="mt-3 text-base sm:text-lg text-slate-400 max-w-2xl mx-auto">
-            Scale your real estate construction and sales operations with enterprise-grade entitlements.
+          <p className="mt-3 text-base sm:text-lg text-slate-300 max-w-2xl mx-auto">
+            Transparent pricing: One-time setup cost with flexible monthly subscription packages.
           </p>
 
+          {/* Setup Cost Callout Banner */}
+          <div className="mt-4 inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#2648E7]/20 border border-[#2648E7]/40 text-xs font-semibold text-blue-200">
+            <Zap size={14} className="text-[#FCC300]" />
+            <span>Setup cost is a one-time onboarding fee — subsequent renewals only pay the monthly subscription!</span>
+          </div>
+
           {/* Duration Selector Switcher */}
-          <div className="mt-8 inline-flex items-center p-1.5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-xl shadow-2xl">
-            {([4, 6, 12] as DurationOption[]).map((dur) => (
-              <button
-                key={dur}
-                type="button"
-                onClick={() => setSelectedDuration(dur)}
-                className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-all duration-200 flex items-center gap-2 ${
-                  selectedDuration === dur
-                    ? 'bg-[#2648E7] text-white shadow-lg shadow-[#2648E7]/40 scale-100'
-                    : 'text-slate-400 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                <span>{dur} Months</span>
-                {dur === 12 && (
-                  <span className="text-[10px] uppercase tracking-wider bg-[#FCC300] text-black font-extrabold px-2 py-0.5 rounded-md">
-                    Best Value
-                  </span>
-                )}
-              </button>
-            ))}
+          <div className="mt-8 flex flex-wrap justify-center gap-2 sm:gap-3 p-1.5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-xl shadow-2xl max-w-2xl mx-auto">
+            {([1, 4, 6, 12] as DurationOption[]).map((dur) => {
+              const pkg = DURATION_PACKAGES[dur];
+              const isSelected = selectedDuration === dur;
+              return (
+                <button
+                  key={dur}
+                  type="button"
+                  onClick={() => setSelectedDuration(dur)}
+                  className={`flex-1 min-w-[120px] px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all duration-200 flex flex-col items-center gap-1 ${
+                    isSelected
+                      ? 'bg-[#2648E7] text-white shadow-lg shadow-[#2648E7]/40 scale-100'
+                      : 'text-slate-400 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  <span>{pkg.label}</span>
+                  {pkg.badge ? (
+                    <span className="text-[10px] uppercase tracking-wider bg-[#FCC300] text-black font-extrabold px-1.5 py-0.5 rounded-md">
+                      {pkg.badge}
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-slate-400 font-medium">Standard</span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -304,16 +338,16 @@ export default function SubscriptionPage() {
         {/* 3 Commercial Plan Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch mb-12">
           {PLANS.map((plan) => {
-            const totalPrice = calculateTotal(plan.basePrice, selectedDuration);
+            const calc = getPlanCalculation(plan, selectedDuration);
             const isSelected = selectedPlan === plan.id;
 
             return (
               <div
                 key={plan.id}
                 onClick={() => setSelectedPlan(plan.id)}
-                className={`relative flex flex-col rounded-3xl p-8 cursor-pointer transition-all duration-300 backdrop-blur-2xl border ${
+                className={`relative flex flex-col rounded-3xl p-7 cursor-pointer transition-all duration-300 backdrop-blur-2xl border ${
                   plan.isRecommended
-                    ? 'bg-gradient-to-b from-[#2648E7]/15 to-white/5 border-[#2648E7] shadow-2xl shadow-[#2648E7]/20 md:-translate-y-2'
+                    ? 'bg-gradient-to-b from-[#2648E7]/20 via-[#1C2541]/80 to-white/5 border-[#2648E7] shadow-2xl shadow-[#2648E7]/25 md:-translate-y-2'
                     : isSelected
                     ? 'bg-white/10 border-white/40 shadow-xl'
                     : 'bg-white/[0.03] border-white/10 hover:border-white/20 hover:bg-white/[0.06]'
@@ -322,25 +356,25 @@ export default function SubscriptionPage() {
                 {plan.isRecommended && (
                   <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-gradient-to-r from-[#FCC300] to-[#F59E0B] text-black text-xs font-black tracking-wider uppercase shadow-md flex items-center gap-1.5">
                     <Sparkles size={12} />
-                    <span>RECOMMENDED</span>
+                    <span>POPULAR & RECOMMENDED</span>
                   </div>
                 )}
 
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h3 className="text-xl font-bold text-white">{plan.name}</h3>
-                    <span className="text-xs font-semibold text-slate-400">{plan.badge}</span>
+                    <h3 className="text-2xl font-black text-white">{plan.name}</h3>
+                    <span className="text-xs font-semibold text-blue-300">{plan.maxProjects}</span>
                   </div>
                   <div
                     className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
                       plan.isRecommended
-                        ? 'bg-[#2648E7] text-white shadow-lg'
+                        ? 'bg-[#2648E7] text-white shadow-lg shadow-[#2648E7]/40'
                         : 'bg-white/10 text-slate-300'
                     }`}
                   >
-                    {plan.id === 'PLAN_100K' ? (
+                    {plan.id === 'ENTERPRISE' ? (
                       <Sparkles size={22} />
-                    ) : plan.id === 'PLAN_50K' ? (
+                    ) : plan.id === 'PROFESSIONAL' ? (
                       <Building2 size={22} />
                     ) : (
                       <Layers size={22} />
@@ -348,25 +382,61 @@ export default function SubscriptionPage() {
                   </div>
                 </div>
 
-                <p className="text-xs text-slate-400 mb-6 min-h-[36px]">{plan.description}</p>
+                <p className="text-xs text-slate-400 mb-5 min-h-[34px]">{plan.description}</p>
 
-                {/* Price Display */}
-                <div className="mb-6 p-4 rounded-2xl bg-black/20 border border-white/5">
-                  <div className="text-xs text-slate-400 uppercase tracking-wider font-bold mb-1">
-                    {selectedDuration} Months Total
+                {/* Pricing Breakdown Box */}
+                <div className="mb-6 p-4 rounded-2xl bg-black/30 border border-white/10 space-y-2.5">
+                  {/* Setup Cost Row */}
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-slate-400">Setup Cost (One-Time)</span>
+                    <span className="font-bold text-white">{formatINR(calc.setupCost)}</span>
                   </div>
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-3xl sm:text-4xl font-extrabold text-white">
-                      {formatINR(totalPrice)}
-                    </span>
+
+                  {/* Monthly Fee Base */}
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-slate-400">Monthly Plan Rate</span>
+                    <span className="font-bold text-slate-200">{formatINR(plan.monthlyPrice)} / mo</span>
                   </div>
-                  <div className="text-[11px] text-slate-400 mt-1">
-                    (₹{(plan.basePrice / 1000).toFixed(0)}K × {selectedDuration} months)
+
+                  {/* Subscription Subtotal */}
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-slate-400">Subscription ({selectedDuration} Mo)</span>
+                    <div className="text-right">
+                      {calc.discountAmount > 0 && (
+                        <span className="text-[11px] text-slate-500 line-through mr-1.5">
+                          {formatINR(calc.grossSubscription)}
+                        </span>
+                      )}
+                      <span className="font-bold text-emerald-400">{formatINR(calc.subscriptionAmount)}</span>
+                    </div>
+                  </div>
+
+                  {/* Discount notice */}
+                  {calc.discountPercent > 0 && (
+                    <div className="flex justify-between items-center text-[11px] text-emerald-400 font-semibold bg-emerald-500/10 px-2 py-1 rounded-lg">
+                      <span>Package Discount ({calc.discountPercent}%)</span>
+                      <span>Save {formatINR(calc.discountAmount)}</span>
+                    </div>
+                  )}
+
+                  <div className="pt-2 border-t border-white/10 flex justify-between items-baseline">
+                    <div>
+                      <div className="text-[11px] font-bold uppercase tracking-wider text-slate-300">
+                        Total Due Today
+                      </div>
+                      <div className="text-[10px] text-slate-400">Setup fee + {selectedDuration} mo plan</div>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-2xl sm:text-3xl font-black text-white">
+                        {formatINR(calc.totalToday)}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
                 {/* Features list */}
-                <div className="flex-1 space-y-3.5 mb-8">
+                <div className="flex-1 space-y-3 mb-6">
+                  <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Features Included</div>
                   {plan.features.map((feat, idx) => (
                     <div key={idx} className="flex items-center gap-3 text-sm">
                       {feat.included ? (
@@ -407,7 +477,7 @@ export default function SubscriptionPage() {
                     e.stopPropagation();
                     handlePayment(plan.id);
                   }}
-                  className={`w-full py-4 rounded-2xl font-bold text-sm transition-all duration-300 flex items-center justify-center gap-2 shadow-xl ${
+                  className={`w-full py-3.5 rounded-2xl font-bold text-sm transition-all duration-300 flex items-center justify-center gap-2 shadow-xl ${
                     plan.isRecommended
                       ? 'bg-gradient-to-r from-[#2648E7] to-[#4F6DFF] hover:from-[#1e3bbd] hover:to-[#2648E7] text-white shadow-[#2648E7]/30 hover:scale-[1.02]'
                       : 'bg-white text-slate-900 hover:bg-slate-100 hover:scale-[1.02]'
@@ -418,13 +488,18 @@ export default function SubscriptionPage() {
                   ) : (
                     <>
                       <Zap size={16} />
-                      <span>Subscribe for {formatINR(totalPrice)}</span>
+                      <span>Get Started for {formatINR(calc.totalToday)}</span>
                     </>
                   )}
                 </button>
               </div>
             );
           })}
+        </div>
+
+        {/* Informative Note on Recurring Renewals */}
+        <div className="max-w-2xl mx-auto mb-10 text-center p-4 rounded-2xl bg-white/[0.03] border border-white/10 text-xs text-slate-400">
+          💡 <strong>Transparent Billing:</strong> Setup cost is a one-time onboarding investment. Subsequent renewals will only charge the monthly subscription package with duration discounts applied.
         </div>
 
         {/* Free trial footer */}

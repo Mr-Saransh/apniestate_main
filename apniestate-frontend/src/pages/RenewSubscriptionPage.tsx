@@ -14,25 +14,35 @@ declare global {
 
 const RAZORPAY_KEY = import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_live_S5I6BaqdNg0Tjk';
 
-type PlanTier = 'PLAN_30K' | 'PLAN_50K' | 'PLAN_100K';
-type DurationOption = 4 | 6 | 12;
+type PlanTier = 'BASIC' | 'PROFESSIONAL' | 'ENTERPRISE';
+type DurationOption = 1 | 4 | 6 | 12;
 
 const PLANS = [
-  { id: 'PLAN_30K' as PlanTier, name: 'Starter (₹30K)', basePrice: 30000, desc: '1 Active Project' },
-  { id: 'PLAN_50K' as PlanTier, name: 'Growth (₹50K)', basePrice: 50000, desc: '3 Active Projects' },
-  { id: 'PLAN_100K' as PlanTier, name: 'Enterprise (₹1L)', basePrice: 100000, desc: 'Unlimited Projects + Full CRM' },
+  { id: 'BASIC' as PlanTier, name: 'Basic (₹10K/mo)', monthlyPrice: 10000, desc: '1 Active Project' },
+  { id: 'PROFESSIONAL' as PlanTier, name: 'Professional (₹20K/mo)', monthlyPrice: 20000, desc: '3 Active Projects' },
+  { id: 'ENTERPRISE' as PlanTier, name: 'Enterprise (₹40K/mo)', monthlyPrice: 40000, desc: 'Unlimited Projects + CRM' },
 ];
+
+const DURATION_DISCOUNTS: Record<DurationOption, { rate: number; label: string; badge?: string }> = {
+  1: { rate: 0, label: '1 Mo' },
+  4: { rate: 0.10, label: '4 Mo', badge: '10% OFF' },
+  6: { rate: 0.20, label: '6 Mo', badge: '20% OFF' },
+  12: { rate: 0.35, label: '12 Mo', badge: '35% OFF' },
+};
 
 export default function RenewSubscriptionPage() {
   const navigate = useNavigate();
   const { user, logout, updateUser } = useAuth();
-  const [selectedPlan, setSelectedPlan] = useState<PlanTier>('PLAN_100K');
+  const [selectedPlan, setSelectedPlan] = useState<PlanTier>('ENTERPRISE');
   const [selectedDuration, setSelectedDuration] = useState<DurationOption>(4);
   const [paying, setPaying] = useState(false);
   const [error, setError] = useState('');
 
   const currentPlan = PLANS.find((p) => p.id === selectedPlan) || PLANS[2];
-  const totalPrice = currentPlan.basePrice * selectedDuration;
+  const discountInfo = DURATION_DISCOUNTS[selectedDuration];
+  const grossAmount = currentPlan.monthlyPrice * selectedDuration;
+  const discountAmount = Math.round(grossAmount * discountInfo.rate);
+  const totalPrice = grossAmount - discountAmount;
 
   const formatINR = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
@@ -139,14 +149,20 @@ export default function RenewSubscriptionPage() {
           <Logo size="lg" variant="light" />
         </div>
 
-        <div className="w-16 h-16 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto mb-4 text-red-400">
-          <AlertCircle size={32} />
+        <div className="w-16 h-16 rounded-full bg-blue-500/10 border border-blue-500/20 flex items-center justify-center mx-auto mb-4 text-blue-400">
+          <RefreshCw size={30} />
         </div>
 
-        <h2 className="text-2xl font-black text-white mb-2">Subscription Renewal Required</h2>
+        <h2 className="text-2xl font-black text-white mb-2">Renew Your Subscription</h2>
         <p className="text-sm text-slate-400 mb-6">
-          Your workspace access has ended. Choose your commercial plan and duration to reactivate seamlessly. Your data remains fully safe and intact.
+          Reactivate your workspace instantly. Your existing projects, budgets, and team data remain 100% intact.
         </p>
+
+        {/* Setup Cost Reassurance Banner */}
+        <div className="mb-6 p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-300 font-semibold flex items-center justify-center gap-2">
+          <Check size={16} className="text-emerald-400 shrink-0" />
+          <span>One-time setup fee is already paid! You only pay the monthly subscription plan.</span>
+        </div>
 
         {error && (
           <div className="p-3.5 mb-6 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-xs font-semibold flex items-center gap-2 text-left">
@@ -164,7 +180,7 @@ export default function RenewSubscriptionPage() {
               onClick={() => setSelectedPlan(p.id)}
               className={`p-3 rounded-2xl border text-left transition-all ${
                 selectedPlan === p.id
-                  ? 'bg-[#2648E7]/20 border-[#2648E7] text-white'
+                  ? 'bg-[#2648E7]/25 border-[#2648E7] text-white shadow-lg'
                   : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'
               }`}
             >
@@ -175,30 +191,54 @@ export default function RenewSubscriptionPage() {
         </div>
 
         {/* Duration selector */}
-        <div className="flex items-center justify-center p-1 rounded-xl bg-black/20 border border-white/10 mb-6">
-          {([4, 6, 12] as DurationOption[]).map((dur) => (
-            <button
-              key={dur}
-              type="button"
-              onClick={() => setSelectedDuration(dur)}
-              className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
-                selectedDuration === dur
-                  ? 'bg-[#2648E7] text-white shadow-md'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              {dur} Months
-            </button>
-          ))}
+        <div className="flex items-center justify-center gap-1.5 p-1.5 rounded-2xl bg-black/20 border border-white/10 mb-6">
+          {([1, 4, 6, 12] as DurationOption[]).map((dur) => {
+            const d = DURATION_DISCOUNTS[dur];
+            const isSelected = selectedDuration === dur;
+            return (
+              <button
+                key={dur}
+                type="button"
+                onClick={() => setSelectedDuration(dur)}
+                className={`flex-1 py-2 px-1 text-xs font-bold rounded-xl transition-all flex flex-col items-center gap-0.5 ${
+                  isSelected
+                    ? 'bg-[#2648E7] text-white shadow-md'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <span>{d.label}</span>
+                {d.badge && (
+                  <span className="text-[9px] font-black uppercase text-[#FCC300]">
+                    {d.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
 
         {/* Total Price summary */}
-        <div className="p-4 rounded-2xl bg-black/30 border border-white/5 mb-6">
-          <div className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">
-            Total Renewal Fee ({selectedDuration} Months)
+        <div className="p-4 rounded-2xl bg-black/30 border border-white/10 mb-6 space-y-2">
+          <div className="flex justify-between items-center text-xs text-slate-400">
+            <span>Setup Fee</span>
+            <span className="text-emerald-400 font-bold uppercase tracking-wider">₹0 (Waived)</span>
           </div>
-          <div className="text-3xl font-black text-white">
-            {formatINR(totalPrice)}
+
+          <div className="flex justify-between items-center text-xs text-slate-400">
+            <span>Subscription ({selectedDuration} Mo @ {formatINR(currentPlan.monthlyPrice)}/mo)</span>
+            <span className="text-white font-medium">{formatINR(grossAmount)}</span>
+          </div>
+
+          {discountAmount > 0 && (
+            <div className="flex justify-between items-center text-xs text-emerald-400 font-semibold bg-emerald-500/10 px-2.5 py-1 rounded-lg">
+              <span>Duration Package Discount ({Math.round(discountInfo.rate * 100)}%)</span>
+              <span>- {formatINR(discountAmount)}</span>
+            </div>
+          )}
+
+          <div className="pt-2 border-t border-white/10 flex justify-between items-baseline">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-300">Total Renewal Fee</span>
+            <span className="text-3xl font-black text-white">{formatINR(totalPrice)}</span>
           </div>
         </div>
 
@@ -215,7 +255,7 @@ export default function RenewSubscriptionPage() {
           ) : (
             <span className="flex items-center gap-2">
               <CreditCard size={18} />
-              Renew Now for {formatINR(totalPrice)}
+              Renew Subscription for {formatINR(totalPrice)}
             </span>
           )}
         </button>

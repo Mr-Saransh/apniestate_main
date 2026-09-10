@@ -1,99 +1,187 @@
 import { prisma } from "@/lib/prisma";
 import { SubscriptionStatus } from "@prisma/client";
 
-export type CommercialPlanId = "PLAN_30K" | "PLAN_50K" | "PLAN_100K";
+export type CommercialPlanId = "BASIC" | "PROFESSIONAL" | "ENTERPRISE";
 
 export interface PlanConfig {
   id: CommercialPlanId;
   name: string;
   badge: string;
-  basePrice: number; // Monthly base equivalent (30,000 | 50,000 | 100,000)
+  setupCost: number; // One-time setup fee (1,00,000 | 1,50,000 | 2,00,000)
+  monthlyPrice: number; // Monthly recurring fee (10,000 | 20,000 | 40,000)
+  basePrice: number; // Maintained for backward-compat (same as monthlyPrice)
   maxActiveProjects: number; // 1, 3, or Infinity
   hasCRM: boolean;
   hasConstruction: boolean;
-  allowedDurations: number[]; // [4, 6, 12]
+  allowedDurations: number[]; // [1, 4, 6, 12]
   description: string;
   features: string[];
 }
 
-export const COMMERCIAL_PLANS: Record<string, PlanConfig> = {
-  PLAN_30K: {
-    id: "PLAN_30K",
-    name: "₹30,000 Starter Plan",
-    badge: "Starter",
-    basePrice: 30000,
-    maxActiveProjects: 1,
-    hasCRM: false,
-    hasConstruction: true,
-    allowedDurations: [4, 6, 12],
-    description: "Ideal for individual builders managing 1 active site.",
-    features: [
-      "1 Active Project limit",
-      "Full Construction Management",
-      "BOQ, DPR, & Attendance",
-      "Materials & Inventory tracking",
-      "Finance & Cashbook entries",
-      "CRM: Not Included",
-    ],
-  },
-  PLAN_50K: {
-    id: "PLAN_50K",
-    name: "₹50,000 Growth Plan",
-    badge: "Growth",
-    basePrice: 50000,
-    maxActiveProjects: 3,
-    hasCRM: false,
-    hasConstruction: true,
-    allowedDurations: [4, 6, 12],
-    description: "Designed for growing developers managing up to 3 active sites.",
-    features: [
-      "Up to 3 Active Projects",
-      "Full Construction Management",
-      "BOQ, DPR, & Attendance",
-      "Materials & Inventory tracking",
-      "Finance & Cashbook entries",
-      "Multi-site supervision",
-      "CRM: Not Included",
-    ],
-  },
-  PLAN_100K: {
-    id: "PLAN_100K",
-    name: "₹1,00,000 Premium Plan",
-    badge: "Enterprise",
-    basePrice: 100000,
-    maxActiveProjects: Infinity,
-    hasCRM: true,
-    hasConstruction: true,
-    allowedDurations: [4, 6, 12],
-    description: "Complete ERP + CRM suite with unlimited active projects.",
-    features: [
-      "Unlimited Active Projects",
-      "Full Construction Management",
-      "CRM Workspace Included (Leads, Pipeline, Follow-ups, Deals)",
-      "BOQ, DPR, & Attendance",
-      "Materials & Inventory tracking",
-      "Finance & Cashbook entries",
-      "Priority Support & Dedicated Onboarding",
-    ],
-  },
+export const DURATION_DISCOUNTS: Record<number, { discountRate: number; label: string }> = {
+  1: { discountRate: 0, label: "No Discount" },
+  4: { discountRate: 0.10, label: "10% Discount" },
+  6: { discountRate: 0.20, label: "20% Discount" },
+  12: { discountRate: 0.35, label: "35% Discount" },
 };
 
+const PLAN_BASIC: PlanConfig = {
+  id: "BASIC",
+  name: "Basic",
+  badge: "Basic",
+  setupCost: 100000,
+  monthlyPrice: 10000,
+  basePrice: 10000,
+  maxActiveProjects: 1,
+  hasCRM: false,
+  hasConstruction: true,
+  allowedDurations: [1, 4, 6, 12],
+  description: "Essential construction management for individual builders & single-site developers.",
+  features: [
+    "1 Active Project limit",
+    "Full Construction Management",
+    "BOQ, DPR & Site Attendance",
+    "Materials & Inventory tracking",
+    "Finance & Cashbook entries",
+    "CRM: Not Included",
+  ],
+};
+
+const PLAN_PROFESSIONAL: PlanConfig = {
+  id: "PROFESSIONAL",
+  name: "Professional",
+  badge: "Professional",
+  setupCost: 150000,
+  monthlyPrice: 20000,
+  basePrice: 20000,
+  maxActiveProjects: 3,
+  hasCRM: false,
+  hasConstruction: true,
+  allowedDurations: [1, 4, 6, 12],
+  description: "Designed for growing developers managing up to 3 active construction sites.",
+  features: [
+    "Up to 3 Active Projects",
+    "Full Construction Management",
+    "BOQ, DPR & Site Attendance",
+    "Materials & Inventory tracking",
+    "Finance & Cashbook entries",
+    "Multi-site supervision",
+    "CRM: Not Included",
+  ],
+};
+
+const PLAN_ENTERPRISE: PlanConfig = {
+  id: "ENTERPRISE",
+  name: "Enterprise",
+  badge: "Enterprise",
+  setupCost: 200000,
+  monthlyPrice: 40000,
+  basePrice: 40000,
+  maxActiveProjects: Infinity,
+  hasCRM: true,
+  hasConstruction: true,
+  allowedDurations: [1, 4, 6, 12],
+  description: "Complete Construction ERP + CRM suite with unlimited active projects.",
+  features: [
+    "Unlimited Active Projects",
+    "Full Construction Management",
+    "CRM Workspace Included (Leads, Pipeline, Follow-ups, Deals)",
+    "BOQ, DPR & Site Attendance",
+    "Materials & Inventory tracking",
+    "Finance & Cashbook entries",
+    "Priority Support & Dedicated Onboarding",
+  ],
+};
+
+export const COMMERCIAL_PLANS: Record<string, PlanConfig> = {
+  BASIC: PLAN_BASIC,
+  PROFESSIONAL: PLAN_PROFESSIONAL,
+  ENTERPRISE: PLAN_ENTERPRISE,
+  // Seamless backward-compatibility for existing DB subscriptions
+  PLAN_30K: PLAN_BASIC,
+  PLAN_50K: PLAN_PROFESSIONAL,
+  PLAN_100K: PLAN_ENTERPRISE,
+};
+
+export function resolvePlanKey(rawPlanId?: string | null): CommercialPlanId {
+  if (!rawPlanId) return "BASIC";
+  if (rawPlanId === "ENTERPRISE" || rawPlanId === "PLAN_100K") return "ENTERPRISE";
+  if (rawPlanId === "PROFESSIONAL" || rawPlanId === "PLAN_50K") return "PROFESSIONAL";
+  return "BASIC";
+}
+
+export interface SubscriptionPriceBreakdown {
+  planId: CommercialPlanId;
+  durationMonths: number;
+  monthlyPrice: number;
+  grossSubscriptionPrice: number;
+  discountPercentage: number;
+  discountAmount: number;
+  subscriptionPrice: number;
+  setupCost: number;
+  totalPrice: number;
+  isRenewal: boolean;
+}
+
 /**
- * Calculates total subscription price dynamically from base plan price and duration.
- * Formula: Plan Price × Duration (in months)
- * ₹30k:  4m = 1.2L, 6m = 1.8L, 12m = 3.6L
- * ₹50k:  4m = 2.0L, 6m = 3.0L, 12m = 6.0L
- * ₹100k: 4m = 4.0L, 6m = 6.0L, 12m = 12.0L
+ * Calculates complete transparent breakdown of subscription price.
+ * Formula:
+ *  - grossSubscription = monthlyPrice × durationMonths
+ *  - discount = grossSubscription × discountRate
+ *  - subscriptionAmount = grossSubscription - discount
+ *  - setupCost = isRenewal ? 0 : one-time setup fee (Setup cost remains unchanged; discount applies only to subscription)
+ *  - total = setupCost + subscriptionAmount
  */
-export function calculateSubscriptionPrice(planId: string, durationMonths: number): number {
-  const plan = COMMERCIAL_PLANS[planId];
+export function calculateSubscriptionBreakdown(
+  planId: string,
+  durationMonths: number,
+  options?: { isRenewal?: boolean }
+): SubscriptionPriceBreakdown {
+  const normalizedId = resolvePlanKey(planId);
+  const plan = COMMERCIAL_PLANS[normalizedId];
   if (!plan) {
-    throw new Error(`Invalid plan: ${planId}. Allowed: PLAN_30K, PLAN_50K, PLAN_100K`);
+    throw new Error(`Invalid plan: ${planId}. Allowed: BASIC, PROFESSIONAL, ENTERPRISE`);
   }
   if (!plan.allowedDurations.includes(durationMonths)) {
     throw new Error(`Invalid duration: ${durationMonths} months. Allowed: ${plan.allowedDurations.join(", ")}`);
   }
-  return plan.basePrice * durationMonths;
+
+  const isRenewal = !!options?.isRenewal;
+  const monthlyPrice = plan.monthlyPrice;
+  const grossSubscriptionPrice = monthlyPrice * durationMonths;
+  const discountInfo = DURATION_DISCOUNTS[durationMonths] || { discountRate: 0 };
+  const discountRate = discountInfo.discountRate;
+  const discountPercentage = Math.round(discountRate * 100);
+  const discountAmount = Math.round(grossSubscriptionPrice * discountRate);
+  const subscriptionPrice = grossSubscriptionPrice - discountAmount;
+  
+  // Setup cost is a one-time cost. Subsequent renewals pay only the monthly plan.
+  const setupCost = isRenewal ? 0 : plan.setupCost;
+  const totalPrice = setupCost + subscriptionPrice;
+
+  return {
+    planId: normalizedId,
+    durationMonths,
+    monthlyPrice,
+    grossSubscriptionPrice,
+    discountPercentage,
+    discountAmount,
+    subscriptionPrice,
+    setupCost,
+    totalPrice,
+    isRenewal,
+  };
+}
+
+/**
+ * Calculates total subscription price (INR) considering setup cost and duration discounts.
+ */
+export function calculateSubscriptionPrice(
+  planId: string,
+  durationMonths: number,
+  options?: { isRenewal?: boolean }
+): number {
+  return calculateSubscriptionBreakdown(planId, durationMonths, options).totalPrice;
 }
 
 /**
@@ -178,8 +266,8 @@ export async function getCompanyEntitlements(companyId: string | null | undefine
     },
   });
 
-  const rawPlanId = sub?.plan || "PLAN_30K";
-  const planKey = (COMMERCIAL_PLANS[rawPlanId] ? rawPlanId : "PLAN_30K") as keyof typeof COMMERCIAL_PLANS;
+  const rawPlanId = sub?.plan || "BASIC";
+  const planKey = resolvePlanKey(rawPlanId);
   const plan = COMMERCIAL_PLANS[planKey];
 
   const isDemo = !!sub?.is_demo;
@@ -216,6 +304,8 @@ export async function getCompanyEntitlements(companyId: string | null | undefine
     plan_id: plan.id,
     plan_name: plan.name,
     badge: plan.badge,
+    setup_cost: plan.setupCost,
+    monthly_price: plan.monthlyPrice,
     base_price: plan.basePrice,
     status: sub?.status || SubscriptionStatus.NONE,
     is_demo: isDemo,
@@ -263,7 +353,7 @@ export async function canCreateProject(companyId: string | null | undefined): Pr
 
 /**
  * Checks whether a company is allowed to access CRM features.
- * CRM is included ONLY in the ₹1,00,000 Plan.
+ * CRM is included in the Enterprise Plan.
  */
 export async function canAccessCRM(companyId: string | null | undefined): Promise<{
   allowed: boolean;
@@ -288,7 +378,7 @@ export async function canAccessCRM(companyId: string | null | undefined): Promis
   if (!entitlements.has_crm) {
     return {
       allowed: false,
-      reason: "CRM is available exclusively on the ₹1,00,000 Premium Plan. Upgrade your plan to manage leads, pipelines, and deals.",
+      reason: "CRM is available exclusively on the Enterprise Plan. Upgrade your plan to manage leads, pipelines, and deals.",
     };
   }
 

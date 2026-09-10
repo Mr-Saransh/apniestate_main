@@ -1,9 +1,11 @@
 import { apiClient } from './client';
 
 export interface CommercialPlan {
-  id: "PLAN_30K" | "PLAN_50K" | "PLAN_100K";
+  id: "BASIC" | "PROFESSIONAL" | "ENTERPRISE" | "PLAN_30K" | "PLAN_50K" | "PLAN_100K";
   name: string;
   badge: string;
+  setup_cost: number;
+  monthly_price: number;
   base_price: number;
   max_active_projects: number | "Unlimited";
   has_crm: boolean;
@@ -13,6 +15,12 @@ export interface CommercialPlan {
   features: string[];
   pricing_matrix: {
     duration_months: number;
+    discount_percentage: number;
+    discount_amount: number;
+    subscription_price: number;
+    setup_cost: number;
+    total_initial_price: number;
+    total_renewal_price: number;
     total_price: number;
     monthly_equivalent: number;
   }[];
@@ -20,9 +28,11 @@ export interface CommercialPlan {
 
 export interface CompanyEntitlements {
   company_id: string | null;
-  plan_id: "PLAN_30K" | "PLAN_50K" | "PLAN_100K" | null;
+  plan_id: "BASIC" | "PROFESSIONAL" | "ENTERPRISE" | "PLAN_30K" | "PLAN_50K" | "PLAN_100K" | null;
   plan_name: string;
   badge: string;
+  setup_cost?: number;
+  monthly_price?: number;
   base_price: number;
   status: string;
   is_demo: boolean;
@@ -82,7 +92,7 @@ export const subscriptionApi = {
   completeProfile: (data: CompleteProfileData) =>
     apiClient.post<any>('/subscription/complete-profile', data),
 
-  createOrder: (plan_id: string = "PLAN_30K", duration_months: number = 4) =>
+  createOrder: (plan_id: string = "BASIC", duration_months: number = 1) =>
     apiClient.post<any>('/subscription/create-order', { plan_id, duration_months }),
 
   verifyPayment: (data: PaymentVerification) =>
@@ -94,7 +104,7 @@ export const subscriptionApi = {
   getStatus: () =>
     apiClient.get<SubscriptionStatus>('/subscription/status'),
 
-  createRenewOrder: (plan_id: string = "PLAN_30K", duration_months: number = 4) =>
+  createRenewOrder: (plan_id: string = "BASIC", duration_months: number = 1) =>
     apiClient.get<any>(`/subscription/renew?plan_id=${plan_id}&duration_months=${duration_months}`),
 
   verifyRenewal: (data: PaymentVerification) =>
