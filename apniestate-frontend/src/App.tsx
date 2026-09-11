@@ -6,7 +6,7 @@ import { AppModeProvider } from '@/context/AppModeContext';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import AppLayout from '@/components/layout/AppLayout';
 import LoginPage from '@/pages/LoginPage';
-import LandingPage from '@/pages/LandingPage';
+import LandingPage from '@/pages/LandingPageV3';
 import SignupPage from '@/pages/SignupPage';
 import MyInvitationsPage from '@/pages/MyInvitationsPage';
 import CompanyInvitationsPage from '@/pages/CompanyInvitationsPage';
