@@ -7,6 +7,7 @@ import PaymentsPage from './PaymentsPage';
 import ExpensesPage from './ExpensesPage';
 import BudgetsPage from './BudgetsPage';
 import QuotationsSection from '@/components/finance/QuotationsSection';
+import DuesSection from '@/components/finance/DuesSection';
 
 export default function FinanceWorkspace() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -19,6 +20,7 @@ export default function FinanceWorkspace() {
     { id: 'invoices', label: 'Invoices' },
     { id: 'quotations', label: 'Quotations' },
     { id: 'budgets', label: 'Budgets' },
+    { id: 'dues', label: 'Due' },
   ];
 
   if (!activeProjectId) {
@@ -65,6 +67,9 @@ export default function FinanceWorkspace() {
         )}
         {tab === 'budgets' && (
           <div className="max-w-2xl mx-auto px-4 py-5"><BudgetsPage /></div>
+        )}
+        {tab === 'dues' && (
+          <div className="max-w-3xl mx-auto px-4 py-5"><DuesSection /></div>
         )}
       </div>
     </div>

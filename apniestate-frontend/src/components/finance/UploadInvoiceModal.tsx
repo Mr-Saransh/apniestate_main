@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, UploadCloud, FileText, CheckCircle2, AlertCircle } from 'lucide-react';
 import { invoicesApi, type Invoice } from '@/api/invoices';
 import { vendorsApi, type Vendor } from '@/api/vendors';
+import { duesApi } from '@/api/dues';
 import { apiClient } from '@/api/client';
 
 interface UploadInvoiceModalProps {
@@ -9,24 +10,26 @@ interface UploadInvoiceModalProps {
   onClose: () => void;
   onSuccess: () => void;
   preselectedInvoiceId?: string;
+  projectId?: string | null;
 }
 
 export default function UploadInvoiceModal({
   isOpen,
   onClose,
   onSuccess,
-  preselectedInvoiceId
+  preselectedInvoiceId,
+  projectId
 }: UploadInvoiceModalProps) {
   const [mode, setMode] = useState<'EXISTING' | 'NEW'>('NEW');
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState(preselectedInvoiceId || '');
   
-  // New invoice fields
-  const [number, setNumber] = useState('');
+  // Simplified invoice fields: keep ONLY amount, vendor/party, date, notes
   const [vendorId, setVendorId] = useState('');
+  const [partyName, setPartyName] = useState('');
+  const [isCustomParty, setIsCustomParty] = useState(false);
   const [amount, setAmount] = useState('');
-  const [taxAmount, setTaxAmount] = useState('0');
   const [dueDate, setDueDate] = useState('');
   const [notes, setNotes] = useState('');
 
@@ -47,7 +50,13 @@ export default function UploadInvoiceModal({
         vendorsApi.getVendors().catch(() => ({ data: [] }))
       ]).then(([invRes, venRes]) => {
         if (invRes.data) setInvoices(invRes.data);
-        if (venRes.data) setVendors(venRes.data);
+        if (venRes.data) {
+          setVendors(venRes.data);
+          if (venRes.data.length > 0 && !vendorId) {
+            setVendorId(venRes.data[0].id);
+            setPartyName(venRes.data[0].name);
+          }
+        }
       });
     }
   }, [isOpen, preselectedInvoiceId]);
@@ -101,27 +110,51 @@ export default function UploadInvoiceModal({
       const publicId = uploadedResult.public_id;
 
       let targetInvoiceId = selectedInvoiceId;
+      const parsedAmount = parseFloat(amount);
 
       // 2. If new invoice mode, create the invoice first
       if (mode === 'NEW') {
-        if (!number || !vendorId || !amount) {
-          throw new Error('Please fill in Invoice Number, Vendor, and Amount.');
+        const resolvedPartyName = isCustomParty ? partyName.trim() : (vendors.find(v => v.id === vendorId)?.name || 'Vendor');
+        const resolvedVendorId = isCustomParty ? (vendors[0]?.id || '') : vendorId;
+
+        if (!resolvedPartyName || !parsedAmount || parsedAmount <= 0) {
+          throw new Error('Please fill in Vendor / Party Name and a valid Amount.');
         }
 
+        // Auto-generate invoice number (no user input needed)
+        const autoNumber = `INV-${Math.floor(100000 + Math.random() * 900000)}`;
+
         const invPayload = {
-          number: number.trim(),
-          vendor_id: vendorId,
-          amount: parseFloat(amount),
-          tax_amount: parseFloat(taxAmount) || 0,
-          total: parseFloat(amount) + (parseFloat(taxAmount) || 0),
+          number: autoNumber,
+          vendor_id: resolvedVendorId,
+          amount: parsedAmount,
+          tax_amount: 0,
+          total: parsedAmount,
           due_date: dueDate ? new Date(dueDate).toISOString() : new Date().toISOString(),
           status: 'DRAFT' as const,
-          notes: notes || `Invoice file: ${file.name}`
+          notes: notes ? `${notes} [Party: ${resolvedPartyName}]` : `Invoice for ${resolvedPartyName}`
         };
 
         const createRes = await invoicesApi.createInvoice(invPayload);
         const createdInvoice = (createRes as any).data || createRes;
         targetInvoiceId = createdInvoice.id;
+
+        // Automatically register as a Due in Finance as well
+        try {
+          await duesApi.createDue({
+            project_id: projectId || undefined,
+            vendor_id: isCustomParty ? undefined : vendorId,
+            party_name: resolvedPartyName,
+            party_type: isCustomParty ? 'PERSON' : 'VENDOR',
+            due_type: 'MANUAL_DUE',
+            title: `Invoice ${autoNumber} - ${notes || resolvedPartyName}`,
+            total_amount: parsedAmount,
+            due_date: dueDate ? new Date(dueDate).toISOString() : undefined,
+            notes: notes || `Attached invoice: ${file.name}`
+          });
+        } catch (dueErr) {
+          console.error('Failed to auto-register due for invoice:', dueErr);
+        }
       }
 
       if (!targetInvoiceId) {
@@ -257,28 +290,38 @@ export default function UploadInvoiceModal({
             </div>
           ) : (
             <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">
-                    Invoice No. <span className="text-red-500">*</span>
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                    {isCustomParty ? 'Party / Person Name' : 'Vendor'} <span className="text-red-500">*</span>
                   </label>
+                  <button
+                    type="button"
+                    onClick={() => setIsCustomParty(!isCustomParty)}
+                    className="text-[11px] font-bold text-[#2648E7] hover:underline"
+                  >
+                    {isCustomParty ? '← Select Existing Vendor' : '+ New Person / Other'}
+                  </button>
+                </div>
+
+                {isCustomParty ? (
                   <input
                     type="text"
                     required
-                    placeholder="e.g. INV-2024-001"
-                    value={number}
-                    onChange={(e) => setNumber(e.target.value)}
+                    placeholder="e.g. Ramesh Kumar / Sharma Electricals"
+                    value={partyName}
+                    onChange={(e) => setPartyName(e.target.value)}
                     className="w-full p-2.5 border border-border rounded-xl text-sm focus:outline-none focus:border-[#2648E7]"
                   />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">
-                    Vendor <span className="text-red-500">*</span>
-                  </label>
+                ) : (
                   <select
                     required
                     value={vendorId}
-                    onChange={(e) => setVendorId(e.target.value)}
+                    onChange={(e) => {
+                      setVendorId(e.target.value);
+                      const found = vendors.find(v => v.id === e.target.value);
+                      if (found) setPartyName(found.name);
+                    }}
                     className="w-full p-2.5 bg-white border border-border rounded-xl text-sm focus:outline-none focus:border-[#2648E7]"
                   >
                     <option value="" disabled>Select vendor...</option>
@@ -286,39 +329,27 @@ export default function UploadInvoiceModal({
                       <option key={v.id} value={v.id}>{v.name}</option>
                     ))}
                   </select>
-                </div>
+                )}
               </div>
 
-              <div className="grid grid-cols-3 gap-2">
-                <div className="col-span-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
                   <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">
-                    Taxable (₹) <span className="text-red-500">*</span>
+                    Amount (₹) <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="number"
                     required
-                    min="0"
+                    min="0.01"
                     step="0.01"
                     placeholder="0.00"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
-                    className="w-full p-2.5 border border-border rounded-xl text-sm font-semibold focus:outline-none focus:border-[#2648E7]"
+                    className="w-full p-2.5 border border-border rounded-xl text-sm font-bold text-foreground focus:outline-none focus:border-[#2648E7]"
                   />
                 </div>
-                <div className="col-span-1">
-                  <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">
-                    Tax/GST (₹)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={taxAmount}
-                    onChange={(e) => setTaxAmount(e.target.value)}
-                    className="w-full p-2.5 border border-border rounded-xl text-sm focus:outline-none focus:border-[#2648E7]"
-                  />
-                </div>
-                <div className="col-span-1">
+
+                <div>
                   <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">
                     Due Date
                   </label>

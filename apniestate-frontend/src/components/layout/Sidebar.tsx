@@ -10,7 +10,7 @@ import {
   BarChart2, FileSpreadsheet, Package, ClipboardList, Archive,
   Truck, BookOpen, FolderOpen, FileBarChart, Bell, Settings, X,
   LogOut, UserCheck, GitCommit, Clock, IndianRupee, Calendar,
-  Sparkles, Layers, Lock, Shield
+  Sparkles, Layers, Lock, Shield, Handshake
 } from "lucide-react";
 import { useTranslation } from 'react-i18next';
 import { subscriptionApi, CompanyEntitlements } from '@/api/subscription';
@@ -110,6 +110,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
     },
     {
       label: "Team & Performance", items: [
+        { id: "/crm?tab=channel-partners", label: "Channel Partners", icon: Handshake },
         { id: "/crm?tab=team", label: "CRM Team", icon: Users },
         { id: "/crm?tab=deals", label: "Bookings", icon: IndianRupee },
         { id: "/crm?tab=reports", label: "Reports", icon: FileBarChart },
@@ -135,6 +136,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
     },
     {
       label: "Management & Inventory", items: [
+        { id: "/crm?tab=channel-partners", label: "Channel Partners", icon: Handshake },
         { id: "/crm?tab=team", label: "CRM Team", icon: Users },
         { id: "/crm?tab=deals", label: "Bookings", icon: IndianRupee },
         { id: "/crm?tab=activities", label: "Site Visits & Tasks", icon: Calendar },

@@ -31,6 +31,7 @@ import CrmPropertiesTab from '@/components/crm/CrmPropertiesTab';
 import CrmTeamTab from '@/components/crm/CrmTeamTab';
 import CrmReportsTab from '@/components/crm/CrmReportsTab';
 import CrmSettingsTab from '@/components/crm/CrmSettingsTab';
+import CrmChannelPartnersTab from '@/components/crm/CrmChannelPartnersTab';
 
 // Modals
 import AddLeadModal from '@/components/crm/AddLeadModal';
@@ -51,6 +52,7 @@ type CrmTab =
   | 'customers'
   | 'activities'
   | 'properties'
+  | 'channel-partners'
   | 'team'
   | 'reports'
   | 'settings'
@@ -348,6 +350,10 @@ export default function CrmWorkspace() {
           onOpenAddProperty={() => setIsAddPropertyOpen(true)}
           onOpenShareProperty={handleOpenShareProperty}
         />
+      )}
+
+      {tab === 'channel-partners' && (
+        <CrmChannelPartnersTab />
       )}
 
       {tab === 'team' && (

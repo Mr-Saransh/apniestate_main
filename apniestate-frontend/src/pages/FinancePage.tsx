@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Plus, X, Truck, FileText, TrendingUp, IndianRupee, ArrowDownLeft, ArrowUpRight, Wallet, PieChart } from 'lucide-react';
 import { apiClient } from '@/api/client';
 import { expensesApi, type Expense } from '@/api/expenses';
+import { duesApi, type DuesSummary } from '@/api/dues';
 import { useProject } from '@/context/ProjectContext';
 import UploadInvoiceModal from '@/components/finance/UploadInvoiceModal';
 
@@ -64,6 +65,7 @@ export default function FinancePage() {
 
   const [data, setData] = useState<CashbookData | null>(null);
   const [summary, setSummary] = useState<FinanceSummary | null>(null);
+  const [duesSummary, setDuesSummary] = useState<DuesSummary | null>(null);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -82,19 +84,22 @@ export default function FinancePage() {
     if (!activeProjectId) {
       setData(null);
       setSummary(null);
+      setDuesSummary(null);
       setLoading(false);
       return;
     }
     setLoading(true);
     try {
-      const [cashRes, summaryRes, expRes] = await Promise.all([
+      const [cashRes, summaryRes, expRes, duesRes] = await Promise.all([
         apiClient.get<CashbookData>(`/cashbook?project_id=${activeProjectId}`),
         apiClient.get<FinanceSummary>(`/finance/summary?project_id=${activeProjectId}`),
-        expensesApi.getExpenses(activeProjectId)
+        expensesApi.getExpenses(activeProjectId),
+        duesApi.getDues({ project_id: activeProjectId }).catch(() => ({ data: null }))
       ]);
       if (cashRes.data) setData(cashRes.data);
       if (summaryRes.data) setSummary(summaryRes.data);
       if (expRes.data) setExpenses(expRes.data.slice(0, 5));
+      if (duesRes.data?.summary) setDuesSummary(duesRes.data.summary);
     } catch (err) {
       console.error('Failed to load finance data', err);
     } finally {
@@ -279,6 +284,37 @@ export default function FinancePage() {
             </button>
           </div>
 
+          {/* Outstanding Dues Banner */}
+          {duesSummary && duesSummary.total_due_amount > 0 && (
+            <div className="bg-gradient-to-r from-red-50 to-orange-50 border border-red-200/80 rounded-2xl p-4 flex items-center justify-between shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="size-10 rounded-xl bg-red-100 flex items-center justify-center text-red-600 shrink-0">
+                  <IndianRupee size={20} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-red-800 uppercase tracking-wider">Outstanding Dues</span>
+                    <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-red-200/80 text-red-800">
+                      {duesSummary.count_pending} pending
+                    </span>
+                  </div>
+                  <p className="text-lg font-extrabold text-red-700">
+                    ₹{duesSummary.total_due_amount.toLocaleString('en-IN')}
+                  </p>
+                  <p className="text-[11px] text-red-600/80">
+                    Settled to date: ₹{duesSummary.total_paid_amount.toLocaleString('en-IN')}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => navigate('/finance?tab=dues')}
+                className="px-3.5 py-2 rounded-xl text-xs font-bold text-white shadow-sm hover:opacity-95 transition-all shrink-0 bg-red-600 flex items-center gap-1"
+              >
+                View & Pay Dues <ArrowUpRight size={13} />
+              </button>
+            </div>
+          )}
+
           {/* Where Did The Money Go? Category Outflow Breakdown */}
           <div>
             <div className="flex items-center justify-between mb-2">
@@ -435,6 +471,7 @@ export default function FinancePage() {
         isOpen={showUploadModal}
         onClose={() => setShowUploadModal(false)}
         onSuccess={() => { loadData(); }}
+        projectId={activeProjectId}
       />
     </div>
   );

@@ -366,6 +366,21 @@ enum CrmActivityType {
   NOTE
 }
 
+enum DueStatus {
+  UNPAID
+  PARTIAL
+  PAID
+  CANCELLED
+}
+
+enum DueType {
+  VENDOR_PURCHASE
+  MANUAL_DUE
+  LABOUR_WAGE
+  SUBCONTRACTOR
+  OTHER
+}
+
 // ─── Core Models ─────────────────────────────────────────
 
 model User {
@@ -530,6 +545,7 @@ model Project {
   company_id          String?
   company             Company?            @relation(fields: [company_id], references: [id])
   Equipment           Equipment[]
+  finance_dues        FinanceDue[]
 
   // CRM relations
   crm_leads       CrmLead[]
@@ -1165,6 +1181,7 @@ model PurchaseOrder {
   grns       GoodsReceiptNote[]
   company_id String?
   company    Company?            @relation(fields: [company_id], references: [id])
+  finance_dues FinanceDue[]
 
   @@index([vendor_id], name: "idx_purchase_orders_vendor_id")
   @@index([project_id], name: "idx_purchase_orders_project_id")
@@ -1384,6 +1401,7 @@ model Vendor {
   material_requests MaterialRequest[]
   company_id        String?
   company           Company?          @relation(fields: [company_id], references: [id])
+  finance_dues      FinanceDue[]
 
   @@index([company_id], name: "idx_vendor_company_id")
   @@map("vendors")
@@ -1945,6 +1963,9 @@ model Company {
   crm_activities  CrmActivity[]
   crm_deals       CrmDeal[]
   crm_properties  CrmProperty[]
+  channel_partners ChannelPartner[]
+  finance_dues     FinanceDue[]
+  due_payments     DuePayment[]
 
   subscriptions   Subscription[]
 
@@ -2404,21 +2425,26 @@ model CrmDeal {
   property_name   String?
   deal_value      Float    @default(0)
   commission      Float    @default(0)
-  amount_received Float    @default(0)
-  payment_mode    String?  @default("UPI")
-  transaction_id  String?
-  deal_date       DateTime @default(now())
-  notes           String?
-  created_at      DateTime @default(now())
-  updated_at      DateTime @updatedAt
+  amount_received    Float    @default(0)
+  due_amount         Float    @default(0)
+  channel_partner_id String?
+  referral_code      String?
+  payment_mode       String?  @default("UPI")
+  transaction_id     String?
+  deal_date          DateTime @default(now())
+  notes              String?
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
 
-  company  Company  @relation(fields: [company_id], references: [id])
-  lead     CrmLead  @relation(fields: [lead_id], references: [id], onDelete: Cascade)
-  project  Project? @relation(fields: [project_id], references: [id])
-  creator  User     @relation(fields: [created_by], references: [id])
+  company         Company         @relation(fields: [company_id], references: [id])
+  lead            CrmLead         @relation(fields: [lead_id], references: [id], onDelete: Cascade)
+  project         Project?        @relation(fields: [project_id], references: [id])
+  creator         User            @relation(fields: [created_by], references: [id])
+  channel_partner ChannelPartner? @relation(fields: [channel_partner_id], references: [id])
 
   @@index([company_id], name: "idx_crmdeal_company")
   @@index([lead_id], name: "idx_crmdeal_lead")
+  @@index([channel_partner_id], name: "idx_crmdeal_partner")
   @@map("crm_deals")
 }
 
@@ -2445,4 +2471,78 @@ model CrmProperty {
   @@index([company_id], name: "idx_crmproperty_company")
   @@index([project_id], name: "idx_crmproperty_project")
   @@map("crm_properties")
+}
+
+model ChannelPartner {
+  id              String   @id @default(cuid())
+  company_id      String
+  name            String
+  email           String
+  phone           String
+  referral_code   String   @unique
+  commission_rate Float?   @default(0)
+  status          String   @default("ACTIVE")
+  notes           String?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  company Company   @relation(fields: [company_id], references: [id])
+  deals   CrmDeal[]
+
+  @@index([company_id], name: "idx_channelpartner_company")
+  @@map("channel_partners")
+}
+
+model FinanceDue {
+  id                String       @id @default(cuid())
+  company_id        String
+  project_id        String?
+  vendor_id         String?
+  purchase_order_id String?
+  title             String
+  party_name        String
+  party_phone       String?
+  party_type        String?      @default("VENDOR")
+  due_type          DueType      @default(VENDOR_PURCHASE)
+  total_amount      Float
+  paid_amount       Float        @default(0)
+  remaining_amount  Float
+  due_date          DateTime?
+  status            DueStatus    @default(UNPAID)
+  notes             String?
+  created_by        String?
+  created_at        DateTime     @default(now())
+  updated_at        DateTime     @updatedAt
+
+  company        Company        @relation(fields: [company_id], references: [id])
+  project        Project?       @relation(fields: [project_id], references: [id])
+  vendor         Vendor?        @relation(fields: [vendor_id], references: [id])
+  purchase_order PurchaseOrder? @relation(fields: [purchase_order_id], references: [id])
+  payments       DuePayment[]
+
+  @@index([company_id], name: "idx_financedue_company")
+  @@index([project_id], name: "idx_financedue_project")
+  @@index([vendor_id], name: "idx_financedue_vendor")
+  @@index([status], name: "idx_financedue_status")
+  @@map("finance_dues")
+}
+
+model DuePayment {
+  id             String        @id @default(cuid())
+  due_id         String
+  company_id     String
+  amount         Float
+  payment_date   DateTime      @default(now())
+  payment_method PaymentMethod @default(UPI)
+  reference      String?
+  notes          String?
+  created_by     String?
+  created_at     DateTime      @default(now())
+
+  due     FinanceDue @relation(fields: [due_id], references: [id], onDelete: Cascade)
+  company Company    @relation(fields: [company_id], references: [id])
+
+  @@index([due_id], name: "idx_duepayment_due")
+  @@index([company_id], name: "idx_duepayment_company")
+  @@map("due_payments")
 }

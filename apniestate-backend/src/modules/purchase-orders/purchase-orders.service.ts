@@ -71,7 +71,7 @@ export async function createPurchaseOrder(
 
     const final_amount = total_amount + total_gst;
 
-    return await tx.purchaseOrder.create({
+    const po = await tx.purchaseOrder.create({
       data: {
         po_number,
         vendor_id: data.vendor_id,
@@ -95,6 +95,34 @@ export async function createPurchaseOrder(
         items: true
       }
     });
+
+    // Auto-create Due in Finance
+    try {
+      await tx.financeDue.create({
+        data: {
+          company_id,
+          project_id: data.project_id || null,
+          vendor_id: data.vendor_id,
+          purchase_order_id: po.id,
+          title: `PO ${po_number} - Material Order`,
+          party_name: po.vendor?.name || "Vendor",
+          party_phone: (po.vendor as any)?.phone || null,
+          party_type: "VENDOR",
+          due_type: "VENDOR_PURCHASE",
+          total_amount: final_amount,
+          paid_amount: 0,
+          remaining_amount: final_amount,
+          due_date: data.delivery_date ? new Date(data.delivery_date) : null,
+          status: "UNPAID",
+          notes: `Auto-generated due from Purchase Order ${po_number}`,
+          created_by,
+        }
+      });
+    } catch (dueErr) {
+      console.error("Auto FinanceDue generation error in service:", dueErr);
+    }
+
+    return po;
   });
 }
 

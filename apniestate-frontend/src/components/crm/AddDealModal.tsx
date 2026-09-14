@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
-import { X, IndianRupee, Building2, CheckCircle2 } from 'lucide-react';
-import { crmApi, type CrmLead } from '@/api/crm';
-import { useProject } from '@/context/ProjectContext';
+import React, { useState, useEffect } from 'react';
+import { X, IndianRupee, Building2, CheckCircle2, Users, AlertCircle } from 'lucide-react';
+import { crmApi, type CrmLead, type ChannelPartner, type CrmProperty } from '@/api/crm';
 
 interface AddDealModalProps {
   lead: CrmLead | null;
@@ -18,13 +17,19 @@ export default function AddDealModal({
   onClose,
   onSuccess,
 }: AddDealModalProps) {
-  const { projects } = useProject();
   const [selectedLeadId, setSelectedLeadId] = useState(lead?.id || '');
   const [customerName, setCustomerName] = useState(lead?.name || '');
   const [propertyName, setPropertyName] = useState(lead?.project?.name || '');
+  const [properties, setProperties] = useState<CrmProperty[]>([]);
+  const [partners, setPartners] = useState<ChannelPartner[]>([]);
+  const [selectedPartnerId, setSelectedPartnerId] = useState<string>('');
+  const [referralCode, setReferralCode] = useState<string>('');
+  
+  // Financial amounts
   const [dealValue, setDealValue] = useState('');
-  const [commission, setCommission] = useState('');
   const [amountReceived, setAmountReceived] = useState('');
+  const [commission, setCommission] = useState('');
+
   const [paymentMode, setPaymentMode] = useState('UPI');
   const [transactionId, setTransactionId] = useState('');
   const [dealDate, setDealDate] = useState(() => new Date().toISOString().split('T')[0]);
@@ -32,7 +37,19 @@ export default function AddDealModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  React.useEffect(() => {
+  useEffect(() => {
+    if (isOpen) {
+      Promise.all([
+        crmApi.getChannelPartners().catch(() => ({ data: [] })),
+        crmApi.getProperties().catch(() => ({ data: [] })),
+      ]).then(([partRes, propRes]) => {
+        if (partRes.data) setPartners(partRes.data);
+        if (propRes.data) setProperties(propRes.data);
+      });
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
     if (lead) {
       setSelectedLeadId(lead.id);
       setCustomerName(lead.name);
@@ -43,6 +60,41 @@ export default function AddDealModal({
     }
   }, [lead, leads]);
 
+  // Handle partner selection and auto-calculate commission
+  const handlePartnerSelect = (partnerId: string) => {
+    setSelectedPartnerId(partnerId);
+    if (!partnerId) {
+      setReferralCode('');
+      return;
+    }
+    const found = partners.find((p) => p.id === partnerId);
+    if (found) {
+      setReferralCode(found.referral_code);
+      if (found.commission_rate && dealValue) {
+        const val = parseFloat(dealValue) || 0;
+        const comm = Math.round((val * found.commission_rate) / 100);
+        setCommission(comm.toString());
+      }
+    }
+  };
+
+  // Re-calculate commission when deal value changes if partner is selected
+  const handleDealValueChange = (val: string) => {
+    setDealValue(val);
+    const num = parseFloat(val) || 0;
+    if (selectedPartnerId) {
+      const found = partners.find((p) => p.id === selectedPartnerId);
+      if (found && found.commission_rate) {
+        const comm = Math.round((num * found.commission_rate) / 100);
+        setCommission(comm.toString());
+      }
+    }
+  };
+
+  const parsedDealValue = parseFloat(dealValue) || 0;
+  const parsedReceived = parseFloat(amountReceived) || 0;
+  const calculatedDue = Math.max(0, parsedDealValue - parsedReceived);
+
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -52,16 +104,30 @@ export default function AddDealModal({
       return;
     }
 
+    if (parsedDealValue <= 0) {
+      setError('Please enter a valid total deal / property value');
+      return;
+    }
+
+    if (parsedReceived > parsedDealValue) {
+      setError('Amount received cannot be greater than the total property deal value');
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
+
       const res = await crmApi.createDeal({
         lead_id: selectedLeadId,
         customer_name: customerName.trim(),
         property_name: propertyName.trim() || undefined,
-        deal_value: Number(dealValue) || 0,
-        commission: Number(commission) || 0,
-        amount_received: Number(amountReceived) || 0,
+        deal_value: parsedDealValue,
+        amount_received: parsedReceived,
+        due_amount: calculatedDue,
+        commission: parseFloat(commission) || 0,
+        channel_partner_id: selectedPartnerId || undefined,
+        referral_code: referralCode.trim() || undefined,
         payment_mode: paymentMode,
         transaction_id: transactionId.trim() || undefined,
         deal_date: new Date(dealDate).toISOString(),
@@ -90,8 +156,8 @@ export default function AddDealModal({
               <IndianRupee className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h2 className="text-base font-bold">Record Won Deal</h2>
-              <p className="text-xs text-white/80">Convert lead into booked client & record revenue</p>
+              <h2 className="text-base font-bold">Record Customer Deal</h2>
+              <p className="text-xs text-white/80">Track property sale, customer payments, due balance & CP referral</p>
             </div>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10 text-white/80 hover:text-white">
@@ -99,7 +165,7 @@ export default function AddDealModal({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto custom-scrollbar">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[82vh] overflow-y-auto custom-scrollbar">
           {error && (
             <div className="p-3 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-xl">
               {error}
@@ -111,9 +177,9 @@ export default function AddDealModal({
               <label className="block text-xs font-bold text-slate-700 mb-1">Select Lead</label>
               <select
                 value={selectedLeadId}
-                onChange={e => {
+                onChange={(e) => {
                   setSelectedLeadId(e.target.value);
-                  const found = leads.find(l => l.id === e.target.value);
+                  const found = leads.find((l) => l.id === e.target.value);
                   if (found) {
                     setCustomerName(found.name);
                     setPropertyName(found.project?.name || '');
@@ -121,8 +187,10 @@ export default function AddDealModal({
                 }}
                 className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-amber-600"
               >
-                {leads.map(l => (
-                  <option key={l.id} value={l.id}>{l.name} ({l.phone || 'No phone'})</option>
+                {leads.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.name} ({l.phone || 'No phone'})
+                  </option>
                 ))}
               </select>
             </div>
@@ -135,65 +203,148 @@ export default function AddDealModal({
                 type="text"
                 required
                 value={customerName}
-                onChange={e => setCustomerName(e.target.value)}
+                onChange={(e) => setCustomerName(e.target.value)}
                 className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-amber-600"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Property / Unit Name</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Property / Unit Done</label>
               <input
                 type="text"
+                required
+                list="property-suggestions"
                 value={propertyName}
-                onChange={e => setPropertyName(e.target.value)}
-                placeholder="e.g. Skyline Residences Tower A - 402"
+                onChange={(e) => setPropertyName(e.target.value)}
+                placeholder="e.g. Skyline Tower A - 402"
                 className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-amber-600"
               />
+              <datalist id="property-suggestions">
+                {properties.map((p) => (
+                  <option key={p.id} value={p.name}>
+                    {p.name} ({p.price ? `₹${p.price}` : p.type || 'Property'})
+                  </option>
+                ))}
+              </datalist>
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          {/* Channel Partner Suggestion / Referral Code */}
+          <div className="p-3.5 rounded-xl bg-amber-50/70 border border-amber-200/80 space-y-2">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-amber-900">
+              <Users size={14} className="text-amber-700" />
+              <span>Channel Partner / Referral Code</span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div>
+                <label className="block text-[10px] font-bold text-amber-800 uppercase tracking-wider mb-1">
+                  Select Partner
+                </label>
+                <select
+                  value={selectedPartnerId}
+                  onChange={(e) => handlePartnerSelect(e.target.value)}
+                  className="w-full px-2.5 py-1.5 text-xs bg-white border border-amber-200 rounded-lg focus:outline-none focus:border-amber-600"
+                >
+                  <option value="">Direct / No Channel Partner</option>
+                  {partners.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} ({p.referral_code}) {p.commission_rate ? `- ${p.commission_rate}%` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-amber-800 uppercase tracking-wider mb-1">
+                  Referral Code
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. CP-RAJ-8421"
+                  value={referralCode}
+                  onChange={(e) => {
+                    const code = e.target.value.toUpperCase();
+                    setReferralCode(code);
+                    const matched = partners.find((p) => p.referral_code.toUpperCase() === code);
+                    if (matched) {
+                      setSelectedPartnerId(matched.id);
+                    }
+                  }}
+                  className="w-full px-2.5 py-1.5 text-xs font-mono font-bold bg-white border border-amber-200 rounded-lg focus:outline-none focus:border-amber-600 uppercase"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Financial Amounts with Paid vs Due Calculation */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Total Deal (₹)</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Property Value (₹) <span className="text-red-500">*</span>
+              </label>
               <input
                 type="number"
                 required
+                min="1"
+                step="0.01"
                 value={dealValue}
-                onChange={e => setDealValue(e.target.value)}
-                placeholder="7500000"
-                className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-amber-600"
+                onChange={(e) => handleDealValueChange(e.target.value)}
+                placeholder="2000000"
+                className="w-full px-3 py-2 text-sm font-bold bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-amber-600"
               />
+              <span className="text-[10px] text-slate-400 mt-0.5 block">Total agreed deal</span>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Commission (₹)</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Customer Paid (₹)</label>
               <input
                 type="number"
-                value={commission}
-                onChange={e => setCommission(e.target.value)}
-                placeholder="150000"
-                className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-amber-600"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Received (₹)</label>
-              <input
-                type="number"
+                min="0"
+                step="0.01"
                 value={amountReceived}
-                onChange={e => setAmountReceived(e.target.value)}
-                placeholder="500000"
+                onChange={(e) => setAmountReceived(e.target.value)}
+                placeholder="200000"
+                className="w-full px-3 py-2 text-sm font-bold text-emerald-700 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-amber-600"
+              />
+              <span className="text-[10px] text-slate-400 mt-0.5 block">Token / initial payment</span>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">CP Commission (₹)</label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={commission}
+                onChange={(e) => setCommission(e.target.value)}
+                placeholder="40000"
                 className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-amber-600"
               />
+              <span className="text-[10px] text-slate-400 mt-0.5 block">Brokerage fee</span>
             </div>
           </div>
+
+          {/* Live Calculation Banner */}
+          {parsedDealValue > 0 && (
+            <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
+              <div className="text-xs">
+                <span className="text-muted-foreground font-medium">Customer Paid: </span>
+                <span className="font-extrabold text-emerald-700">₹{parsedReceived.toLocaleString('en-IN')}</span>
+              </div>
+              <div className="text-xs">
+                <span className="text-muted-foreground font-medium">Customer Due Balance: </span>
+                <span className="font-extrabold text-red-700">₹{calculatedDue.toLocaleString('en-IN')}</span>
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">Payment Mode</label>
               <select
                 value={paymentMode}
-                onChange={e => setPaymentMode(e.target.value)}
+                onChange={(e) => setPaymentMode(e.target.value)}
                 className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-amber-600"
               >
                 <option value="UPI">UPI / GPay / PhonePe</option>
@@ -209,7 +360,7 @@ export default function AddDealModal({
               <input
                 type="text"
                 value={transactionId}
-                onChange={e => setTransactionId(e.target.value)}
+                onChange={(e) => setTransactionId(e.target.value)}
                 placeholder="e.g. TXN-99823412"
                 className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-amber-600"
               />
@@ -222,7 +373,7 @@ export default function AddDealModal({
               type="date"
               required
               value={dealDate}
-              onChange={e => setDealDate(e.target.value)}
+              onChange={(e) => setDealDate(e.target.value)}
               className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-amber-600"
             />
           </div>
@@ -232,7 +383,7 @@ export default function AddDealModal({
             <textarea
               rows={2}
               value={notes}
-              onChange={e => setNotes(e.target.value)}
+              onChange={(e) => setNotes(e.target.value)}
               placeholder="e.g. Booking token received. Agreement signing on 15th."
               className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-amber-600 resize-none"
             />

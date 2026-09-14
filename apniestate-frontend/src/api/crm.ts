@@ -64,6 +64,23 @@ export interface CrmActivity {
   lead?: Pick<CrmLead, 'id' | 'name' | 'initials' | 'avatar_color' | 'assigned_to'> | null;
 }
 
+export interface ChannelPartner {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  referral_code: string;
+  commission_rate?: number;
+  status: string;
+  notes?: string | null;
+  created_at: string;
+  deals_count: number;
+  total_deal_amount: number;
+  total_commission: number;
+  total_received: number;
+  recent_deals?: any[];
+}
+
 export interface CrmDeal {
   id: string;
   company_id: string;
@@ -75,6 +92,9 @@ export interface CrmDeal {
   deal_value: number;
   commission: number;
   amount_received: number;
+  due_amount?: number;
+  channel_partner_id?: string | null;
+  referral_code?: string | null;
   payment_mode?: string;
   transaction_id?: string | null;
   deal_date: string;
@@ -82,6 +102,7 @@ export interface CrmDeal {
   created_at: string;
   lead?: Pick<CrmLead, 'id' | 'name' | 'initials' | 'avatar_color' | 'assigned_to'>;
   project?: { id: string; name: string } | null;
+  channel_partner?: { id: string; name: string; referral_code: string; phone?: string | null } | null;
 }
 
 export interface CrmProperty {
@@ -218,6 +239,14 @@ export const crmApi = {
   getDeals: () => apiClient.get<CrmDeal[]>('/crm/deals'),
   createDeal: (data: Partial<CrmDeal>) => apiClient.post<CrmDeal>('/crm/deals', data),
   deleteDeal: (id: string) => apiClient.delete(`/crm/deals/${id}`),
+  payDealDue: (dealId: string, data: { amount: number; payment_mode?: string; notes?: string }) =>
+    apiClient.post<CrmDeal>(`/crm/deals/${dealId}/pay`, data),
+
+  // Channel Partners
+  getChannelPartners: () => apiClient.get<ChannelPartner[]>('/crm/channel-partners'),
+  createChannelPartner: (data: { name: string; email: string; phone: string; commission_rate?: number; notes?: string }) =>
+    apiClient.post<ChannelPartner>('/crm/channel-partners', data),
+  deleteChannelPartner: (id: string) => apiClient.delete(`/crm/channel-partners/${id}`),
 
   // Properties
   getProperties: () => apiClient.get<CrmProperty[]>('/crm/properties'),

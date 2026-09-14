@@ -2,10 +2,13 @@ import React, { useState, useEffect, type FormEvent } from 'react';
 import { Plus, X, Clock, Edit2, Paperclip, UploadCloud } from 'lucide-react';
 import { invoicesApi, type Invoice } from '@/api/invoices';
 import { vendorsApi, type Vendor } from '@/api/vendors';
+import { duesApi } from '@/api/dues';
+import { useProject } from '@/context/ProjectContext';
 import { PH, Card, Chip, SrchBar } from '@/components/shared/FigmaComponents';
 import UploadInvoiceModal from '@/components/finance/UploadInvoiceModal';
 
 export default function InvoicesPage() {
+  const { activeProjectId } = useProject();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [loading, setLoading] = useState(true);
@@ -81,16 +84,38 @@ export default function InvoicesPage() {
     setFormError('');
     setSubmitting(true);
     try {
+      const autoNumber = formNumber.trim() || `INV-${Math.floor(100000 + Math.random() * 900000)}`;
+      const parsedAmount = Number(formAmount);
+
       await invoicesApi.createInvoice({
-        number: formNumber,
+        number: autoNumber,
         vendor_id: formVendorId,
-        amount: Number(formAmount),
-        tax_amount: Number(formTaxAmount),
-        total: Number(formAmount) + Number(formTaxAmount),
+        amount: parsedAmount,
+        tax_amount: 0,
+        total: parsedAmount,
         due_date: formDueDate ? new Date(formDueDate).toISOString() : new Date().toISOString(),
         status: formStatus,
         notes: formNotes || null
       });
+
+      // Automatically register Due in Finance
+      try {
+        const v = vendors.find(ven => ven.id === formVendorId);
+        await duesApi.createDue({
+          project_id: activeProjectId || undefined,
+          vendor_id: formVendorId,
+          party_name: v?.name || 'Vendor',
+          party_type: 'VENDOR',
+          due_type: 'MANUAL_DUE',
+          title: `Invoice ${autoNumber} - ${formNotes || v?.name || 'Vendor Due'}`,
+          total_amount: parsedAmount,
+          due_date: formDueDate ? new Date(formDueDate).toISOString() : undefined,
+          notes: formNotes || undefined
+        });
+      } catch (dueErr) {
+        console.error('Failed to auto-register due for invoice:', dueErr);
+      }
+
       setShowCreateModal(false);
       resetForm();
       fetchData();
@@ -107,12 +132,13 @@ export default function InvoicesPage() {
     setFormError('');
     setSubmitting(true);
     try {
+      const parsedAmount = Number(formAmount);
       await invoicesApi.updateInvoice(selectedInvoice.id, {
-        number: formNumber,
+        number: formNumber.trim() || selectedInvoice.number,
         vendor_id: formVendorId,
-        amount: Number(formAmount),
-        tax_amount: Number(formTaxAmount),
-        total: Number(formAmount) + Number(formTaxAmount),
+        amount: parsedAmount,
+        tax_amount: 0,
+        total: parsedAmount,
         due_date: formDueDate ? new Date(formDueDate).toISOString() : new Date().toISOString(),
         status: formStatus,
         notes: formNotes || null
@@ -270,14 +296,16 @@ export default function InvoicesPage() {
         )}
       </Card>
 
-      {/* Modal */}
+      {/* Modal for Create/Edit Invoice */}
       {(showCreateModal || showEditModal) && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 animate-in fade-in">
-          <div className="bg-card w-full max-w-md rounded-2xl shadow-xl flex flex-col max-h-[90vh]">
-            <div className="flex justify-between items-center p-4 border-b border-border">
-              <h2 className="text-sm font-bold">{showEditModal ? 'Edit Invoice' : 'New Invoice'}</h2>
-              <button onClick={() => { setShowCreateModal(false); setShowEditModal(false); }} className="text-muted-foreground hover:text-foreground">
-                <X className="w-5 h-5" />
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-card border border-border rounded-2xl w-full max-w-md shadow-2xl p-6 relative">
+            <div className="flex justify-between items-center pb-3 border-b border-border">
+              <h2 className="text-base font-bold text-foreground">
+                {showEditModal ? 'Edit Invoice' : 'Create Invoice'}
+              </h2>
+              <button onClick={() => { setShowCreateModal(false); setShowEditModal(false); }} className="p-1 text-muted-foreground hover:text-foreground">
+                <X className="w-4 h-4" />
               </button>
             </div>
             
@@ -286,11 +314,6 @@ export default function InvoicesPage() {
               
               <div className="space-y-3">
                 <div>
-                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Invoice Number</label>
-                  <input required className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary" value={formNumber} onChange={e => setFormNumber(e.target.value)} placeholder="INV-2024-001" />
-                </div>
-                
-                <div>
                   <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Vendor</label>
                   <select required className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary" value={formVendorId} onChange={e => setFormVendorId(e.target.value)}>
                     <option value="" disabled>Select Vendor</option>
@@ -298,15 +321,9 @@ export default function InvoicesPage() {
                   </select>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Amount (Excl. Tax)</label>
-                    <input required type="number" min="0" step="0.01" className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary" value={formAmount || ''} onChange={e => setFormAmount(Number(e.target.value))} placeholder="0.00" />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Tax Amount</label>
-                    <input type="number" min="0" step="0.01" className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary" value={formTaxAmount || ''} onChange={e => setFormTaxAmount(Number(e.target.value))} placeholder="0.00" />
-                  </div>
+                <div>
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Amount (₹) <span className="text-red-500">*</span></label>
+                  <input required type="number" min="0.01" step="0.01" className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm font-bold text-foreground outline-none focus:ring-1 focus:ring-primary" value={formAmount || ''} onChange={e => setFormAmount(Number(e.target.value))} placeholder="0.00" />
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
@@ -350,6 +367,7 @@ export default function InvoicesPage() {
         onClose={() => { setShowUploadModal(false); setUploadInvoiceId(undefined); }} 
         onSuccess={fetchData} 
         preselectedInvoiceId={uploadInvoiceId} 
+        projectId={activeProjectId}
       />
     </div>
   );

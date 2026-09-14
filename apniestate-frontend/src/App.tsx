@@ -109,6 +109,8 @@ export default function App() {
                     <Route path="/crm-customers" element={<Navigate to="/crm?tab=customers" replace />} />
                     <Route path="/crm-activities" element={<Navigate to="/crm?tab=activities" replace />} />
                     <Route path="/crm-properties" element={<Navigate to="/crm?tab=properties" replace />} />
+                    <Route path="/channel-partners" element={<Navigate to="/crm?tab=channel-partners" replace />} />
+                    <Route path="/crm-channel-partners" element={<Navigate to="/crm?tab=channel-partners" replace />} />
 
                     <Route element={<RouteGuard permission="projects.read" />}>
                       <Route path="/projects" element={<ProjectsPage />} />

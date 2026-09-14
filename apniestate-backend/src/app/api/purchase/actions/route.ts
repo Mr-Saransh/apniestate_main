@@ -242,6 +242,35 @@ export const POST = withAuth(async (request: Request, user: any) => {
           }
         }
       });
+
+      // Automatically add as Due in Finance
+      try {
+        const vendor = await prisma.vendor.findUnique({ where: { id: vendorId }, select: { name: true, phone: true } });
+        const itemsSummary = items.map((i: any) => i.materialName).filter(Boolean).join(', ');
+        await prisma.financeDue.create({
+          data: {
+            company_id: user.company_id,
+            project_id: projectId,
+            vendor_id: vendorId,
+            purchase_order_id: po.id,
+            title: `PO ${poNumber} - ${itemsSummary.slice(0, 70) || 'Materials Order'}`,
+            party_name: vendor?.name || "Vendor",
+            party_phone: vendor?.phone || null,
+            party_type: "VENDOR",
+            due_type: "VENDOR_PURCHASE",
+            total_amount: totalAmount,
+            paid_amount: 0,
+            remaining_amount: totalAmount,
+            due_date: eta ? new Date(eta) : null,
+            status: "UNPAID",
+            notes: `Auto-generated from Procurement order ${poNumber}`,
+            created_by: user.sub,
+          }
+        });
+      } catch (dueErr) {
+        console.error("Auto FinanceDue generation error:", dueErr);
+      }
+
       return NextResponse.json({ success: true, po });
     }
 

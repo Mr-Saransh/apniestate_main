@@ -31,6 +31,7 @@ export const GET = withCrmAuth(async (req, user) => {
         lead: { select: { id: true, name: true, initials: true, avatar_color: true, assigned_to: true } },
         project: { select: { id: true, name: true } },
         creator: { select: { id: true, name: true, email: true } },
+        channel_partner: { select: { id: true, name: true, referral_code: true, phone: true } },
       },
     });
 
@@ -68,6 +69,31 @@ export const POST = withCrmAuth(async (req, user) => {
       }
     }
 
+    const dealValue = Number(body.deal_value) || 0;
+    const amountReceived = Number(body.amount_received) || 0;
+    const dueAmount = body.due_amount !== undefined ? Number(body.due_amount) : Math.max(0, dealValue - amountReceived);
+
+    // Resolve Channel Partner if referral code or channel_partner_id passed
+    let partnerId = body.channel_partner_id || null;
+    let referralCode = body.referral_code?.trim() || null;
+
+    if (!partnerId && referralCode) {
+      const partner = await prisma.channelPartner.findFirst({
+        where: { referral_code: referralCode, company_id: user.company_id },
+      });
+      if (partner) {
+        partnerId = partner.id;
+      }
+    } else if (partnerId && !referralCode) {
+      const partner = await prisma.channelPartner.findUnique({
+        where: { id: partnerId },
+        select: { referral_code: true },
+      });
+      if (partner) {
+        referralCode = partner.referral_code;
+      }
+    }
+
     const deal = await prisma.crmDeal.create({
       data: {
         company_id: user.company_id,
@@ -76,9 +102,12 @@ export const POST = withCrmAuth(async (req, user) => {
         created_by: user.sub,
         customer_name: body.customer_name,
         property_name: body.property_name || null,
-        deal_value: Number(body.deal_value) || 0,
+        deal_value: dealValue,
         commission: Number(body.commission) || 0,
-        amount_received: Number(body.amount_received) || 0,
+        amount_received: amountReceived,
+        due_amount: dueAmount,
+        channel_partner_id: partnerId,
+        referral_code: referralCode,
         payment_mode: body.payment_mode || "UPI",
         transaction_id: body.transaction_id || null,
         deal_date: body.deal_date ? new Date(body.deal_date) : new Date(),
@@ -86,6 +115,7 @@ export const POST = withCrmAuth(async (req, user) => {
       },
       include: {
         lead: { select: { id: true, name: true, initials: true, avatar_color: true } },
+        channel_partner: { select: { id: true, name: true, referral_code: true, phone: true } },
       },
     });
 
