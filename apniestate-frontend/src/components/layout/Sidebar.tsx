@@ -85,9 +85,9 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
       label: "My Sales Workspace", items: [
         { id: "/crm?tab=overview", label: "Overview", icon: LayoutDashboard },
         { id: "/crm?tab=leads", label: "My Leads", icon: Users },
+        { id: "/crm?tab=customers", label: "Customers", icon: IndianRupee },
         { id: "/crm?tab=followups", label: "Follow-ups", icon: Clock },
         { id: "/crm?tab=activities", label: "Site Visits", icon: Calendar },
-        { id: "/crm?tab=deals", label: "Bookings", icon: IndianRupee },
       ]
     },
     {
@@ -112,7 +112,6 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
       label: "Team & Performance", items: [
         { id: "/crm?tab=channel-partners", label: "Channel Partners", icon: Handshake },
         { id: "/crm?tab=team", label: "CRM Team", icon: Users },
-        { id: "/crm?tab=deals", label: "Bookings", icon: IndianRupee },
         { id: "/crm?tab=reports", label: "Reports", icon: FileBarChart },
       ]
     },
@@ -138,7 +137,6 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
       label: "Management & Inventory", items: [
         { id: "/crm?tab=channel-partners", label: "Channel Partners", icon: Handshake },
         { id: "/crm?tab=team", label: "CRM Team", icon: Users },
-        { id: "/crm?tab=deals", label: "Bookings", icon: IndianRupee },
         { id: "/crm?tab=activities", label: "Site Visits & Tasks", icon: Calendar },
         { id: "/crm?tab=properties", label: "Properties Catalog", icon: Building2 },
         { id: "/crm?tab=reports", label: "Reports", icon: FileBarChart },

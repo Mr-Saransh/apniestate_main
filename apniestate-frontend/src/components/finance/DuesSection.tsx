@@ -57,7 +57,7 @@ export default function DuesSection() {
 
   const loadDues = async () => {
     try {
-      setLoading(true);
+      if (dues.length === 0) setLoading(true);
       const res = await duesApi.getDues({
         project_id: activeProjectId || undefined,
         status: statusFilter,
@@ -207,7 +207,7 @@ export default function DuesSection() {
             setAddError('');
             setIsAddDueOpen(true);
           }}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white shadow-sm transition-all active:scale-95 shrink-0"
+          className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white shadow-sm transition-all active:scale-95 shrink-0 cursor-pointer"
           style={{ backgroundColor: '#2648E7' }}
         >
           <Plus size={14} /> Add New Due
@@ -215,49 +215,49 @@ export default function DuesSection() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className="p-4 rounded-2xl bg-red-50/80 border border-red-200/80 shadow-sm">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-3">
+        <div className="p-3 sm:p-4 rounded-2xl bg-red-50/80 border border-red-200/80 shadow-sm">
           <span className="text-[10px] sm:text-xs font-bold text-red-700 uppercase tracking-wider">
-            Total Outstanding Due
+            Total Outstanding
           </span>
-          <p className="text-xl sm:text-2xl font-black text-red-700 mt-1">
+          <p className="text-lg sm:text-2xl font-black text-red-700 mt-1 truncate">
             ₹{(summary?.total_due_amount || 0).toLocaleString('en-IN')}
           </p>
-          <p className="text-[10px] text-red-600/80 mt-1">
+          <p className="text-[10px] text-red-600/80 mt-0.5 truncate">
             {summary?.count_pending || 0} pending payment{summary?.count_pending === 1 ? '' : 's'}
           </p>
         </div>
 
-        <div className="p-4 rounded-2xl bg-emerald-50/80 border border-emerald-200/80 shadow-sm">
+        <div className="p-3 sm:p-4 rounded-2xl bg-emerald-50/80 border border-emerald-200/80 shadow-sm">
           <span className="text-[10px] sm:text-xs font-bold text-emerald-700 uppercase tracking-wider">
-            Total Paid Till Now
+            Total Settled
           </span>
-          <p className="text-xl sm:text-2xl font-black text-emerald-700 mt-1">
+          <p className="text-lg sm:text-2xl font-black text-emerald-700 mt-1 truncate">
             ₹{(summary?.total_paid_amount || 0).toLocaleString('en-IN')}
           </p>
-          <p className="text-[10px] text-emerald-600/80 mt-1">Settled payments to date</p>
+          <p className="text-[10px] text-emerald-600/80 mt-0.5 truncate">Settled to date</p>
         </div>
 
-        <div className="p-4 rounded-2xl bg-blue-50/80 border border-blue-200/80 shadow-sm">
+        <div className="p-3 sm:p-4 rounded-2xl bg-blue-50/80 border border-blue-200/80 shadow-sm">
           <span className="text-[10px] sm:text-xs font-bold text-[#2648E7] uppercase tracking-wider">
-            Total Accrued Value
+            Total Accrued
           </span>
-          <p className="text-xl sm:text-2xl font-black text-[#2648E7] mt-1">
+          <p className="text-lg sm:text-2xl font-black text-[#2648E7] mt-1 truncate">
             ₹{(summary?.total_accrued_amount || 0).toLocaleString('en-IN')}
           </p>
-          <p className="text-[10px] text-blue-600/80 mt-1">{summary?.count_total || 0} total dues recorded</p>
+          <p className="text-[10px] text-blue-600/80 mt-0.5 truncate">{summary?.count_total || 0} total dues</p>
         </div>
 
-        <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 shadow-sm">
+        <div className="p-3 sm:p-4 rounded-2xl bg-slate-50 border border-slate-200 shadow-sm">
           <span className="text-[10px] sm:text-xs font-bold text-slate-600 uppercase tracking-wider">
             Settlement Rate
           </span>
-          <p className="text-xl sm:text-2xl font-black text-slate-800 mt-1">
+          <p className="text-lg sm:text-2xl font-black text-slate-800 mt-1 truncate">
             {summary?.total_accrued_amount
               ? `${Math.round(((summary.total_paid_amount || 0) / summary.total_accrued_amount) * 100)}%`
               : '0%'}
           </p>
-          <p className="text-[10px] text-slate-500 mt-1">Dues cleared</p>
+          <p className="text-[10px] text-slate-500 mt-0.5 truncate">Dues cleared</p>
         </div>
       </div>
 
@@ -357,29 +357,30 @@ export default function DuesSection() {
                     </div>
 
                     {/* Right: Numbers & Action */}
-                    <div className="flex items-center justify-between md:justify-end gap-5 shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-border/60">
-                      <div className="text-left md:text-right">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between md:justify-end gap-3 sm:gap-5 shrink-0 pt-2.5 md:pt-0 border-t md:border-t-0 border-border/60">
+                      <div className="flex items-center justify-between sm:block text-left md:text-right">
                         <div className="flex items-baseline md:justify-end gap-1.5">
                           <span className="text-xs text-muted-foreground font-semibold">Remaining Due:</span>
-                          <span className="text-base font-black text-red-700">
+                          <span className="text-base sm:text-lg font-black text-red-700">
                             ₹{d.remaining_amount.toLocaleString('en-IN')}
                           </span>
                         </div>
-                        <p className="text-[11px] text-muted-foreground">
+                        <p className="text-[10px] sm:text-[11px] text-muted-foreground">
                           Paid: ₹{d.paid_amount.toLocaleString('en-IN')} / Total: ₹{d.total_amount.toLocaleString('en-IN')} ({progressPct}%)
                         </p>
                       </div>
 
                       {!isSettled ? (
                         <button
+                          type="button"
                           onClick={() => handleOpenPay(d)}
-                          className="px-4 py-2 rounded-xl text-xs font-bold text-white shadow-sm transition-all active:scale-95 flex items-center gap-1.5"
+                          className="w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-bold text-white shadow-sm transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
                           style={{ backgroundColor: '#2648E7' }}
                         >
                           <IndianRupee size={13} /> Pay Due
                         </button>
                       ) : (
-                        <div className="flex items-center gap-1 text-xs font-bold text-emerald-600 px-3 py-1.5 bg-emerald-50 rounded-xl">
+                        <div className="flex items-center justify-center gap-1 text-xs font-bold text-emerald-600 px-3 py-1.5 bg-emerald-50 rounded-xl">
                           <CheckCircle2 size={14} /> Settled
                         </div>
                       )}
@@ -402,9 +403,9 @@ export default function DuesSection() {
 
       {/* Pay Due Modal */}
       {isPayOpen && selectedDue && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-xl border border-border overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-slate-50/80">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/50 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white w-full max-w-md max-h-[90vh] flex flex-col rounded-2xl shadow-xl border border-border overflow-hidden">
+            <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-border bg-slate-50/80 shrink-0">
               <div className="flex items-center gap-2">
                 <div className="size-8 rounded-lg bg-[#2648E7]/10 flex items-center justify-center text-[#2648E7]">
                   <IndianRupee size={18} />
@@ -414,12 +415,12 @@ export default function DuesSection() {
                   <p className="text-[11px] text-muted-foreground truncate max-w-xs">{selectedDue.title}</p>
                 </div>
               </div>
-              <button onClick={() => setIsPayOpen(false)} className="p-1 hover:bg-slate-200 rounded-lg text-muted-foreground">
+              <button onClick={() => setIsPayOpen(false)} className="p-1 hover:bg-slate-200 rounded-lg text-muted-foreground cursor-pointer">
                 <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={handlePaySubmit} className="p-6 space-y-4">
+            <form onSubmit={handlePaySubmit} className="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1">
               {payError && (
                 <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-center gap-2">
                   <AlertCircle size={16} className="shrink-0 text-red-500" />
@@ -550,21 +551,21 @@ export default function DuesSection() {
 
       {/* Add New Due Modal (Vendors or New People) */}
       {isAddDueOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white w-full max-w-lg rounded-2xl shadow-xl border border-border overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-slate-50/80">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/50 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white w-full max-w-lg max-h-[90vh] flex flex-col rounded-2xl shadow-xl border border-border overflow-hidden">
+            <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-border bg-slate-50/80 shrink-0">
               <div className="flex items-center gap-2">
                 <div className="size-8 rounded-lg bg-[#2648E7]/10 flex items-center justify-center text-[#2648E7]">
                   <Plus size={18} />
                 </div>
                 <h3 className="font-bold text-base text-foreground">Add New Due Entry</h3>
               </div>
-              <button onClick={() => setIsAddDueOpen(false)} className="p-1 hover:bg-slate-200 rounded-lg text-muted-foreground">
+              <button onClick={() => setIsAddDueOpen(false)} className="p-1 hover:bg-slate-200 rounded-lg text-muted-foreground cursor-pointer">
                 <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={handleAddDueSubmit} className="p-6 space-y-4">
+            <form onSubmit={handleAddDueSubmit} className="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1">
               {addError && (
                 <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-center gap-2">
                   <AlertCircle size={16} className="shrink-0 text-red-500" />

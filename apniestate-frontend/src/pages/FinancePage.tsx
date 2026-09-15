@@ -88,7 +88,9 @@ export default function FinancePage() {
       setLoading(false);
       return;
     }
-    setLoading(true);
+    if (!data) {
+      setLoading(true);
+    }
     try {
       const [cashRes, summaryRes, expRes, duesRes] = await Promise.all([
         apiClient.get<CashbookData>(`/cashbook?project_id=${activeProjectId}`),
@@ -214,7 +216,7 @@ export default function FinancePage() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1">
         <div className="max-w-2xl mx-auto px-4 py-5 space-y-6">
           {/* Prominent Money In, Money Out, Net Balance */}
           <div>
@@ -271,14 +273,14 @@ export default function FinancePage() {
           <div className="grid grid-cols-2 gap-3">
             <button
               onClick={() => setShowModal(true)}
-              className="rounded-2xl p-4 flex justify-center items-center gap-2 font-bold text-sm text-center shadow-sm hover:shadow-md transition-shadow text-white"
+              className="rounded-2xl p-4 flex justify-center items-center gap-2 font-bold text-sm text-center shadow-sm hover:shadow-md transition-shadow text-white cursor-pointer active:scale-98"
               style={{ backgroundColor: "#2648E7" }}
             >
               <Plus size={20} /> Add Entry
             </button>
             <button
               onClick={() => setShowUploadModal(true)}
-              className="rounded-2xl p-4 flex justify-center items-center gap-2 font-bold text-sm text-center shadow-sm hover:shadow-md transition-shadow bg-white border border-border hover:border-[#2648E7] text-[#2648E7]"
+              className="rounded-2xl p-4 flex justify-center items-center gap-2 font-bold text-sm text-center shadow-sm hover:shadow-md transition-shadow bg-white border border-border hover:border-[#2648E7] text-[#2648E7] cursor-pointer active:scale-98"
             >
               <FileText size={20} /> Upload Invoice
             </button>
@@ -286,32 +288,39 @@ export default function FinancePage() {
 
           {/* Outstanding Dues Banner */}
           {duesSummary && duesSummary.total_due_amount > 0 && (
-            <div className="bg-gradient-to-r from-red-50 to-orange-50 border border-red-200/80 rounded-2xl p-4 flex items-center justify-between shadow-sm">
-              <div className="flex items-center gap-3">
-                <div className="size-10 rounded-xl bg-red-100 flex items-center justify-center text-red-600 shrink-0">
-                  <IndianRupee size={20} />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-red-800 uppercase tracking-wider">Outstanding Dues</span>
-                    <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-red-200/80 text-red-800">
-                      {duesSummary.count_pending} pending
-                    </span>
+            <div className="bg-gradient-to-br from-red-50 via-red-50/80 to-orange-50/60 border border-red-200/90 rounded-2xl p-4 sm:p-5 shadow-sm hover:shadow-md transition-all">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+                <div className="flex items-start sm:items-center gap-3.5 min-w-0">
+                  <div className="size-11 rounded-2xl bg-red-100 flex items-center justify-center text-red-600 shrink-0 shadow-xs mt-0.5 sm:mt-0">
+                    <IndianRupee size={22} />
                   </div>
-                  <p className="text-lg font-extrabold text-red-700">
-                    ₹{duesSummary.total_due_amount.toLocaleString('en-IN')}
-                  </p>
-                  <p className="text-[11px] text-red-600/80">
-                    Settled to date: ₹{duesSummary.total_paid_amount.toLocaleString('en-IN')}
-                  </p>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <span className="text-xs font-black text-red-800 uppercase tracking-wider">
+                        Outstanding Dues
+                      </span>
+                      <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-red-200/80 text-red-800 shrink-0">
+                        {duesSummary.count_pending} pending
+                      </span>
+                    </div>
+                    <p className="text-xl sm:text-2xl font-black text-red-700 tracking-tight leading-none" style={{ fontFamily: "var(--font-display)" }}>
+                      ₹{duesSummary.total_due_amount.toLocaleString('en-IN')}
+                    </p>
+                    <p className="text-[11px] text-red-600/80 font-medium mt-1">
+                      Settled to date: ₹{duesSummary.total_paid_amount.toLocaleString('en-IN')}
+                    </p>
+                  </div>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={() => navigate('/finance?tab=dues')}
+                  className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-bold text-white shadow-sm hover:bg-red-700 active:scale-98 transition-all shrink-0 bg-red-600 flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <span>View & Pay Dues</span>
+                  <ArrowUpRight size={14} />
+                </button>
               </div>
-              <button
-                onClick={() => navigate('/finance?tab=dues')}
-                className="px-3.5 py-2 rounded-xl text-xs font-bold text-white shadow-sm hover:opacity-95 transition-all shrink-0 bg-red-600 flex items-center gap-1"
-              >
-                View & Pay Dues <ArrowUpRight size={13} />
-              </button>
             </div>
           )}
 

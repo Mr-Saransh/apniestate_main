@@ -12,9 +12,21 @@ export async function getDocuments(
     q?: string;
   }
 ) {
+  const dbUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { company_id: true },
+  });
+
   const where: any = {};
 
-  if (filters?.category) {
+  if (dbUser?.company_id) {
+    where.OR = [
+      { company_id: dbUser.company_id },
+      { company_id: null },
+    ];
+  }
+
+  if (filters?.category && filters.category !== 'ALL') {
     where.category = filters.category;
   }
   if (filters?.entity_type) {
@@ -34,7 +46,7 @@ export async function getDocuments(
     };
   }
   if (filters?.q) {
-    where.OR = [
+    const searchCondition = [
       { name: { contains: filters.q, mode: "insensitive" } },
       { category: { contains: filters.q, mode: "insensitive" } },
       {
@@ -45,6 +57,11 @@ export async function getDocuments(
         },
       },
     ];
+    if (where.OR) {
+      where.AND = [{ OR: searchCondition }];
+    } else {
+      where.OR = searchCondition;
+    }
   }
 
   return prisma.document.findMany({
@@ -74,12 +91,18 @@ export async function getDocumentById(id: string) {
 }
 
 export async function createDocument(data: any, userId: string) {
+  const dbUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { company_id: true },
+  });
+
   const { tags, ...rest } = data;
 
   return prisma.$transaction(async (tx) => {
     const doc = await tx.document.create({
       data: {
         ...rest,
+        company_id: dbUser?.company_id || null,
         uploaded_by: userId,
         versions: {
           create: {

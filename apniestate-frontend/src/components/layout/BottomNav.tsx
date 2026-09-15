@@ -14,17 +14,17 @@ const ERP_BOTTOM_NAV = [
 const TELECALLER_BOTTOM_NAV = [
   { id: "overview", path: "/crm?tab=overview", Icon: LayoutDashboard, label: "Overview" },
   { id: "leads", path: "/crm?tab=leads", Icon: Users, label: "My Leads" },
+  { id: "customers", path: "/crm?tab=customers", Icon: IndianRupee, label: "Customers" },
   { id: "followups", path: "/crm?tab=followups", Icon: Clock, label: "Follow-ups" },
   { id: "activities", path: "/crm?tab=activities", Icon: Calendar, label: "Visits" },
-  { id: "deals", path: "/crm?tab=deals", Icon: IndianRupee, label: "Bookings" },
 ];
 
 const CRM_BOTTOM_NAV = [
   { id: "overview", path: "/crm?tab=overview", Icon: LayoutDashboard, label: "Overview" },
   { id: "leads", path: "/crm?tab=leads", Icon: Users, label: "Leads" },
+  { id: "customers", path: "/crm?tab=customers", Icon: IndianRupee, label: "Customers" },
   { id: "pipeline", path: "/crm?tab=pipeline", Icon: GitCommit, label: "Pipeline" },
   { id: "team", path: "/crm?tab=team", Icon: Users, label: "Team" },
-  { id: "deals", path: "/crm?tab=deals", Icon: IndianRupee, label: "Bookings" },
 ];
 
 export default function BottomNav() {

@@ -20,7 +20,7 @@ export default function FinanceWorkspace() {
     { id: 'invoices', label: 'Invoices' },
     { id: 'quotations', label: 'Quotations' },
     { id: 'budgets', label: 'Budgets' },
-    { id: 'dues', label: 'Due' },
+    { id: 'dues', label: 'Dues' },
   ];
 
   if (!activeProjectId) {
@@ -42,7 +42,7 @@ export default function FinanceWorkspace() {
             <button
               key={t.id}
               onClick={() => setSearchParams({ tab: t.id }, { replace: true })}
-              className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap shrink-0 ${
+              className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                 tab === t.id ? "border-[#2648E7] text-[#2648E7]" : "border-transparent text-muted-foreground hover:text-foreground"
               }`}
             >
@@ -53,9 +53,7 @@ export default function FinanceWorkspace() {
       </div>
 
       <div className="flex-1 w-full">
-        {tab === 'cashbook' && (
-          <div className="max-w-2xl mx-auto px-4 py-5"><CashbookPage /></div>
-        )}
+        {tab === 'cashbook' && <CashbookPage />}
         {tab === 'expenses' && (
           <div className="max-w-2xl mx-auto px-4 py-5"><ExpensesPage /></div>
         )}
