@@ -46,7 +46,7 @@ export default function UploadInvoiceModal({
         setSelectedInvoiceId(preselectedInvoiceId);
       }
       Promise.all([
-        invoicesApi.getInvoices().catch(() => ({ data: [] })),
+        invoicesApi.getInvoices({ project_id: projectId || undefined }).catch(() => ({ data: [] })),
         vendorsApi.getVendors().catch(() => ({ data: [] }))
       ]).then(([invRes, venRes]) => {
         if (invRes.data) setInvoices(invRes.data);
@@ -127,6 +127,7 @@ export default function UploadInvoiceModal({
         const invPayload = {
           number: autoNumber,
           vendor_id: resolvedVendorId,
+          project_id: projectId || undefined,
           amount: parsedAmount,
           tax_amount: 0,
           total: parsedAmount,

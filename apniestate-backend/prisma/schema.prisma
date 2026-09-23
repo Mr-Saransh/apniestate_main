@@ -137,6 +137,8 @@ enum PaymentMethod {
 
 enum InvoiceStatus {
   DRAFT
+  PENDING
+  APPROVED
   SENT
   PAID
   OVERDUE
@@ -546,6 +548,7 @@ model Project {
   company             Company?            @relation(fields: [company_id], references: [id])
   Equipment           Equipment[]
   finance_dues        FinanceDue[]
+  invoices            Invoice[]
 
   // CRM relations
   crm_leads       CrmLead[]
@@ -617,6 +620,7 @@ model Site {
   company_id            String?
   company               Company?              @relation(fields: [company_id], references: [id])
   LabourLog             LabourLog[]
+  invoices              Invoice[]
 
   @@index([project_id], name: "idx_sites_project_id")
   @@index([supervisor_id], name: "idx_sites_supervisor_id")
@@ -1572,6 +1576,8 @@ model Invoice {
   id         String        @id @default(cuid())
   number     String        @unique
   vendor_id  String
+  project_id String?
+  site_id    String?
   amount     Float
   tax_amount Float?        @default(0)
   total      Float
@@ -1582,11 +1588,15 @@ model Invoice {
   updated_at DateTime      @updatedAt
 
   vendor     Vendor    @relation(fields: [vendor_id], references: [id])
+  project    Project?  @relation(fields: [project_id], references: [id])
+  site       Site?     @relation(fields: [site_id], references: [id])
   payments   Payment[]
   company_id String?
   company    Company?  @relation(fields: [company_id], references: [id])
 
   @@index([vendor_id], name: "idx_invoices_vendor_id")
+  @@index([project_id], name: "idx_invoices_project_id")
+  @@index([site_id], name: "idx_invoices_site_id")
   @@index([status], name: "idx_invoices_status")
   @@index([company_id], name: "idx_invoice_company_id")
   @@map("invoices")

@@ -58,7 +58,7 @@ export default function FinanceWorkspace() {
           <div className="max-w-2xl mx-auto px-4 py-5"><ExpensesPage /></div>
         )}
         {tab === 'invoices' && (
-          <div className="max-w-2xl mx-auto px-4 py-5"><InvoicesPage /></div>
+          <div className="max-w-3xl mx-auto px-4 py-5"><InvoicesPage /></div>
         )}
         {tab === 'quotations' && (
           <div className="max-w-2xl mx-auto px-4 py-5"><QuotationsSection /></div>

@@ -89,11 +89,11 @@ export const GET = withAuth(async (req: NextRequest, user) => {
       }
     });
 
-    // Pending vendor payments (unpaid invoices)
+    // Pending vendor payments (unpaid invoices for this specific project)
     const unpaidInvoices = await prisma.invoice.findMany({
       where: {
-        company_id: project.company_id,
-        status: { in: ["DRAFT", "SENT"] }
+        project_id: project.id,
+        status: { in: ["DRAFT", "PENDING", "APPROVED", "SENT", "OVERDUE"] }
       }
     });
     const pendingVendorPayments = unpaidInvoices.length;

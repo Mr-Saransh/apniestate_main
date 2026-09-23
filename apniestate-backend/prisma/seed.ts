@@ -755,18 +755,18 @@ async function main() {
 
   // ── Invoices ──────────────────────────────────────────────
   const invoicesData = [
-    { id: 'inv_001', number: 'INV-2026-001', vendor_id: 'vend_cement_co', amount: 1800000, total: 2016000, tax_amount: 216000, due_date: daysAgo(10), status: 'PAID' },
-    { id: 'inv_002', number: 'INV-2026-002', vendor_id: 'vend_steel_co', amount: 3500000, total: 3920000, tax_amount: 420000, due_date: daysAgo(5), status: 'SENT' },
-    { id: 'inv_003', number: 'INV-2026-003', vendor_id: 'vend_brick_co', amount: 950000, total: 1064000, tax_amount: 114000, due_date: monthsFromNow(1), status: 'DRAFT' },
-    { id: 'inv_004', number: 'INV-2026-004', vendor_id: 'vend_aggregate', amount: 750000, total: 840000, tax_amount: 90000, due_date: daysAgo(20), status: 'PAID' },
-    { id: 'inv_005', number: 'INV-2026-005', vendor_id: 'vend_crane_co', amount: 2200000, total: 2464000, tax_amount: 264000, due_date: monthsFromNow(2), status: 'DRAFT' },
-    { id: 'inv_006', number: 'INV-2026-006', vendor_id: 'vend_cement_co', amount: 1350000, total: 1512000, tax_amount: 162000, due_date: daysAgo(15), status: 'PAID' },
+    { id: 'inv_001', number: 'INV-2026-001', project_id: 'proj_downtown_plaza', vendor_id: 'vend_cement_co', amount: 1800000, total: 2016000, tax_amount: 216000, due_date: daysAgo(10), status: 'PAID' },
+    { id: 'inv_002', number: 'INV-2026-002', project_id: 'proj_downtown_plaza', vendor_id: 'vend_steel_co', amount: 3500000, total: 3920000, tax_amount: 420000, due_date: daysAgo(5), status: 'SENT' },
+    { id: 'inv_003', number: 'INV-2026-003', project_id: 'proj_downtown_plaza', vendor_id: 'vend_brick_co', amount: 950000, total: 1064000, tax_amount: 114000, due_date: monthsFromNow(1), status: 'DRAFT' },
+    { id: 'inv_004', number: 'INV-2026-004', project_id: 'proj_downtown_plaza', vendor_id: 'vend_aggregate', amount: 750000, total: 840000, tax_amount: 90000, due_date: daysAgo(20), status: 'PAID' },
+    { id: 'inv_005', number: 'INV-2026-005', project_id: 'proj_downtown_plaza', vendor_id: 'vend_crane_co', amount: 2200000, total: 2464000, tax_amount: 264000, due_date: monthsFromNow(2), status: 'DRAFT' },
+    { id: 'inv_006', number: 'INV-2026-006', project_id: 'proj_downtown_plaza', vendor_id: 'vend_cement_co', amount: 1350000, total: 1512000, tax_amount: 162000, due_date: daysAgo(15), status: 'PAID' },
   ];
 
   for (const inv of invoicesData) {
     await prisma.invoice.upsert({
       where: { id: inv.id },
-      update: {},
+      update: { project_id: 'proj_downtown_plaza' },
       create: { ...inv, company_id: company.id } as any,
     });
   }
