@@ -28,7 +28,7 @@ export const POST = withAuth(async (request: Request, user: any) => {
       let material = await prisma.material.findFirst({ where: { name: materialName } });
       if (!material) {
         material = await prisma.material.create({
-          data: { name: materialName, unit: 'pcs', company_id: user.company_id }
+          data: { name: materialName, unit: payload.unit || 'pcs', company_id: user.company_id }
         });
       }
 
@@ -79,8 +79,7 @@ export const POST = withAuth(async (request: Request, user: any) => {
     }
 
     if (action === 'CREATE_BOQ_ITEM') {
-      const { projectId, items } = payload;
-      // Find or create BOQ for project
+      const { projectId, items, categoryName = 'General' } = payload;
       let boq = await prisma.bOQ.findFirst({ 
         where: { project_id: projectId },
         orderBy: { version: 'desc' }
@@ -89,17 +88,22 @@ export const POST = withAuth(async (request: Request, user: any) => {
         boq = await prisma.bOQ.create({ data: { project_id: projectId, created_by: user.sub } });
       }
       
-      // Find or create category
-      let category = await prisma.bOQCategory.findFirst({ where: { boq_id: boq.id } });
-      if (!category) {
-        category = await prisma.bOQCategory.create({ data: { boq_id: boq.id, name: 'General' } });
-      }
-
       const boqItemsData = [];
       for (const item of items) {
         const parsedRate = Number(item.rate) || 0;
         const parsedQty = Number(item.planned) || 0;
         if (parsedQty <= 0) continue;
+        const catName = item.category || categoryName || 'General';
+        
+        let category = await prisma.bOQCategory.findFirst({
+          where: { boq_id: boq.id, name: catName }
+        });
+        if (!category) {
+          category = await prisma.bOQCategory.create({
+            data: { boq_id: boq.id, name: catName }
+          });
+        }
+
         boqItemsData.push({
           category_id: category.id,
           description: item.name,
@@ -107,22 +111,159 @@ export const POST = withAuth(async (request: Request, user: any) => {
           quantity: parsedQty,
           material_rate: parsedRate,
           total_rate: parsedRate,
-          total_amount: parsedRate * parsedQty
+          total_amount: (item.amount !== undefined && item.amount !== null && !isNaN(Number(item.amount))) 
+            ? Number(item.amount) 
+            : parsedRate * parsedQty,
+          remarks: item.remarks || null,
+          code: item.code || null
         });
       }
       
       if (boqItemsData.length > 0) {
-        await prisma.bOQItem.createMany({
-          data: boqItemsData
-        });
+        for (const itm of boqItemsData) {
+          await prisma.bOQItem.create({ data: itm });
+        }
       }
       return NextResponse.json({ success: true, count: boqItemsData.length });
+    }
+
+    if (action === 'SAVE_BOQ_TABLES') {
+      const { projectId, categories, replaceAll = false } = payload;
+      let boq = await prisma.bOQ.findFirst({ 
+        where: { project_id: projectId },
+        orderBy: { version: 'desc' }
+      });
+      if (!boq) {
+        boq = await prisma.bOQ.create({ data: { project_id: projectId, created_by: user.sub } });
+      }
+
+      if (replaceAll) {
+        // Remove existing categories and items for clean overwrite
+        await prisma.bOQCategory.deleteMany({
+          where: { boq_id: boq.id }
+        });
+      }
+
+      let totalCost = 0;
+      let totalCreated = 0;
+
+      for (const cat of categories) {
+        if (!cat.name) continue;
+        let category = await prisma.bOQCategory.findFirst({
+          where: { boq_id: boq.id, name: cat.name }
+        });
+        if (!category) {
+          category = await prisma.bOQCategory.create({
+            data: { boq_id: boq.id, name: cat.name }
+          });
+        }
+
+        for (const item of (cat.items || [])) {
+          const parsedRate = Number(item.rate) || 0;
+          const parsedQty = Number(item.planned || item.quantity) || 0;
+          if (!item.name && parsedQty <= 0) continue;
+
+          const itemTotal = (item.amount !== undefined && item.amount !== null && !isNaN(Number(item.amount)))
+            ? Number(item.amount)
+            : parsedRate * parsedQty;
+
+          totalCost += itemTotal;
+
+          await prisma.bOQItem.create({
+            data: {
+              category_id: category.id,
+              description: item.name || 'Unnamed Material',
+              unit: item.unit || 'nos',
+              quantity: parsedQty,
+              material_rate: parsedRate,
+              total_rate: parsedRate,
+              total_amount: itemTotal,
+              remarks: item.remarks || null,
+              code: item.code || null
+            }
+          });
+          totalCreated++;
+        }
+      }
+
+      // Update total estimated cost on BOQ
+      await prisma.bOQ.update({
+        where: { id: boq.id },
+        data: { total_estimated_cost: totalCost }
+      });
+
+      return NextResponse.json({ success: true, count: totalCreated, totalCost });
+    }
+
+    if (action === 'UPDATE_BOQ_ITEM') {
+      const { itemId, name, planned, unit, rate, amount, remarks, code } = payload;
+      const parsedRate = Number(rate) || 0;
+      const parsedQty = Number(planned) || 0;
+      const parsedAmount = (amount !== undefined && amount !== null && !isNaN(Number(amount)))
+        ? Number(amount)
+        : parsedRate * parsedQty;
+
+      const updated = await prisma.bOQItem.update({
+        where: { id: itemId },
+        data: {
+          description: name !== undefined ? name : undefined,
+          quantity: planned !== undefined ? parsedQty : undefined,
+          unit: unit !== undefined ? unit : undefined,
+          material_rate: rate !== undefined ? parsedRate : undefined,
+          total_rate: rate !== undefined ? parsedRate : undefined,
+          total_amount: amount !== undefined || (rate !== undefined && planned !== undefined) ? parsedAmount : undefined,
+          remarks: remarks !== undefined ? remarks : undefined,
+          code: code !== undefined ? code : undefined
+        }
+      });
+      return NextResponse.json({ success: true, item: updated });
     }
 
     if (action === 'DELETE_BOQ_ITEM') {
       const { itemId } = payload;
       await prisma.bOQItem.delete({
         where: { id: itemId }
+      });
+      return NextResponse.json({ success: true });
+    }
+
+    if (action === 'CREATE_BOQ_CATEGORY') {
+      const { projectId, name } = payload;
+      if (!name || !name.trim()) {
+        return NextResponse.json({ error: 'Category name is required' }, { status: 400 });
+      }
+      let boq = await prisma.bOQ.findFirst({ 
+        where: { project_id: projectId },
+        orderBy: { version: 'desc' }
+      });
+      if (!boq) {
+        boq = await prisma.bOQ.create({ data: { project_id: projectId, created_by: user.sub } });
+      }
+      const category = await prisma.bOQCategory.create({
+        data: {
+          boq_id: boq.id,
+          name: name.trim()
+        }
+      });
+      return NextResponse.json({ success: true, category });
+    }
+
+    if (action === 'UPDATE_BOQ_CATEGORY') {
+      const { categoryId, name } = payload;
+      if (!name || !name.trim()) {
+        return NextResponse.json({ error: 'Category name is required' }, { status: 400 });
+      }
+      const category = await prisma.bOQCategory.update({
+        where: { id: categoryId },
+        data: { name: name.trim() }
+      });
+      return NextResponse.json({ success: true, category });
+    }
+
+    if (action === 'DELETE_BOQ_CATEGORY') {
+      const { categoryId } = payload;
+      await prisma.bOQCategory.delete({
+        where: { id: categoryId }
       });
       return NextResponse.json({ success: true });
     }

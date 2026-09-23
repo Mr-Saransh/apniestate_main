@@ -6,6 +6,17 @@ export interface BOQItemSummary {
   unit: string;
   planned: number;
   used: number;
+  rate?: number;
+  amount?: number;
+  category?: string;
+  code?: string | null;
+  remarks?: string | null;
+}
+
+export interface BOQCategorySummary {
+  id: string;
+  name: string;
+  items: BOQItemSummary[];
 }
 
 export interface MaterialRequestSummary {
@@ -86,6 +97,7 @@ export interface ConsumptionLog {
 
 export interface PurchaseSummaryResponse {
   boq_items: BOQItemSummary[];
+  boq_categories?: BOQCategorySummary[];
   material_requests: MaterialRequestSummary[];
   orders: OrderSummary[];
   vendors: VendorSummary[];

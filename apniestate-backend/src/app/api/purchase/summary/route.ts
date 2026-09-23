@@ -17,7 +17,7 @@ export const GET = withAuth(async (request: Request, user: any) => {
     
     console.log(`[API /purchase/summary] Fetching for projectId: ${projectId}`);
 
-    // BOQ Items
+    // BOQ / Quantity of Materials Items
     const boqs = await prisma.bOQ.findMany({
       where: { project_id: projectId },
       include: {
@@ -33,17 +33,43 @@ export const GET = withAuth(async (request: Request, user: any) => {
       take: 1
     });
 
-    const boqItems = boqs.length > 0 
-      ? boqs[0].categories.flatMap(c => c.items).map(i => ({
-          id: i.id,
-          name: i.material?.name || i.description,
-          unit: i.unit,
-          planned: i.quantity,
-          used: i.used_quantity,
+    const boqCategories = boqs.length > 0
+      ? boqs[0].categories.map(c => ({
+          id: c.id,
+          name: c.name,
+          items: c.items.map(i => ({
+            id: i.id,
+            name: i.material?.name || i.description,
+            unit: i.unit,
+            planned: i.quantity,
+            used: i.used_quantity,
+            rate: i.total_rate || i.material_rate || 0,
+            amount: i.total_amount || ((i.quantity || 0) * (i.total_rate || i.material_rate || 0)),
+            remarks: i.remarks || null,
+            code: i.code || null,
+            category: c.name
+          }))
         }))
       : [];
 
-    console.log(`[API /purchase/summary] Found ${boqs.length} BOQs. boqItems:`, boqItems);
+    const boqItems = boqs.length > 0 
+      ? boqs[0].categories.flatMap(c => 
+          c.items.map(i => ({
+            id: i.id,
+            name: i.material?.name || i.description,
+            unit: i.unit,
+            planned: i.quantity,
+            used: i.used_quantity,
+            rate: i.total_rate || i.material_rate || 0,
+            amount: i.total_amount || ((i.quantity || 0) * (i.total_rate || i.material_rate || 0)),
+            remarks: i.remarks || null,
+            code: i.code || null,
+            category: c.name
+          }))
+        )
+      : [];
+
+    console.log(`[API /purchase/summary] Found ${boqs.length} BOQs. boqItems:`, boqItems.length, 'categories:', boqCategories.length);
 
     // Material Requests
     // We need to find sites for this project
@@ -207,6 +233,7 @@ export const GET = withAuth(async (request: Request, user: any) => {
 
     return NextResponse.json({
       boq_items: boqItems,
+      boq_categories: boqCategories,
       material_requests: formattedRequests,
       orders: formattedOrders,
       vendors: formattedVendors,

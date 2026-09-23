@@ -57,7 +57,7 @@ export default function CostDashboard() {
         </div>
         <h2 className="text-xl font-bold text-gray-900 mb-2">No Cost Data Available</h2>
         <p className="text-sm text-gray-500 max-w-sm">
-          Please create and approve a BOQ for this project first to establish a baseline budget.
+          Please add or import Quantity of Materials for this project first to establish a baseline budget.
         </p>
       </div>
     );
@@ -84,7 +84,7 @@ export default function CostDashboard() {
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <KPI
-          label="From Approved BOQ"
+          label="From Quantity of Materials"
           value={`₹${data.estimatedBudget.toLocaleString()}`}
           icon={IndianRupee}
         />

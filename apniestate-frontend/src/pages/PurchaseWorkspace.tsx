@@ -4,14 +4,16 @@ import { useProject } from '@/context/ProjectContext';
 import { useAuth } from '@/context/AuthContext';
 import {
   ShoppingCart, Plus, FileSpreadsheet, Package, ClipboardList,
-  CheckCircle2, Archive, Truck, X, Trash2, Download, UploadCloud, Edit3, ArrowRight, PackageCheck
+  CheckCircle2, Archive, Truck, X, Trash2, Download, UploadCloud, Edit3, ArrowRight, PackageCheck, Layers
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { purchaseApi, type PurchaseSummaryResponse, type BOQItemSummary, type MaterialRequestSummary, type OrderSummary, type ReceivedSummary, type VendorSummary, type ConsumptionLog } from '@/api/purchase';
-import ImportBOQModal from '@/components/purchase/ImportBOQModal';
+import ImportEstimationModal from '@/components/purchase/ImportEstimationModal';
+import QuantityOfMaterialsTab from '@/components/purchase/QuantityOfMaterialsTab';
 import VendorsPage from './VendorsPage';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { normalizeUnit, cleanNumeric, detectDiscipline } from '@/utils/constructionIntelligence';
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -24,7 +26,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 type PurchaseTab = "boq" | "requests" | "quotations" | "orders" | "received" | "inventory" | "vendors";
 
 const PURCHASE_TABS: { id: PurchaseTab; label: string; icon: React.ReactNode }[] = [
-  { id: "boq", label: "BOQ", icon: <FileSpreadsheet size={14} /> },
+  { id: "boq", label: "Quantity of Materials", icon: <Layers size={14} /> },
   { id: "requests", label: "Requirements", icon: <Package size={14} /> },
   { id: "orders", label: "Orders", icon: <ShoppingCart size={14} /> },
   { id: "received", label: "Received", icon: <CheckCircle2 size={14} /> },
@@ -43,6 +45,7 @@ export default function PurchaseWorkspace() {
   const [activeModal, setActiveModal] = useState<string | null>(null);
   const [orderPrefill, setOrderPrefill] = useState<{ materialName: string; quantity: number } | null>(null);
   const [receivePoId, setReceivePoId] = useState<string | null>(null);
+  const [showImportModal, setShowImportModal] = useState(false);
 
   const refreshData = () => {
     if (!activeProjectId) return;
@@ -83,25 +86,25 @@ export default function PurchaseWorkspace() {
 
   const getNewButtonLabel = () => {
     switch (tab) {
-      case 'boq': return 'Add BOQ Item';
+      case 'boq': return 'Add Material';
       case 'vendors': return 'Add Vendor';
       case 'orders': return 'Create Order';
       case 'quotations': return 'Add Quotation';
       case 'received': return 'Receive Goods';
       case 'inventory': return 'Consume Material';
-      default: return 'New Request';
+      default: return 'New Requirement';
     }
   };
 
   return (
     <div className="flex flex-col h-full bg-background relative">
-      {/* Visual Workflow Progression: Site Engg -> PM Review -> Order -> Received -> Inventory */}
+      {/* Visual Workflow Progression: Baseline Qty of Materials -> Site Requirement -> Order -> Received -> Inventory */}
       <div className="bg-white border-b border-border px-4 py-2 overflow-x-auto hide-scrollbar shrink-0">
         <div className="flex items-center gap-1 text-xs max-w-2xl mx-auto justify-between min-w-[500px]">
           {[
-            { step: '1', title: 'Requirement', sub: 'Site Supervisor', tabKey: 'requests' },
-            { step: '2', title: 'PM Review', sub: 'Approve / Modify', tabKey: 'requests' },
-            { step: '3', title: 'Order', sub: 'Purchase Order', tabKey: 'orders' },
+            { step: '1', title: 'Qty of Materials', sub: 'Baseline Estimate', tabKey: 'boq' },
+            { step: '2', title: 'Requirements', sub: 'Site Indents', tabKey: 'requests' },
+            { step: '3', title: 'Orders', sub: 'Purchase Orders', tabKey: 'orders' },
             { step: '4', title: 'Received', sub: 'GRN Inspection', tabKey: 'received' },
             { step: '5', title: 'Inventory', sub: 'Site Stock', tabKey: 'inventory' },
           ].map((s, idx) => (
@@ -128,7 +131,7 @@ export default function PurchaseWorkspace() {
       {/* Tab strip */}
       <div className="bg-white border-b border-border px-4 pt-3 pb-0 shrink-0 sticky top-0 z-10">
         <div className="flex items-center justify-between mb-2.5">
-          <h2 className="text-base font-bold text-foreground" style={{ fontFamily: "var(--font-display)" }}>Procurement</h2>
+          <h2 className="text-base font-bold text-foreground" style={{ fontFamily: "var(--font-display)" }}>Procurement & Materials</h2>
           <button
             onClick={() => setActiveModal(tab)}
             className="flex items-center gap-1.5 text-xs font-bold text-white px-3 py-1.5 rounded-xl transition-opacity hover:opacity-90" style={{ backgroundColor: "#2648E7" }}>
@@ -151,8 +154,17 @@ export default function PurchaseWorkspace() {
 
       {/* Tab content */}
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-2xl mx-auto px-4 py-5">
-          {tab === 'boq' && <BOQTab items={data?.boq_items || []} projectName={activeProject.name} onRefresh={refreshData} projectId={activeProjectId!} />}
+        <div className={`mx-auto px-4 py-5 ${tab === 'boq' ? 'max-w-6xl' : 'max-w-2xl'}`}>
+          {tab === 'boq' && (
+            <QuantityOfMaterialsTab 
+              categories={data?.boq_categories}
+              items={data?.boq_items || []} 
+              projectName={activeProject.name} 
+              projectId={activeProjectId!} 
+              onRefresh={refreshData} 
+              onOpenImport={() => setShowImportModal(true)} 
+            />
+          )}
           {tab === 'requests' && (
             <RequestsTab 
               requests={data?.material_requests || []} 
@@ -179,6 +191,16 @@ export default function PurchaseWorkspace() {
         </div>
       </div>
 
+      <ImportEstimationModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onSuccess={() => {
+          setShowImportModal(false);
+          refreshData();
+        }}
+        projectId={activeProjectId!}
+      />
+
       <PurchaseModals 
         activeModal={activeModal} 
         onClose={() => { setActiveModal(null); setOrderPrefill(null); setReceivePoId(null); }} 
@@ -187,89 +209,6 @@ export default function PurchaseWorkspace() {
         data={data} 
         orderPrefill={orderPrefill} 
         initialPoId={receivePoId}
-      />
-    </div>
-  );
-}
-
-function BOQTab({ items, projectName, onRefresh, projectId }: { items: BOQItemSummary[], projectName: string, onRefresh: () => void, projectId: string }) {
-  const [showImport, setShowImport] = useState(false);
-
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this BOQ item?")) return;
-    try {
-      await purchaseApi.performAction('DELETE_BOQ_ITEM', { itemId: id });
-      onRefresh();
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <SectionLabel>Bill of Quantities — {projectName}</SectionLabel>
-        <button 
-          onClick={() => setShowImport(true)} 
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-[#2648E7]/10 hover:bg-[#2648E7]/20 text-[#2648E7] text-xs font-bold rounded-xl transition-colors mb-3 shadow-sm"
-        >
-          <UploadCloud size={14} /> Import BOQ (Revit / Excel)
-        </button>
-      </div>
-
-      {items.length === 0 ? (
-        <div className="text-center text-muted-foreground py-12 bg-white rounded-2xl border border-border p-6">
-          <FileSpreadsheet size={40} className="mx-auto text-muted-foreground/40 mb-3" />
-          <p className="font-bold text-foreground">No BOQ items added yet</p>
-          <p className="text-xs text-muted-foreground mt-1 mb-4">Import an existing schedule from Revit/Tekla or add items manually.</p>
-          <button 
-            onClick={() => setShowImport(true)} 
-            className="px-4 py-2 bg-[#2648E7] hover:bg-[#2648E7]/90 text-white text-xs font-bold rounded-xl transition-colors shadow-sm inline-flex items-center gap-1.5"
-          >
-            <UploadCloud size={14} /> Import BOQ File
-          </button>
-        </div>
-      ) : (
-        <Card className="overflow-hidden">
-          <div className="grid grid-cols-[1fr_80px_80px_80px_80px_40px] gap-0">
-            {/* Header */}
-            <div className="contents">
-              {["Material", "Unit", "Planned", "Used", "Left", ""].map((h, idx) => (
-                <div key={idx} className="bg-muted px-3 py-2.5 text-[11px] font-bold text-muted-foreground uppercase border-b border-border">
-                  {h}
-                </div>
-              ))}
-            </div>
-            {/* Rows */}
-            {items.map((item, i) => {
-              const remaining = item.planned - item.used;
-              const pct = item.planned > 0 ? (item.used / item.planned) * 100 : 0;
-              const low = pct > 80;
-              const border = i > 0 ? "border-t border-border" : "";
-              return (
-                <div key={item.id} className="contents group">
-                  <div className={`px-3 py-3 text-sm font-semibold text-foreground flex items-center ${border}`}>{item.name}</div>
-                  <div className={`px-3 py-3 text-sm text-muted-foreground flex items-center ${border}`}>{item.unit}</div>
-                  <div className={`px-3 py-3 text-sm text-foreground flex items-center ${border}`}>{item.planned.toLocaleString()}</div>
-                  <div className={`px-3 py-3 text-sm flex items-center ${low ? "text-amber-600 font-semibold" : "text-foreground"} ${border}`}>{item.used.toLocaleString()}</div>
-                  <div className={`px-3 py-3 text-sm font-bold flex items-center ${remaining <= 0 ? "text-red-600" : "text-emerald-600"} ${border}`}>{remaining.toLocaleString()}</div>
-                  <div className={`px-3 py-3 flex items-center justify-center ${border}`}>
-                    <button onClick={() => handleDelete(item.id)} className="text-muted-foreground hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </Card>
-      )}
-
-      <ImportBOQModal 
-        isOpen={showImport} 
-        onClose={() => setShowImport(false)} 
-        onSuccess={onRefresh} 
-        projectId={projectId} 
       />
     </div>
   );
@@ -843,6 +782,25 @@ function PurchaseModals({
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<any>({});
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isCustomMaterial, setIsCustomMaterial] = useState(false);
+
+  const groupedBoqItems = useMemo(() => {
+    const groups: Record<string, BOQItemSummary[]> = {};
+    if (data?.boq_categories && data.boq_categories.length > 0) {
+      data.boq_categories.forEach(cat => {
+        if (cat.items && cat.items.length > 0) {
+          groups[cat.name] = cat.items;
+        }
+      });
+    } else if (data?.boq_items && data.boq_items.length > 0) {
+      data.boq_items.forEach(it => {
+        const cat = it.category || 'Main Work Estimation';
+        if (!groups[cat]) groups[cat] = [];
+        groups[cat].push(it);
+      });
+    }
+    return groups;
+  }, [data]);
 
   const eligibleOrders = useMemo(() => {
     return (data?.orders || []).filter(o => {
@@ -854,10 +812,51 @@ function PurchaseModals({
     });
   }, [data]);
 
+  const allDisciplineOptions = useMemo(() => {
+    const existing = Object.keys(groupedBoqItems);
+    const standard = [
+      'Plumbing & Sanitary Works',
+      'Electrical & Low Voltage',
+      'Painting & False Ceiling',
+      'Waterproofing & Chemical Treatment',
+      'Doors, Windows & Hardware',
+      'Flooring & Tiling',
+      'Reinforcement Schedule (TMT Rebars)',
+      'Concrete Works',
+      'Shuttering & Formwork',
+      'Earthwork & Excavation',
+      'Brickwork & Masonry',
+      'HVAC & Fire Safety',
+      'Material Requisition'
+    ];
+    return Array.from(new Set([...existing, ...standard]));
+  }, [groupedBoqItems]);
+
   useEffect(() => {
     setErrorMsg(null);
+    setIsCustomMaterial(false);
     if (!activeModal) {
       setFormData({});
+      return;
+    }
+
+    if (activeModal === 'requests') {
+      const hasBoq = data?.boq_items && data.boq_items.length > 0;
+      setIsCustomMaterial(!hasBoq);
+      const firstItem = hasBoq ? data.boq_items[0] : null;
+      setFormData({
+        materialName: firstItem ? firstItem.name : '',
+        unit: firstItem ? firstItem.unit : 'cum',
+        urgency: 'NORMAL'
+      });
+      return;
+    }
+
+    if (activeModal === 'boq') {
+      setFormData({
+        categoryName: 'Main Work Estimation',
+        items: [{}]
+      });
       return;
     }
 
@@ -895,13 +894,20 @@ function PurchaseModals({
     }
 
     if (activeModal === 'orders' && orderPrefill) {
+      const matchingBoq = data?.boq_items?.find(b => b.name === orderPrefill.materialName);
       setFormData({
-        items: [{ materialName: orderPrefill.materialName, quantity: orderPrefill.quantity, unit: 'bags' }]
+        items: [{
+          materialName: orderPrefill.materialName,
+          quantity: orderPrefill.quantity,
+          unit: matchingBoq?.unit || 'bags',
+          rate: matchingBoq?.rate || '',
+          plannedRem: matchingBoq ? Math.max(0, matchingBoq.planned - matchingBoq.used) : undefined
+        }]
       });
       return;
     }
 
-    if (['boq', 'quotations', 'orders'].includes(activeModal)) {
+    if (['quotations', 'orders'].includes(activeModal)) {
       setFormData({ items: [{}] });
       return;
     }
@@ -1034,6 +1040,73 @@ function PurchaseModals({
     try {
       let payload = { ...formData, projectId };
 
+      if (activeModal === 'requests') {
+        payload.quantity = cleanNumeric(payload.quantity);
+        payload.unit = normalizeUnit(payload.unit || 'nos');
+        if (payload.addToBoq && payload.materialName) {
+          const targetCategory = payload.customCategory || detectDiscipline(payload.materialName);
+          try {
+            await purchaseApi.performAction('CREATE_BOQ_ITEM', {
+              projectId,
+              categoryName: targetCategory,
+              items: [{
+                name: payload.materialName.trim(),
+                planned: Number(payload.quantity) || 10,
+                unit: payload.unit,
+                rate: 0,
+                remarks: 'Registered via Site Requirement'
+              }]
+            });
+          } catch (regErr) {
+            console.error('Auto baseline registration error:', regErr);
+          }
+        }
+      }
+
+      if (activeModal === 'boq') {
+        payload.categoryName = payload.categoryName || 'Main Work Estimation';
+        payload.items = (payload.items || []).map((it: any) => ({
+          ...it,
+          name: (it.name || '').trim(),
+          planned: cleanNumeric(it.planned),
+          unit: normalizeUnit(it.unit || 'nos'),
+          rate: cleanNumeric(it.rate),
+          remarks: it.remarks ? it.remarks.trim() : undefined
+        }));
+      }
+
+      if (activeModal === 'orders') {
+        payload.items = (payload.items || []).map((it: any) => ({
+          ...it,
+          materialName: (it.materialName || '').trim(),
+          quantity: cleanNumeric(it.quantity),
+          unit: normalizeUnit(it.unit || 'nos'),
+          rate: cleanNumeric(it.rate)
+        }));
+
+        // Auto-register any custom items into Quantity of Materials baseline
+        for (const it of (formData.items || [])) {
+          if (it.isCustom && it.addToBoq !== false && it.materialName?.trim()) {
+            const discipline = it.customCategory || detectDiscipline(it.materialName);
+            try {
+              await purchaseApi.performAction('CREATE_BOQ_ITEM', {
+                projectId,
+                categoryName: discipline,
+                items: [{
+                  name: it.materialName.trim(),
+                  planned: cleanNumeric(it.quantity) || 10,
+                  unit: normalizeUnit(it.unit || 'nos'),
+                  rate: cleanNumeric(it.rate) || 0,
+                  remarks: 'Auto-registered from Purchase Order'
+                }]
+              });
+            } catch (regErr) {
+              console.error('PO auto-registration error:', regErr);
+            }
+          }
+        }
+      }
+
       if (activeModal === 'received') {
         if (!payload.poId) {
           setErrorMsg('Please select a purchase order.');
@@ -1118,8 +1191,8 @@ function PurchaseModals({
   };
 
   const titles: Record<string, string> = {
-    requests: 'New Material Request',
-    boq: 'Add BOQ Item',
+    requests: 'New Material Requirement',
+    boq: 'Add Material to Estimation',
     vendors: 'Add Vendor',
     quotations: 'Add Quotation',
     orders: 'Create Purchase Order',
@@ -1151,20 +1224,252 @@ function PurchaseModals({
             {activeModal === 'requests' && (
               <>
                 <div className="space-y-1.5">
-                  <label className="text-sm font-bold text-foreground">Material Name</label>
-                  <input required type="text" className="w-full bg-white border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900" placeholder="e.g. Cement OPC 53 Grade" value={formData.materialName || ''} onChange={e => setFormData({ ...formData, materialName: e.target.value })} />
+                  <label className="text-sm font-bold text-foreground">Select Material</label>
+                  {Object.keys(groupedBoqItems).length > 0 ? (
+                    <>
+                      <select
+                        required={!isCustomMaterial}
+                        value={isCustomMaterial ? '__CUSTOM__' : (formData.materialName || '')}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === '__CUSTOM__') {
+                            setIsCustomMaterial(true);
+                            setFormData({ ...formData, materialName: '', unit: 'units' });
+                          } else {
+                            setIsCustomMaterial(false);
+                            const found = data?.boq_items?.find(it => it.name === val);
+                            setFormData({
+                              ...formData,
+                              materialName: val,
+                              unit: found?.unit || 'units'
+                            });
+                          }
+                        }}
+                        className="w-full bg-white border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900 font-semibold shadow-2xs"
+                      >
+                        <option value="" disabled>-- Choose from Quantity of Materials --</option>
+                        {Object.entries(groupedBoqItems).map(([catName, bItems]) => (
+                          <optgroup key={catName} label={`📁 ${catName}`}>
+                            {bItems.map(it => {
+                              const remaining = Math.max(0, it.planned - it.used);
+                              return (
+                                <option key={it.id} value={it.name}>
+                                  {it.name} ({remaining.toLocaleString()} {it.unit} left of {it.planned.toLocaleString()})
+                                </option>
+                              );
+                            })}
+                          </optgroup>
+                        ))}
+                        <option value="__CUSTOM__">➕ [+ Custom / Unlisted Material]</option>
+                      </select>
+
+                      {isCustomMaterial && (
+                        <div className="mt-3 p-4 bg-muted/40 border border-border rounded-2xl space-y-3 animate-in fade-in">
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-bold text-foreground">Custom Material Name</label>
+                            <input
+                              required
+                              type="text"
+                              placeholder="e.g. CPVC 1 inch pipe / Asian Paints Royale / Dr Fixit..."
+                              value={formData.materialName || ''}
+                              onChange={e => {
+                                const newName = e.target.value;
+                                const detected = detectDiscipline(newName);
+                                setFormData((prev: any) => ({
+                                  ...prev,
+                                  materialName: newName,
+                                  customCategory: prev.userOverrodeCategory ? prev.customCategory : detected
+                                }));
+                              }}
+                              className="w-full bg-white border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900 font-semibold"
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <label className="text-xs font-semibold text-muted-foreground">Standard Unit</label>
+                              <select
+                                value={formData.unit || 'nos'}
+                                onChange={e => setFormData({ ...formData, unit: e.target.value })}
+                                className="w-full bg-white border border-border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-[#2648E7] text-gray-900 font-medium"
+                              >
+                                <option value="cum">cum (m³)</option>
+                                <option value="kg">kg</option>
+                                <option value="Tonnes">Tonnes</option>
+                                <option value="bags">bags</option>
+                                <option value="sqm">sqm (m²)</option>
+                                <option value="sqft">sqft</option>
+                                <option value="nos">nos / pieces</option>
+                                <option value="Running meter">Running meter (Rmt)</option>
+                                <option value="Cft">Cft</option>
+                                <option value="Ltr">Ltr</option>
+                                <option value="set">set</option>
+                                <option value="lumpsum">lumpsum</option>
+                              </select>
+                            </div>
+
+                            <div className="space-y-1">
+                              <label className="text-xs font-semibold text-muted-foreground">Discipline / Work Table</label>
+                              <select
+                                value={formData.customCategory || detectDiscipline(formData.materialName || '')}
+                                onChange={e => setFormData({ ...formData, customCategory: e.target.value, userOverrodeCategory: true })}
+                                className="w-full bg-white border border-border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-[#2648E7] text-gray-900 font-medium"
+                              >
+                                {allDisciplineOptions.map(disc => (
+                                  <option key={disc} value={disc}>{disc}</option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+
+                          <label className="flex items-start gap-2.5 p-2.5 bg-blue-50/70 border border-blue-200/80 rounded-xl cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={formData.addToBoq !== false}
+                              onChange={e => setFormData({ ...formData, addToBoq: e.target.checked })}
+                              className="mt-0.5 rounded text-[#2648E7] focus:ring-[#2648E7] size-4"
+                            />
+                            <div className="text-xs text-blue-900 leading-tight">
+                              <span className="font-bold">Auto-register into Quantity of Materials baseline</span>
+                              <p className="text-[11px] text-blue-700/80 mt-0.5">
+                                Adds to "{formData.customCategory || detectDiscipline(formData.materialName || '')}" table so inventory, POs, and GRNs track seamlessly.
+                              </p>
+                            </div>
+                          </label>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="p-4 bg-muted/40 border border-border rounded-2xl space-y-3">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-foreground">Material Name</label>
+                        <input
+                          required
+                          type="text"
+                          className="w-full bg-white border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900 font-semibold"
+                          placeholder="e.g. Cement OPC 53 Grade / 16mm TMT Bar / PVC Pipe..."
+                          value={formData.materialName || ''}
+                          onChange={e => {
+                            const newName = e.target.value;
+                            const detected = detectDiscipline(newName);
+                            setFormData((prev: any) => ({
+                              ...prev,
+                              materialName: newName,
+                              customCategory: prev.userOverrodeCategory ? prev.customCategory : detected
+                            }));
+                          }}
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-muted-foreground">Standard Unit</label>
+                          <select
+                            value={formData.unit || 'nos'}
+                            onChange={e => setFormData({ ...formData, unit: e.target.value })}
+                            className="w-full bg-white border border-border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-[#2648E7] text-gray-900 font-medium"
+                          >
+                            <option value="cum">cum (m³)</option>
+                            <option value="kg">kg</option>
+                            <option value="Tonnes">Tonnes</option>
+                            <option value="bags">bags</option>
+                            <option value="sqm">sqm (m²)</option>
+                            <option value="sqft">sqft</option>
+                            <option value="nos">nos / pieces</option>
+                            <option value="Running meter">Running meter (Rmt)</option>
+                            <option value="Cft">Cft</option>
+                            <option value="Ltr">Ltr</option>
+                            <option value="set">set</option>
+                            <option value="lumpsum">lumpsum</option>
+                          </select>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-muted-foreground">Discipline / Work Table</label>
+                          <select
+                            value={formData.customCategory || detectDiscipline(formData.materialName || '')}
+                            onChange={e => setFormData({ ...formData, customCategory: e.target.value, userOverrodeCategory: true })}
+                            className="w-full bg-white border border-border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-[#2648E7] text-gray-900 font-medium"
+                          >
+                            {allDisciplineOptions.map(disc => (
+                              <option key={disc} value={disc}>{disc}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      <label className="flex items-start gap-2.5 p-2.5 bg-blue-50/70 border border-blue-200/80 rounded-xl cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.addToBoq !== false}
+                          onChange={e => setFormData({ ...formData, addToBoq: e.target.checked })}
+                          className="mt-0.5 rounded text-[#2648E7] focus:ring-[#2648E7] size-4"
+                        />
+                        <div className="text-xs text-blue-900 leading-tight">
+                          <span className="font-bold">Auto-register into Quantity of Materials baseline</span>
+                          <p className="text-[11px] text-blue-700/80 mt-0.5">
+                            Adds to "{formData.customCategory || detectDiscipline(formData.materialName || '')}" table so inventory, POs, and GRNs track seamlessly.
+                          </p>
+                        </div>
+                      </label>
+                    </div>
+                  )}
                 </div>
+
+                {/* Show Baseline Budget Info when material is picked */}
+                {(() => {
+                  const selectedBoq = data?.boq_items?.find(it => it.name === formData.materialName);
+                  if (!selectedBoq) return null;
+                  const remaining = Math.max(0, selectedBoq.planned - selectedBoq.used);
+                  const isOverBudget = Number(formData.quantity) > remaining;
+
+                  return (
+                    <div className="p-3 bg-blue-50/70 border border-blue-200/80 rounded-2xl text-xs space-y-1.5 animate-in fade-in">
+                      <div className="flex items-center justify-between font-bold text-blue-950">
+                        <span>Baseline Estimation</span>
+                        <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${remaining <= 0 ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-800'}`}>
+                          {remaining.toLocaleString()} {selectedBoq.unit} Remaining
+                        </span>
+                      </div>
+                      <div className="text-blue-800 flex justify-between text-[11px]">
+                        <span>Planned: <strong>{selectedBoq.planned.toLocaleString()} {selectedBoq.unit}</strong></span>
+                        <span>In Procurement / Used: <strong>{selectedBoq.used.toLocaleString()} {selectedBoq.unit}</strong></span>
+                      </div>
+                      {isOverBudget && (
+                        <div className="p-2 bg-amber-50 text-amber-900 rounded-xl text-[11px] font-semibold border border-amber-200/70 flex items-center gap-1.5">
+                          <span>⚠️ Requested quantity ({formData.quantity} {selectedBoq.unit}) exceeds remaining baseline ({remaining} {selectedBoq.unit}). Will require PM variance review.</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-sm font-bold text-foreground">Quantity</label>
-                    <input required type="number" className="w-full bg-white border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900" placeholder="0" value={formData.quantity || ''} onChange={e => setFormData({ ...formData, quantity: e.target.value })} />
+                    <label className="text-sm font-bold text-foreground">
+                      Quantity {formData.unit ? `(${formData.unit})` : ''}
+                    </label>
+                    <input
+                      required
+                      type="number"
+                      step="any"
+                      min="0.01"
+                      className="w-full bg-white border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900 font-bold"
+                      placeholder="0"
+                      value={formData.quantity || ''}
+                      onChange={e => setFormData({ ...formData, quantity: e.target.value })}
+                    />
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-sm font-bold text-foreground">Urgency</label>
-                    <select className="w-full bg-white border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900" value={formData.urgency || 'NORMAL'} onChange={e => setFormData({ ...formData, urgency: e.target.value })}>
+                    <select
+                      className="w-full bg-white border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900"
+                      value={formData.urgency || 'NORMAL'}
+                      onChange={e => setFormData({ ...formData, urgency: e.target.value })}
+                    >
                       <option value="NORMAL">Normal</option>
-                      <option value="HIGH">High</option>
-                      <option value="URGENT">Urgent</option>
+                      <option value="HIGH">High Priority</option>
+                      <option value="URGENT">Urgent (Immediate Site Stoppage)</option>
                     </select>
                   </div>
                 </div>
@@ -1173,8 +1478,41 @@ function PurchaseModals({
 
             {activeModal === 'boq' && (
               <>
+                <div className="space-y-1.5 mb-3">
+                  <label className="text-sm font-bold text-foreground">Work Package / Discipline Table</label>
+                  <select
+                    className="w-full bg-white border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900 font-medium"
+                    value={formData.isCustomCat ? '__CUSTOM_NEW__' : (formData.categoryName || (allDisciplineOptions[0] || 'Main Work Estimation'))}
+                    onChange={e => {
+                      if (e.target.value === '__CUSTOM_NEW__') {
+                        setFormData({ ...formData, isCustomCat: true, categoryName: '' });
+                      } else {
+                        setFormData({ ...formData, isCustomCat: false, categoryName: e.target.value });
+                      }
+                    }}
+                  >
+                    <optgroup label="📋 Work Tables">
+                      {allDisciplineOptions.map(disc => (
+                        <option key={disc} value={disc}>{disc}</option>
+                      ))}
+                    </optgroup>
+                    <option value="__CUSTOM_NEW__">➕ [+ Create New Work Table]</option>
+                  </select>
+
+                  {formData.isCustomCat && (
+                    <input
+                      required
+                      type="text"
+                      className="w-full bg-white border border-border rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900 mt-2 font-medium"
+                      placeholder="Type new work table / discipline name..."
+                      value={formData.categoryName || ''}
+                      onChange={e => setFormData({ ...formData, categoryName: e.target.value })}
+                    />
+                  )}
+                </div>
+
                 <div className="mt-4 mb-2 flex items-center justify-between">
-                  <label className="text-sm font-bold text-foreground">BOQ Items</label>
+                  <label className="text-sm font-bold text-foreground">Items to Add</label>
                   <button type="button" onClick={addItemRow} className="text-xs font-bold text-[#2648E7] hover:underline flex items-center gap-1">
                     <Plus size={12} /> Add Item
                   </button>
@@ -1188,22 +1526,26 @@ function PurchaseModals({
                       </button>
                       <div className="space-y-3">
                         <div className="space-y-1.5">
-                          <input required type="text" className="w-full bg-white border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900" placeholder="Material / Description (e.g. River Sand)" value={item.name || ''} onChange={e => handleItemChange(idx, 'name', e.target.value)} />
+                          <input required type="text" className="w-full bg-white border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900" placeholder="Material / Description (e.g. 16mm TMT Bar)" value={item.name || ''} onChange={e => handleItemChange(idx, 'name', e.target.value)} />
                         </div>
                         <div className="grid grid-cols-3 gap-3">
-                          <input required type="number" min="1" className="w-full bg-white border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900" placeholder="Qty" value={item.planned || ''} onChange={e => handleItemChange(idx, 'planned', e.target.value)} />
+                          <input required type="number" min="0.1" step="any" className="w-full bg-white border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900" placeholder="Qty" value={item.planned || ''} onChange={e => handleItemChange(idx, 'planned', e.target.value)} />
                           <select required className="w-full bg-white border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900" value={item.unit || ''} onChange={e => handleItemChange(idx, 'unit', e.target.value)}>
                             <option value="" disabled>Unit</option>
-                            <option value="kg">kg</option>
-                            <option value="bags">bags</option>
                             <option value="cum">cum</option>
-                            <option value="cft">cft</option>
-                            <option value="m">m</option>
+                            <option value="kg">kg</option>
+                            <option value="Tonnes">Tonnes</option>
+                            <option value="sqm">sqm</option>
+                            <option value="bags">bags</option>
+                            <option value="Cft">Cft</option>
+                            <option value="Running meter">Running meter</option>
                             <option value="nos">nos/pieces</option>
-                            <option value="lumpsum">lumpsum</option>
                             <option value="sqft">sqft</option>
+                            <option value="Ltr">Ltr</option>
+                            <option value="set">set</option>
+                            <option value="lumpsum">lumpsum</option>
                           </select>
-                          <input required type="number" min="0" className="w-full bg-white border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900" placeholder="Rate (₹)" value={item.rate || ''} onChange={e => handleItemChange(idx, 'rate', e.target.value)} />
+                          <input required type="number" min="0" step="any" className="w-full bg-white border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900" placeholder="Rate (₹)" value={item.rate || ''} onChange={e => handleItemChange(idx, 'rate', e.target.value)} />
                         </div>
                       </div>
                     </div>
@@ -1259,26 +1601,134 @@ function PurchaseModals({
 
                 <div className="space-y-3">
                   {formData.items?.map((item: any, idx: number) => (
-                    <div key={idx} className="p-3 bg-muted/50 border border-border rounded-xl relative group">
+                    <div key={idx} className="p-3.5 bg-muted/40 border border-border rounded-2xl relative group">
                       <button type="button" onClick={() => removeItemRow(idx)} className="absolute -top-2 -right-2 bg-red-100 text-red-600 rounded-full p-1 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity">
                         <X size={14} />
                       </button>
                       <div className="space-y-3">
-                        <input required type="text" className="w-full bg-white border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900" placeholder="Material Name (e.g. TMT Steel 12mm)" value={item.materialName || ''} onChange={e => handleItemChange(idx, 'materialName', e.target.value)} />
+                        <div className="space-y-1">
+                          {Object.keys(groupedBoqItems).length > 0 ? (
+                            <>
+                              <select
+                                value={item.isCustom ? '__CUSTOM__' : (item.materialName || '')}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  if (val === '__CUSTOM__') {
+                                    handleItemChange(idx, 'isCustom', true);
+                                    handleItemChange(idx, 'materialName', '');
+                                  } else {
+                                    handleItemChange(idx, 'isCustom', false);
+                                    handleItemChange(idx, 'materialName', val);
+                                    const found = data?.boq_items?.find(b => b.name === val);
+                                    if (found) {
+                                      handleItemChange(idx, 'unit', found.unit);
+                                      if (found.rate && found.rate > 0) {
+                                        handleItemChange(idx, 'rate', found.rate);
+                                      }
+                                      handleItemChange(idx, 'plannedRem', Math.max(0, found.planned - found.used));
+                                    }
+                                  }
+                                }}
+                                className="w-full bg-white border border-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900 font-semibold"
+                              >
+                                <option value="" disabled>-- Choose from Quantity of Materials --</option>
+                                {Object.entries(groupedBoqItems).map(([catName, bItems]) => (
+                                  <optgroup key={catName} label={`📁 ${catName}`}>
+                                    {bItems.map(b => (
+                                      <option key={b.id} value={b.name}>
+                                        {b.name} ({Math.max(0, b.planned - b.used).toLocaleString()} {b.unit} rem · ₹{b.rate || 0})
+                                      </option>
+                                    ))}
+                                  </optgroup>
+                                ))}
+                                <option value="__CUSTOM__">➕ [+ Custom / Unlisted Material]</option>
+                              </select>
+                              {item.isCustom && (
+                                <div className="mt-2.5 p-3 bg-muted/40 border border-border rounded-xl space-y-2.5 animate-in fade-in">
+                                  <input
+                                    required
+                                    type="text"
+                                    className="w-full bg-white border border-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900 font-semibold"
+                                    placeholder="Custom material name (e.g. CPVC 25mm pipe / Berger primer)..."
+                                    value={item.materialName || ''}
+                                    onChange={e => {
+                                      const val = e.target.value;
+                                      handleItemChange(idx, 'materialName', val);
+                                      if (!item.userOverrodeCategory) {
+                                        handleItemChange(idx, 'customCategory', detectDiscipline(val));
+                                      }
+                                    }}
+                                  />
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                      <label className="text-[11px] font-semibold text-muted-foreground">Discipline / Table</label>
+                                      <select
+                                        value={item.customCategory || detectDiscipline(item.materialName || '')}
+                                        onChange={e => {
+                                          handleItemChange(idx, 'customCategory', e.target.value);
+                                          handleItemChange(idx, 'userOverrodeCategory', true);
+                                        }}
+                                        className="w-full bg-white border border-border rounded-lg px-2.5 py-1.5 text-xs text-gray-900 font-medium focus:outline-none focus:border-[#2648E7]"
+                                      >
+                                        {allDisciplineOptions.map(disc => (
+                                          <option key={disc} value={disc}>{disc}</option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                    <div className="flex items-center pt-3.5">
+                                      <label className="flex items-center gap-1.5 cursor-pointer text-[11px] text-blue-900 font-medium">
+                                        <input
+                                          type="checkbox"
+                                          checked={item.addToBoq !== false}
+                                          onChange={e => handleItemChange(idx, 'addToBoq', e.target.checked)}
+                                          className="rounded text-[#2648E7] size-3.5"
+                                        />
+                                        <span>Auto-register to QOM</span>
+                                      </label>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            <input
+                              required
+                              type="text"
+                              className="w-full bg-white border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900"
+                              placeholder="Material Name (e.g. TMT Steel 12mm)"
+                              value={item.materialName || ''}
+                              onChange={e => handleItemChange(idx, 'materialName', e.target.value)}
+                            />
+                          )}
+                          {item.plannedRem !== undefined && (
+                            <div className="text-[11px] text-muted-foreground flex items-center justify-between px-1 pt-0.5">
+                              <span>Baseline Remaining: <strong className="text-emerald-700">{item.plannedRem} {item.unit}</strong></span>
+                              {Number(item.quantity) > item.plannedRem && (
+                                <span className="text-amber-600 font-bold">⚠️ Exceeds remaining planned</span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
                         <div className="grid grid-cols-3 gap-3">
-                          <input required type="number" min="1" className="w-full bg-white border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900" placeholder="Quantity" value={item.quantity || ''} onChange={e => handleItemChange(idx, 'quantity', e.target.value)} />
+                          <input required type="number" min="0.1" step="any" className="w-full bg-white border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900" placeholder="Quantity" value={item.quantity || ''} onChange={e => handleItemChange(idx, 'quantity', e.target.value)} />
                           <select required className="w-full bg-white border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900" value={item.unit || ''} onChange={e => handleItemChange(idx, 'unit', e.target.value)}>
                             <option value="" disabled>Unit</option>
                             <option value="kg">kg</option>
                             <option value="bags">bags</option>
                             <option value="cum">cum</option>
                             <option value="cft">cft</option>
+                            <option value="Tonnes">Tonnes</option>
+                            <option value="Running meter">Running meter</option>
                             <option value="m">m</option>
                             <option value="nos">nos/pieces</option>
-                            <option value="lumpsum">lumpsum</option>
                             <option value="sqft">sqft</option>
+                            <option value="sqm">sqm</option>
+                            <option value="Ltr">Ltr</option>
+                            <option value="set">set</option>
+                            <option value="lumpsum">lumpsum</option>
                           </select>
-                          <input required type="number" min="0" className="w-full bg-white border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900" placeholder="Rate (₹)" value={item.rate || ''} onChange={e => handleItemChange(idx, 'rate', e.target.value)} />
+                          <input required type="number" min="0" step="any" className="w-full bg-white border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900" placeholder="Rate (₹)" value={item.rate || ''} onChange={e => handleItemChange(idx, 'rate', e.target.value)} />
                         </div>
                       </div>
                     </div>

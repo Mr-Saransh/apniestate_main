@@ -266,12 +266,12 @@ export default function ProjectCommandCenter() {
         {intel?.materialVariances && intel.materialVariances.length > 0 && (
           <Card className="mt-2.5 p-3.5">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-foreground">Material Usage vs BOQ Planned</span>
+              <span className="text-xs font-bold text-foreground">Material Usage vs Planned Quantities</span>
               <button 
                 onClick={() => navigate('/purchase?tab=boq')}
                 className="text-[11px] font-bold text-[#2648E7] hover:underline"
               >
-                View BOQ →
+                View Materials →
               </button>
             </div>
             <div className="space-y-2">
