@@ -6,7 +6,7 @@ import SmartProjectHealth from '@/components/dashboard/SmartProjectHealth';
 import {
   Users, IndianRupee, Package, CloudSun,
   ChevronRight, Calendar, TrendingUp, ShoppingCart, Wallet, HardHat,
-  AlertTriangle, Clock
+  AlertTriangle, Clock, CheckCircle2
 } from 'lucide-react';
 
 interface ProjectIntelligence {
@@ -117,7 +117,7 @@ export default function ProjectCommandCenter() {
   const paymentExposure = intel?.pendingPaymentExposure ?? (summary?.pendingVendorPaymentAmount || 0);
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-6">
       {/* Hero */}
       <div className="rounded-2xl p-5 text-white" style={{ backgroundColor: "#2648E7" }}>
         <div className="flex items-start justify-between mb-4">
@@ -201,9 +201,9 @@ export default function ProjectCommandCenter() {
         </div>
 
         {/* Real Warnings: Low stock / Delay */}
-        {((intel?.lowStockCount && intel.lowStockCount > 0) || (intel?.procurementDelayCount && intel.procurementDelayCount > 0) || (intel?.overdueMilestoneCount && intel.overdueMilestoneCount > 0)) && (
+        {((Number(intel?.lowStockCount) > 0) || (Number(intel?.procurementDelayCount) > 0) || (Number(intel?.overdueMilestoneCount) > 0)) ? (
           <div className="mt-2.5 space-y-2">
-            {intel.lowStockCount > 0 && (
+            {(Number(intel?.lowStockCount) > 0) && (
               <div 
                 onClick={() => navigate('/purchase?tab=inventory')}
                 className="cursor-pointer bg-amber-50/90 hover:bg-amber-100 border border-amber-200 rounded-xl p-3 flex items-center justify-between transition-colors"
@@ -213,9 +213,9 @@ export default function ProjectCommandCenter() {
                     <AlertTriangle size={14} />
                   </span>
                   <div className="truncate">
-                    <p className="text-xs font-bold text-amber-900">Low Stock Reorder Warning ({intel.lowStockCount} items)</p>
+                    <p className="text-xs font-bold text-amber-900">Low Stock Reorder Warning ({intel?.lowStockCount} items)</p>
                     <p className="text-[11px] text-amber-700 truncate">
-                      {intel.lowStockItems?.[0]?.name ? `${intel.lowStockItems[0].name} (${intel.lowStockItems[0].quantity} ${intel.lowStockItems[0].unit} left)` : 'Stock below minimum threshold'}
+                      {intel?.lowStockItems?.[0]?.name ? `${intel.lowStockItems[0].name} (${intel.lowStockItems[0].quantity} ${intel.lowStockItems[0].unit} left)` : 'Stock below minimum threshold'}
                     </p>
                   </div>
                 </div>
@@ -223,7 +223,7 @@ export default function ProjectCommandCenter() {
               </div>
             )}
 
-            {intel.procurementDelayCount > 0 && (
+            {(Number(intel?.procurementDelayCount) > 0) && (
               <div 
                 onClick={() => navigate('/purchase?tab=orders')}
                 className="cursor-pointer bg-red-50/90 hover:bg-red-100 border border-red-200 rounded-xl p-3 flex items-center justify-between transition-colors"
@@ -233,7 +233,7 @@ export default function ProjectCommandCenter() {
                     <Clock size={14} />
                   </span>
                   <div className="truncate">
-                    <p className="text-xs font-bold text-red-900">Procurement Delay Warning ({intel.procurementDelayCount} orders)</p>
+                    <p className="text-xs font-bold text-red-900">Procurement Delay Warning ({intel?.procurementDelayCount} orders)</p>
                     <p className="text-[11px] text-red-700 truncate">Purchase orders past expected delivery date</p>
                   </div>
                 </div>
@@ -241,7 +241,7 @@ export default function ProjectCommandCenter() {
               </div>
             )}
 
-            {intel.overdueMilestoneCount > 0 && (
+            {(Number(intel?.overdueMilestoneCount) > 0) && (
               <div 
                 onClick={() => navigate('/progress?tab=timeline')}
                 className="cursor-pointer bg-rose-50/90 hover:bg-rose-100 border border-rose-200 rounded-xl p-3 flex items-center justify-between transition-colors"
@@ -251,9 +251,9 @@ export default function ProjectCommandCenter() {
                     <Calendar size={14} />
                   </span>
                   <div className="truncate">
-                    <p className="text-xs font-bold text-rose-900">Milestone Delay Warning ({intel.overdueMilestoneCount} overdue)</p>
+                    <p className="text-xs font-bold text-rose-900">Milestone Delay Warning ({intel?.overdueMilestoneCount} overdue)</p>
                     <p className="text-[11px] text-rose-700 truncate">
-                      {intel.overdueMilestones?.[0]?.name || 'Milestone target date exceeded'}
+                      {intel?.overdueMilestones?.[0]?.name || 'Milestone target date exceeded'}
                     </p>
                   </div>
                 </div>
@@ -261,7 +261,7 @@ export default function ProjectCommandCenter() {
               </div>
             )}
           </div>
-        )}
+        ) : null}
 
         {/* Material Usage Variance where BOQ data exists */}
         {intel?.materialVariances && intel.materialVariances.length > 0 && (
@@ -303,7 +303,7 @@ export default function ProjectCommandCenter() {
       {/* Needs attention */}
       <div>
         <SectionLabel>Needs Attention</SectionLabel>
-        <div className="space-y-2">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           {[
             { color: "#f59e0b", icon: <Package size={16} className="text-amber-500" />, title: `${summary?.pendingMaterialRequests || 0} Material Requests Pending`, sub: "Approval needed", link: "/purchase?tab=requests" },
             { color: "#ef4444", icon: <IndianRupee size={16} className="text-red-500" />, title: `${summary?.pendingVendorPayments || 0} Vendor Payments Due`, sub: "Overdue payments", link: "/finance" },
@@ -317,8 +317,8 @@ export default function ProjectCommandCenter() {
             >
               <span className="shrink-0">{a.icon}</span>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-foreground">{a.title}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{a.sub}</p>
+                <p className="text-xs sm:text-sm font-semibold text-foreground truncate">{a.title}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{a.sub}</p>
               </div>
               <ChevronRight size={14} className="text-muted-foreground shrink-0" />
             </button>
@@ -329,7 +329,7 @@ export default function ProjectCommandCenter() {
       {/* Quick actions */}
       <div>
         <SectionLabel>Quick Actions</SectionLabel>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
           {[
             { icon: <IndianRupee size={20} />, label: "Add Expense", style: { backgroundColor: "#2648E7" }, textClass: "text-white", link: "/finance?create=true" },
             { icon: <Package size={20} />, label: "Material Request", bg: "bg-amber-50", textClass: "text-amber-700", link: "/purchase?tab=requests" },
@@ -351,39 +351,57 @@ export default function ProjectCommandCenter() {
         </div>
       </div>
 
-      {/* Next milestone */}
-      {progress?.nextMilestone && (
+      {/* Next milestone & Supervisor side-by-side */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Next milestone */}
         <div>
           <SectionLabel>Next Milestone</SectionLabel>
-          <Card className="p-4 flex items-center gap-4">
-            <div className="size-12 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: "#FCC300" }}>
-              <Calendar size={20} className="text-gray-900" />
+          {progress?.nextMilestone ? (
+            <Card className="p-4 flex items-center gap-4 h-[calc(100%-24px)]">
+              <div className="size-12 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: "#FCC300" }}>
+                <Calendar size={20} className="text-gray-900" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-foreground truncate">{progress.nextMilestone.name}</p>
+                <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                  Due: {new Date(progress.nextMilestone.targetDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </p>
+              </div>
+              <div className="text-right shrink-0">
+                <p className="font-bold text-amber-600">
+                  {Math.max(0, Math.ceil((new Date(progress.nextMilestone.targetDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))} days
+                </p>
+                <p className="text-[10px] text-muted-foreground">remaining</p>
+              </div>
+            </Card>
+          ) : (
+            <Card className="p-4 flex items-center gap-4 h-[calc(100%-24px)]">
+              <div className="size-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                <CheckCircle2 size={20} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-foreground">All Milestones Completed</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Project schedule up to date</p>
+              </div>
+            </Card>
+          )}
+        </div>
+
+        {/* Supervisor */}
+        <div>
+          <SectionLabel>Site Command</SectionLabel>
+          <Card className="p-4 flex items-center gap-3 h-[calc(100%-24px)]">
+            <div className="size-10 rounded-full bg-[#2648E7]/10 flex items-center justify-center shrink-0">
+              <HardHat size={18} className="text-[#2648E7]" />
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-bold text-foreground">{progress.nextMilestone.name}</p>
-              <p className="text-sm text-muted-foreground mt-0.5">Due: {new Date(progress.nextMilestone.targetDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+            <div className="min-w-0">
+              <p className="text-xs text-muted-foreground">Site Supervisor</p>
+              <p className="font-bold text-sm text-foreground truncate">{project?.supervisor || 'Not Assigned'}</p>
             </div>
-            <div className="text-right shrink-0">
-              <p className="font-bold text-amber-600">
-                {Math.max(0, Math.ceil((new Date(progress.nextMilestone.targetDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))} days
-              </p>
-              <p className="text-xs text-muted-foreground">remaining</p>
-            </div>
+            <span className="ml-auto text-xs bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-full font-bold shrink-0">On Site</span>
           </Card>
         </div>
-      )}
-
-      {/* Supervisor */}
-      <Card className="p-4 flex items-center gap-3">
-        <div className="size-10 rounded-full bg-[#2648E7]/10 flex items-center justify-center shrink-0">
-          <HardHat size={18} className="text-[#2648E7]" />
-        </div>
-        <div>
-          <p className="text-xs text-muted-foreground">Site Supervisor</p>
-          <p className="font-bold text-sm text-foreground">{project?.supervisor || 'Not Assigned'}</p>
-        </div>
-        <span className="ml-auto text-xs bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-full font-bold">On Site</span>
-      </Card>
+      </div>
     </div>
   );
 }

@@ -80,6 +80,13 @@ interface FactorHealth {
   badgeColor: string;
 }
 
+function formatSmartCurrency(val: number | null | undefined): string {
+  if (!val || val === 0) return '₹0';
+  if (val >= 10000000) return `₹${(val / 10000000).toFixed(2)} Cr`;
+  if (val >= 100000) return `₹${(val / 100000).toFixed(2)} L`;
+  return `₹${Math.round(val).toLocaleString('en-IN')}`;
+}
+
 export default function SmartProjectHealth({
   data,
   className = "",
@@ -154,9 +161,9 @@ export default function SmartProjectHealth({
     summary: financeSummary,
     badgeColor: financeStatus === 'OPTIMAL' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : financeStatus === 'WATCH' ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-rose-50 text-rose-700 border-rose-200',
     metrics: [
-      { label: 'Utilization', value: totalBudget > 0 ? `${budgetUtilizedPct.toFixed(0)}%` : 'No Budget Set', isWarning: budgetUtilizedPct > 90 },
-      { label: 'Remaining', value: `₹${Math.max(0, totalBudget - actualSpend).toLocaleString('en-IN')}` },
-      { label: 'Exposure', value: paymentExposure > 0 ? `₹${paymentExposure.toLocaleString('en-IN')}` : '₹0', isWarning: paymentExposure > 100000 }
+      { label: 'Utilization', value: totalBudget > 0 ? `${budgetUtilizedPct.toFixed(0)}%` : 'No Budget', isWarning: budgetUtilizedPct > 90 },
+      { label: 'Remaining', value: formatSmartCurrency(Math.max(0, totalBudget - actualSpend)) },
+      { label: 'Exposure', value: formatSmartCurrency(paymentExposure), isWarning: paymentExposure > 100000 }
     ]
   };
 
@@ -291,8 +298,8 @@ export default function SmartProjectHealth({
     summary: opsSummary,
     badgeColor: opsStatus === 'OPTIMAL' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : opsStatus === 'WATCH' ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-rose-50 text-rose-700 border-rose-200',
     metrics: [
-      { label: 'Workers Today', value: `${labourCount} logged`, isWarning: labourCount === 0 },
-      { label: 'Daily Report', value: recentDpr ? 'Active' : 'Missing DPR', isWarning: !recentDpr },
+      { label: 'Workers', value: `${labourCount} logged`, isWarning: labourCount === 0 },
+      { label: 'DPR Report', value: recentDpr ? 'Active' : 'Missing', isWarning: !recentDpr },
       { label: 'Equipment', value: `${equipmentRunning} running` }
     ]
   };
