@@ -38,7 +38,8 @@ export const POST = withAuth(async (request: Request, user: any) => {
           material_id: material.id,
           quantity: Number(quantity),
           status: 'PENDING_APPROVAL',
-          requested_by: user.sub
+          requested_by: user.sub,
+          notes: payload.varianceReason ? `[Cost Intelligence Variance: ${payload.varianceReason}] ${payload.notes || ''}`.trim() : (payload.notes || undefined)
         }
       });
       return NextResponse.json({ success: true, request: req });
@@ -92,7 +93,7 @@ export const POST = withAuth(async (request: Request, user: any) => {
       for (const item of items) {
         const parsedRate = Number(item.rate) || 0;
         const parsedQty = Number(item.planned) || 0;
-        if (parsedQty <= 0) continue;
+        if (parsedQty < 0 || !item.name) continue;
         const catName = item.category || categoryName || 'General';
         
         let category = await prisma.bOQCategory.findFirst({

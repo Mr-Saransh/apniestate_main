@@ -213,6 +213,54 @@ export function detectDiscipline(description: string, currentCategory?: string):
  */
 export const INDUSTRY_DISCIPLINE_PRESETS: StandardDisciplineTemplate[] = [
   {
+    id: 'civil_structural',
+    name: 'Civil & Structural Works',
+    category: 'Civil',
+    iconName: 'Building2',
+    badgeColor: 'bg-blue-50 text-blue-800 border-blue-200',
+    description: 'Earthwork excavation, PCC base, RCC structural elements, brick masonry, and cement plastering.',
+    suggestedItems: [
+      { name: 'Earthwork in excavation for foundation trenches', unit: 'cum', rate: 180.00, remarks: 'Open cut excavation up to 2m depth' },
+      { name: 'Filling available excavated earth in plinth & foundation', unit: 'cum', rate: 120.00, remarks: 'Compacted in 15cm layers' },
+      { name: 'Plain Cement Concrete (PCC 1:4:8) under foundations', unit: 'cum', rate: 4200.00, remarks: 'Base levelling coarse concrete' },
+      { name: 'Reinforced Cement Concrete (RCC M25) for Footings & Columns', unit: 'cum', rate: 6500.00, remarks: 'Ready mix / design mix complete' },
+      { name: 'Reinforced Cement Concrete (RCC M20) for Beams & Slabs', unit: 'cum', rate: 5800.00, remarks: 'Structural suspended members' },
+      { name: 'Brickwork / AAC Blockwork in Cement Mortar 1:6 (200mm)', unit: 'cum', rate: 4500.00, remarks: 'Main external & internal walls' },
+      { name: '12mm Interior Cement Plaster with fine sand (1:6)', unit: 'sqm', rate: 160.00, remarks: 'Smooth sponge finish' },
+      { name: '20mm Double Coat Sand-Faced Plaster (External)', unit: 'sqm', rate: 240.00, remarks: 'Waterproof exterior finish' }
+    ]
+  },
+  {
+    id: 'reinforcement_steel',
+    name: 'Reinforcement Schedule (TMT Rebars)',
+    category: 'Civil',
+    iconName: 'Layers',
+    badgeColor: 'bg-amber-50 text-amber-800 border-amber-200',
+    description: 'Fe500D Thermo-Mechanically Treated (TMT) steel reinforcement bars by structural diameter.',
+    suggestedItems: [
+      { name: '8mm TMT Fe500D Steel Rebars', unit: 'kg', rate: 72.00, remarks: 'Stirrups, rings & ties' },
+      { name: '10mm TMT Fe500D Steel Rebars', unit: 'kg', rate: 72.00, remarks: 'Slab distribution & main mesh' },
+      { name: '12mm TMT Fe500D Steel Rebars', unit: 'kg', rate: 70.00, remarks: 'Slab & beam reinforcement' },
+      { name: '16mm TMT Fe500D Steel Rebars', unit: 'kg', rate: 70.00, remarks: 'Column vertical & beam longitudinal' },
+      { name: '20mm TMT Fe500D Steel Rebars', unit: 'kg', rate: 70.00, remarks: 'Heavy column main vertical bars' },
+      { name: '25mm TMT Fe500D Steel Rebars', unit: 'kg', rate: 70.00, remarks: 'Foundation & heavy transfer beams' },
+      { name: '18 Gauge Annealed GI Binding Wire', unit: 'kg', rate: 85.00, remarks: 'Rebar tie binding' }
+    ]
+  },
+  {
+    id: 'shuttering_formwork',
+    name: 'Shuttering & Formwork',
+    category: 'Civil',
+    iconName: 'Ruler',
+    badgeColor: 'bg-purple-50 text-purple-800 border-purple-200',
+    description: 'Centering, formwork, staging, and prop supports for all structural concrete elements.',
+    suggestedItems: [
+      { name: 'Formwork for foundation footings and plinth beams', unit: 'sqm', rate: 280.00, remarks: 'Steel / plywood shuttering' },
+      { name: 'Centering and shuttering for columns & retaining walls', unit: 'sqm', rate: 360.00, remarks: 'Vertical shuttering with MS props' },
+      { name: 'Centering and shuttering for slabs & superstructure beams', unit: 'sqm', rate: 420.00, remarks: 'Waterproof film faced plywood' }
+    ]
+  },
+  {
     id: 'plumbing',
     name: 'Plumbing, Sanitation & Drainage',
     category: 'MEP',

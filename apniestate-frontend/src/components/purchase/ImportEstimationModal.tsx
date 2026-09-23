@@ -159,21 +159,20 @@ export const AOD_CONSULTANCY_PRESET: EditableCategory[] = [
   }
 ];
 
-// Complete Multi-Discipline Builder Suite: Civil + Plumbing + Electrical + Painting + Waterproofing + Tiling
-export const COMPLETE_BUILDER_SUITE: EditableCategory[] = [
-  ...AOD_CONSULTANCY_PRESET,
-  ...INDUSTRY_DISCIPLINE_PRESETS.map(preset => ({
-    name: preset.name,
-    items: preset.suggestedItems.map(it => ({
-      name: it.name,
-      planned: 100,
-      unit: it.unit,
-      rate: it.rate,
-      amount: 100 * it.rate,
-      remarks: it.remarks
-    }))
+// Master Multi-Discipline Builder Suite: Clean standardized catalog across all 10 construction disciplines
+// (Civil & Structural, Rebars, Shuttering, Plumbing, Electrical, Painting, Waterproofing, Doors/Windows, Flooring, HVAC/Safety)
+// Zero project-specific gibberish numbers: initialized with clean 0-quantities ready for real site measurements.
+export const COMPLETE_BUILDER_SUITE: EditableCategory[] = INDUSTRY_DISCIPLINE_PRESETS.map(preset => ({
+  name: preset.name,
+  items: preset.suggestedItems.map(it => ({
+    name: it.name,
+    planned: 0,
+    unit: it.unit,
+    rate: it.rate,
+    amount: 0,
+    remarks: it.remarks
   }))
-];
+}));
 
 export default function ImportEstimationModal({
   isOpen,
@@ -217,10 +216,10 @@ export default function ImportEstimationModal({
       name: preset.name,
       items: preset.suggestedItems.map(it => ({
         name: it.name,
-        planned: 100,
+        planned: 0,
         unit: it.unit,
         rate: it.rate,
-        amount: 100 * it.rate,
+        amount: 0,
         remarks: it.remarks
       }))
     };
@@ -411,8 +410,7 @@ export default function ImportEstimationModal({
       }));
     }
 
-    // Default to AOD standard schedule
-    return JSON.parse(JSON.stringify(AOD_CONSULTANCY_PRESET));
+    throw new Error('Could not automatically detect tabular estimation rows (Item, Qty, Unit, Rate) in this PDF. Please ensure the document contains clear table columns or load our clean Master Builder Template.');
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -635,70 +633,64 @@ export default function ImportEstimationModal({
                   <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
                     Or Instant Load Standard Construction Schedules
                   </h4>
-                  <span className="text-[11px] text-primary font-bold">100% Verified Civil Standards</span>
+                  <span className="text-[11px] text-emerald-700 font-bold">Clean Master Catalogs (Zero Gibberish)</span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* Preset 1: AOD Consultancy G+5 RCC (PDF exact) */}
-                  <div className="p-4 rounded-2xl border border-primary/20 bg-primary/5 hover:bg-primary/10 transition-colors flex items-start justify-between gap-3">
-                    <div>
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <Sparkles className="w-4 h-4 text-primary" />
-                        <h5 className="font-bold text-xs text-foreground">AOD Consultancy G+5 RCC Unit-VI</h5>
-                        <span className="text-[10px] px-2 py-0.2 bg-primary/20 text-primary font-black rounded-full">PDF Exact</span>
-                      </div>
-                      <p className="text-[11px] text-muted-foreground">
-                        Exact 7-table structural estimate: Earthwork, Rebars by element/dia, Shuttering, Brickwork, Concrete, & Requisitions (₹9.30 Cr).
-                      </p>
-                      <button
-                        type="button"
-                        onClick={handleLoadAODPreset}
-                        className="mt-2.5 px-3 py-1.5 bg-primary text-white text-xs font-bold rounded-lg shadow-2xs hover:bg-primary/90 transition-all flex items-center gap-1"
-                      >
-                        Load PDF Schedule <ArrowRight className="w-3 h-3" />
-                      </button>
+                {/* Primary Card: Universal Master Multi-Discipline Builder Template */}
+                <div className="p-4 sm:p-5 rounded-2xl border-2 border-emerald-300 bg-emerald-50/50 hover:bg-emerald-50 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="space-y-1 max-w-xl">
+                    <div className="flex items-center gap-2">
+                      <Layers className="w-5 h-5 text-emerald-700" />
+                      <h5 className="font-bold text-sm text-foreground">Universal Master Builder Template</h5>
+                      <span className="text-[10px] px-2 py-0.5 bg-emerald-200 text-emerald-900 font-black rounded-full">All 10 Core Disciplines</span>
                     </div>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Complete master work package catalog covering Civil, Rebars, Shuttering, Plumbing, Electrical, Painting, Waterproofing, Doors/Windows, Flooring & HVAC. Pure standard materials and unit rates with zero placeholder quantities so your site team enters actual project figures.
+                    </p>
                   </div>
-
-                  {/* Preset 2: Complete Builder Suite (Civil + MEP + Finishes) */}
-                  <div className="p-4 rounded-2xl border border-emerald-300 bg-emerald-50/50 hover:bg-emerald-50 transition-colors flex items-start justify-between gap-3">
-                    <div>
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <Layers className="w-4 h-4 text-emerald-700" />
-                        <h5 className="font-bold text-xs text-foreground">Complete Builder Multi-Discipline Suite</h5>
-                        <span className="text-[10px] px-2 py-0.2 bg-emerald-200 text-emerald-900 font-black rounded-full">All Disciplines</span>
-                      </div>
-                      <p className="text-[11px] text-muted-foreground">
-                        Everything included: Civil, Rebars, Shuttering + Plumbing, Electrical, Painting, Waterproofing, Windows/Doors & Tiling.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={handleLoadCompleteSuite}
-                        className="mt-2.5 px-3 py-1.5 bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-2xs hover:bg-emerald-800 transition-all flex items-center gap-1"
-                      >
-                        Load Complete Suite <ArrowRight className="w-3 h-3" />
-                      </button>
-                    </div>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={handleLoadCompleteSuite}
+                    className="px-5 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 shrink-0"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    Load Clean Template <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
                 </div>
 
                 {/* Individual Discipline Quick Presets */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
-                  {INDUSTRY_DISCIPLINE_PRESETS.slice(0, 4).map(preset => (
-                    <button
-                      key={preset.id}
-                      type="button"
-                      onClick={() => handleLoadSinglePreset(preset.id)}
-                      className="p-2.5 bg-white border border-border hover:border-primary/40 rounded-xl text-left transition-all group"
-                    >
-                      <span className="text-xs font-bold text-foreground block group-hover:text-primary transition-colors">
-                        + {preset.name.split(',')[0]}
-                      </span>
-                      <span className="text-[10px] text-muted-foreground">
-                        {preset.suggestedItems.length} starter materials
-                      </span>
-                    </button>
-                  ))}
+                <div>
+                  <h5 className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-2">
+                    Or Load Individual Discipline Work Package
+                  </h5>
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                    {INDUSTRY_DISCIPLINE_PRESETS.map(preset => (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        onClick={() => handleLoadSinglePreset(preset.id)}
+                        className="p-2.5 bg-white border border-border hover:border-primary/50 hover:bg-muted/30 rounded-xl text-left transition-all group"
+                      >
+                        <span className="text-xs font-bold text-foreground block group-hover:text-primary transition-colors truncate">
+                          + {preset.name.split(',')[0]}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {preset.suggestedItems.length} master items
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Optional Demo Sample for testing */}
+                <div className="pt-1 text-center">
+                  <button
+                    type="button"
+                    onClick={handleLoadAODPreset}
+                    className="text-[11px] text-muted-foreground hover:text-foreground underline decoration-dotted"
+                  >
+                    Need a test demo? Click to load sample G+5 RCC reference project (AODC2402 Demo)
+                  </button>
                 </div>
               </div>
             </div>

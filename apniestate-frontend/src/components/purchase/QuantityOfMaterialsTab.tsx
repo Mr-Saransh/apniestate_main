@@ -32,7 +32,7 @@ import {
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { purchaseApi, type BOQItemSummary, type BOQCategorySummary } from '@/api/purchase';
-import { AOD_CONSULTANCY_PRESET, COMPLETE_BUILDER_SUITE } from './ImportEstimationModal';
+import { COMPLETE_BUILDER_SUITE } from './ImportEstimationModal';
 import {
   normalizeUnit,
   cleanNumeric,
@@ -267,16 +267,16 @@ export default function QuantityOfMaterialsTab({
     try {
       const preset = INDUSTRY_DISCIPLINE_PRESETS.find(p => p.id === seedPresetTemplate);
       if (preset && preset.suggestedItems.length > 0) {
-        // Create table with seed items
+        // Create table with seed master items (zero planned quantity awaiting site input)
         await purchaseApi.performAction('CREATE_BOQ_ITEM', {
           projectId,
           categoryName: newTableName.trim(),
           items: preset.suggestedItems.map(it => ({
             name: it.name,
-            planned: 100,
+            planned: 0,
             unit: it.unit,
             rate: it.rate,
-            amount: 100 * it.rate,
+            amount: 0,
             remarks: it.remarks
           }))
         });
@@ -328,28 +328,10 @@ export default function QuantityOfMaterialsTab({
     }
   };
 
-  // 1-Click Load AOD Consultancy Preset
-  const handleLoadPreset = async () => {
-    if (!confirm('Load the 7-table AOD Consultancy G+5 RCC Unit-VI estimation schedule (₹9.30 Cr) from the PDF?')) return;
-    setPresetLoading(true);
-    try {
-      await purchaseApi.performAction('SAVE_BOQ_TABLES', {
-        projectId,
-        categories: AOD_CONSULTANCY_PRESET,
-        replaceAll: items.length === 0
-      });
-      onRefresh();
-    } catch (err) {
-      console.error(err);
-      alert('Failed to load preset estimate');
-    } finally {
-      setPresetLoading(false);
-    }
-  };
 
-  // 1-Click Load Complete Builder Suite (Civil + MEP + Finishes)
+  // 1-Click Load Master Multi-Discipline Builder Template
   const handleLoadCompleteSuite = async () => {
-    if (!confirm('Load the Complete Multi-Discipline Builder Suite? This includes Civil, RCC, Steel + Plumbing, Electrical, Painting, Waterproofing, Doors/Windows & Tiling.')) return;
+    if (!confirm('Load the Universal Master Multi-Discipline Template? This creates standardized work tables for all 10 construction disciplines (Civil, Rebars, Shuttering, Plumbing, Electrical, Painting, Waterproofing, Flooring, Doors/Windows, HVAC) with clean zero quantities ready for your actual project measurements.')) return;
     setPresetLoading(true);
     try {
       await purchaseApi.performAction('SAVE_BOQ_TABLES', {
@@ -360,7 +342,7 @@ export default function QuantityOfMaterialsTab({
       onRefresh();
     } catch (err) {
       console.error(err);
-      alert('Failed to load complete builder suite');
+      alert('Failed to load master builder template');
     } finally {
       setPresetLoading(false);
     }
@@ -567,16 +549,15 @@ export default function QuantityOfMaterialsTab({
               className="w-full sm:w-auto px-5 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-200 text-xs font-bold rounded-xl transition-all shadow-sm flex items-center justify-center gap-2"
             >
               <Sparkles size={16} className="text-emerald-600" />
-              {presetLoading ? 'Loading Suite...' : 'Load Complete Builder Suite'}
+              {presetLoading ? 'Loading Template...' : 'Load Master Builder Template'}
             </button>
 
             <button
-              onClick={handleLoadPreset}
-              disabled={presetLoading}
-              className="w-full sm:w-auto px-5 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-xs font-bold rounded-xl transition-all shadow-sm flex items-center justify-center gap-2"
+              onClick={() => setShowAddTableModal(true)}
+              className="w-full sm:w-auto px-5 py-2.5 bg-muted hover:bg-muted/80 text-foreground border border-border text-xs font-bold rounded-xl transition-all shadow-sm flex items-center justify-center gap-2"
             >
-              <HardHat size={16} className="text-amber-600" />
-              Load AOD G+5 RCC PDF Preset
+              <Plus size={16} />
+              + Create Custom Work Table
             </button>
           </div>
         </Card>

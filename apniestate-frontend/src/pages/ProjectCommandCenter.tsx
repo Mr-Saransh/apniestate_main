@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useProject } from '@/context/ProjectContext';
 import { apiClient } from '@/api/client';
+import SmartProjectHealth from '@/components/dashboard/SmartProjectHealth';
 import {
   Users, IndianRupee, Package, CloudSun,
   ChevronRight, Calendar, TrendingUp, ShoppingCart, Wallet, HardHat,
@@ -295,6 +296,9 @@ export default function ProjectCommandCenter() {
           </Card>
         )}
       </div>
+
+      {/* Smart Cross-Functional Project Health Index */}
+      <SmartProjectHealth data={data} />
 
       {/* Needs attention */}
       <div>
