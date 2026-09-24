@@ -240,10 +240,17 @@ export const POST = withAuth(async (request: Request, user: any) => {
       if (!boq) {
         boq = await prisma.bOQ.create({ data: { project_id: projectId, created_by: user.sub } });
       }
+      const trimmedName = name.trim();
+      const existing = await prisma.bOQCategory.findFirst({
+        where: { boq_id: boq.id, name: trimmedName }
+      });
+      if (existing) {
+        return NextResponse.json({ success: true, category: existing });
+      }
       const category = await prisma.bOQCategory.create({
         data: {
           boq_id: boq.id,
-          name: name.trim()
+          name: trimmedName
         }
       });
       return NextResponse.json({ success: true, category });
@@ -262,10 +269,24 @@ export const POST = withAuth(async (request: Request, user: any) => {
     }
 
     if (action === 'DELETE_BOQ_CATEGORY') {
-      const { categoryId } = payload;
-      await prisma.bOQCategory.delete({
-        where: { id: categoryId }
-      });
+      const { categoryId, name, projectId } = payload;
+      if (categoryId) {
+        const cat = await prisma.bOQCategory.findUnique({ where: { id: categoryId } });
+        if (cat) {
+          await prisma.bOQCategory.delete({
+            where: { id: categoryId }
+          });
+          return NextResponse.json({ success: true });
+        }
+      }
+      if (name && projectId) {
+        const boq = await prisma.bOQ.findFirst({ where: { project_id: projectId }, orderBy: { version: 'desc' } });
+        if (boq) {
+          await prisma.bOQCategory.deleteMany({
+            where: { boq_id: boq.id, name }
+          });
+        }
+      }
       return NextResponse.json({ success: true });
     }
 

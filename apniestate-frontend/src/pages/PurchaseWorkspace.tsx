@@ -789,9 +789,7 @@ function PurchaseModals({
     const groups: Record<string, BOQItemSummary[]> = {};
     if (data?.boq_categories && data.boq_categories.length > 0) {
       data.boq_categories.forEach(cat => {
-        if (cat.items && cat.items.length > 0) {
-          groups[cat.name] = cat.items;
-        }
+        groups[cat.name] = cat.items || [];
       });
     } else if (data?.boq_items && data.boq_items.length > 0) {
       data.boq_items.forEach(it => {

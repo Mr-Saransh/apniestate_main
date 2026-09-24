@@ -22,6 +22,7 @@ export const GET = withAuth(async (request: Request, user: any) => {
       where: { project_id: projectId },
       include: {
         categories: {
+          orderBy: { created_at: 'asc' },
           include: {
             items: {
               include: { material: true }
