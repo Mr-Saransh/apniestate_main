@@ -4,7 +4,7 @@ import { useProject } from '@/context/ProjectContext';
 import { useAuth } from '@/context/AuthContext';
 import {
   ShoppingCart, Plus, FileSpreadsheet, Package, ClipboardList,
-  CheckCircle2, Archive, Truck, X, Trash2, Download, UploadCloud, Edit3, ArrowRight, PackageCheck, Layers
+  CheckCircle2, Archive, Truck, X, Trash2, Download, UploadCloud, Edit3, ArrowRight, PackageCheck, Layers, FileText
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { purchaseApi, type PurchaseSummaryResponse, type BOQItemSummary, type MaterialRequestSummary, type OrderSummary, type ReceivedSummary, type VendorSummary, type ConsumptionLog } from '@/api/purchase';
@@ -44,7 +44,7 @@ export default function PurchaseWorkspace() {
   const [data, setData] = useState<PurchaseSummaryResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeModal, setActiveModal] = useState<string | null>(null);
-  const [orderPrefill, setOrderPrefill] = useState<{ materialName: string; quantity: number } | null>(null);
+  const [orderPrefill, setOrderPrefill] = useState<any | null>(null);
   const [receivePoId, setReceivePoId] = useState<string | null>(null);
   const [showImportModal, setShowImportModal] = useState(false);
 
@@ -170,16 +170,35 @@ export default function PurchaseWorkspace() {
             <RequestsTab 
               requests={data?.material_requests || []} 
               onRefresh={refreshData}
-              onConvertToOrder={(materialName, quantity) => {
-                setOrderPrefill({ materialName, quantity });
+              onConvertToOrder={(materialName, quantity, requestId) => {
+                setOrderPrefill({ materialName, quantity, requestId });
                 setActiveModal('orders');
               }}
             />
           )}
-          {tab === 'quotations' && <QuotationsTab quotations={data?.quotations || []} />}
+          {tab === 'quotations' && (
+            <QuotationsTab 
+              quotations={data?.quotations || []} 
+              orders={data?.orders || []}
+              projectName={activeProject.name}
+              onOpenAddQuotation={() => setActiveModal('quotations')}
+              onAcceptQuote={(quote) => {
+                setOrderPrefill({
+                  materialName: quote.material,
+                  quantity: quote.quantity || 1,
+                  unit: quote.unit || 'nos',
+                  vendorId: quote.vendorId,
+                  quotedRate: quote.numericRate || cleanNumeric(quote.rate),
+                  quotationId: quote.id
+                });
+                setActiveModal('orders');
+              }}
+            />
+          )}
           {tab === 'orders' && (
             <OrdersTab 
               orders={data?.orders || []} 
+              projectName={activeProject.name}
               onReceiveOrder={(poId) => {
                 setReceivePoId(poId);
                 setActiveModal('received');
@@ -215,6 +234,104 @@ export default function PurchaseWorkspace() {
   );
 }
 
+// Helper: Export Procurement Price Variance & Savings PDF Report
+function handleDownloadPriceVariancePDF(orders: OrderSummary[], projectName: string) {
+  const doc = new jsPDF();
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+
+  // Premium Dark Header
+  doc.setFillColor(15, 23, 42); // Slate-900
+  doc.rect(0, 0, pageW, 40, 'F');
+  doc.setFillColor(38, 72, 231); // Brand Blue
+  doc.rect(0, 40, pageW, 3, 'F');
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(18);
+  doc.setFont('helvetica', 'bold');
+  doc.text("PROCUREMENT PRICE VARIANCE REPORT", 14, 22);
+
+  doc.setFontSize(10);
+  doc.setTextColor(190, 205, 255);
+  doc.text(`Project: ${projectName} · Quoted Price vs Final Bought Price Analysis`, 14, 32);
+
+  doc.setFontSize(9);
+  doc.text(`GENERATED`, pageW - 14, 20, { align: 'right' });
+  doc.setFont('helvetica', 'bold');
+  doc.text(`${new Date().toLocaleDateString('en-IN')}`, pageW - 14, 28, { align: 'right' });
+
+  // Summary Metrics Section
+  let totalQuoted = 0;
+  let totalBought = 0;
+  const rows: any[] = [];
+
+  orders.forEach(o => {
+    (o.items || []).forEach(it => {
+      const quoted = it.quotedPrice && it.quotedPrice > 0 ? it.quotedPrice : (it.unitPrice || 0);
+      const bought = it.unitPrice || 0;
+      const qty = it.orderedQty || 1;
+      const totalQuotedLine = quoted * qty;
+      const totalBoughtLine = bought * qty;
+      const diff = totalBoughtLine - totalQuotedLine;
+
+      totalQuoted += totalQuotedLine;
+      totalBought += totalBoughtLine;
+
+      rows.push([
+        it.materialName,
+        o.vendor,
+        `${qty} ${it.unit}`,
+        `₹${quoted.toLocaleString('en-IN')}`,
+        `₹${bought.toLocaleString('en-IN')}`,
+        diff < 0 ? `Saved ₹${Math.abs(diff).toLocaleString('en-IN')}` : diff > 0 ? `+₹${diff.toLocaleString('en-IN')}` : 'Exact match',
+        o.poNumber || o.name
+      ]);
+    });
+  });
+
+  const netSavings = totalQuoted - totalBought;
+
+  doc.setTextColor(15, 23, 42);
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  doc.text(`Total Quoted Value: ₹${totalQuoted.toLocaleString('en-IN')}`, 14, 52);
+  doc.text(`Total Agreed PO Value: ₹${totalBought.toLocaleString('en-IN')}`, 100, 52);
+
+  doc.setTextColor(netSavings >= 0 ? 22 : 220, netSavings >= 0 ? 101 : 38, netSavings >= 0 ? 52 : 38);
+  doc.text(
+    netSavings >= 0 
+      ? `Net Negotiation Savings: +₹${netSavings.toLocaleString('en-IN')} (Negotiated under quote)` 
+      : `Net Cost Variance: -₹${Math.abs(netSavings).toLocaleString('en-IN')} (Over quoted rate)`, 
+    14, 
+    60
+  );
+
+  autoTable(doc, {
+    startY: 68,
+    head: [['Material', 'Vendor', 'Qty', 'Quoted Rate', 'Final PO Rate', 'Variance / Savings', 'PO Ref']],
+    body: rows.length > 0 ? rows : [['No procurement orders recorded yet', '-', '-', '-', '-', '-', '-']],
+    headStyles: { fillColor: [38, 72, 231], textColor: [255, 255, 255], fontStyle: 'bold' },
+    styles: { fontSize: 8.5 },
+    alternateRowStyles: { fillColor: [248, 250, 252] }
+  });
+
+  // Footer
+  const pageCount = (doc as any).internal.getNumberOfPages ? (doc as any).internal.getNumberOfPages() : 1;
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setDrawColor(226, 232, 240);
+    doc.setLineWidth(0.5);
+    doc.line(14, pageH - 12, pageW - 14, pageH - 12);
+    doc.setFontSize(8);
+    doc.setTextColor(148, 163, 184);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Apni Estate · Construction Procurement Intelligence', 14, pageH - 6);
+    doc.text(`Page ${i} of ${pageCount}`, pageW - 14, pageH - 6, { align: 'right' });
+  }
+
+  doc.save(`Price_Variance_Report_${projectName.replace(/\s+/g, '_')}.pdf`);
+}
+
 function RequestsTab({ 
   requests, 
   onRefresh, 
@@ -222,7 +339,7 @@ function RequestsTab({
 }: { 
   requests: MaterialRequestSummary[], 
   onRefresh: () => void, 
-  onConvertToOrder: (materialName: string, quantity: number) => void 
+  onConvertToOrder: (materialName: string, quantity: number, requestId?: string) => void 
 }) {
   const { user } = useAuth();
   const role = user?.role || 'BUILDER';
@@ -281,8 +398,8 @@ function RequestsTab({
       PENDING_APPROVAL: { label: "Pending PM Review", cls: "bg-amber-50 text-amber-700 border border-amber-200" },
       QUOTATION: { label: "Getting Quotes", cls: "bg-blue-50 text-[#2648E7] border border-blue-200" },
       DRAFT: { label: "Draft", cls: "bg-gray-100 text-gray-600 border border-gray-200" },
-      ORDERED: { label: "Order Placed", cls: "bg-emerald-50 text-emerald-700 border border-emerald-200" },
-      APPROVED: { label: "Approved", cls: "bg-emerald-50 text-emerald-700 border border-emerald-200" },
+      ORDERED: { label: "Order Placed (Locked)", cls: "bg-blue-50 text-blue-800 border border-blue-200 font-bold" },
+      APPROVED: { label: "Approved for Order", cls: "bg-emerald-50 text-emerald-700 border border-emerald-200" },
     };
     const s = map[stage] ?? { label: stage, cls: "bg-gray-100 text-gray-600" };
     return <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${s.cls}`}>{s.label}</span>;
@@ -326,11 +443,11 @@ function RequestsTab({
             {m.stage === "APPROVED" && (
               <div className="flex items-center justify-between w-full">
                 <span className="flex items-center gap-1.5 text-xs text-emerald-600 font-bold">
-                  <CheckCircle2 size={15} /> Approved
+                  <CheckCircle2 size={15} /> Approved & Ready to Order
                 </span>
                 <button
-                  onClick={() => onConvertToOrder(m.name, parseInt(m.qty, 10) || 1)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-[#2648E7] hover:bg-[#2648E7]/90 text-white text-xs font-bold rounded-xl transition-colors shadow-sm"
+                  onClick={() => onConvertToOrder(m.name, parseInt(m.qty, 10) || 1, m.id)}
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#2648E7] hover:bg-[#2648E7]/90 text-white text-xs font-bold rounded-xl transition-colors shadow-sm"
                 >
                   <ShoppingCart size={13} /> Create Order
                 </button>
@@ -338,9 +455,14 @@ function RequestsTab({
             )}
 
             {m.stage === "ORDERED" && (
-              <span className="flex items-center gap-1.5 text-xs text-emerald-600 font-bold">
-                <CheckCircle2 size={15} /> Purchase order generated
-              </span>
+              <div className="flex items-center justify-between w-full py-1.5 px-3 rounded-xl bg-blue-50/80 border border-blue-200">
+                <span className="flex items-center gap-1.5 text-xs text-blue-800 font-bold">
+                  <CheckCircle2 size={15} className="text-[#2648E7]" /> Purchase Order Generated
+                </span>
+                <span className="text-[11px] text-muted-foreground font-medium italic">
+                  Requirement locked · duplicate order disabled
+                </span>
+              </div>
             )}
 
             {m.stage === "DRAFT" && (
@@ -411,38 +533,204 @@ function RequestsTab({
   );
 }
 
-function QuotationsTab({ quotations }: { quotations: any[] }) {
-  if (quotations.length === 0) return <div className="text-center text-muted-foreground py-10">No quotations found.</div>;
+function QuotationsTab({ 
+  quotations, 
+  orders = [],
+  projectName = 'Project',
+  onAcceptQuote,
+  onOpenAddQuotation
+}: { 
+  quotations: any[]; 
+  orders?: OrderSummary[];
+  projectName?: string;
+  onAcceptQuote?: (quote: any) => void;
+  onOpenAddQuotation?: () => void;
+}) {
+  // Group quotations by Material to compare side-by-side
+  const groupedByMaterial = useMemo(() => {
+    const map: Record<string, any[]> = {};
+    quotations.forEach(q => {
+      const mat = q.material || 'General Materials';
+      if (!map[mat]) map[mat] = [];
+      map[mat].push(q);
+    });
+    return map;
+  }, [quotations]);
+
+  // Overall negotiation metrics
+  const varianceMetrics = useMemo(() => {
+    let totalQuoted = 0;
+    let totalBought = 0;
+    let itemsTracked = 0;
+
+    orders.forEach(o => {
+      (o.items || []).forEach(it => {
+        if (it.quotedPrice && it.quotedPrice > 0) {
+          totalQuoted += (it.quotedPrice * (it.orderedQty || 1));
+          totalBought += ((it.unitPrice || 0) * (it.orderedQty || 1));
+          itemsTracked++;
+        }
+      });
+    });
+
+    return {
+      totalQuoted,
+      totalBought,
+      savings: totalQuoted - totalBought,
+      itemsTracked
+    };
+  }, [orders]);
+
+  if (quotations.length === 0) {
+    return (
+      <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-border p-6">
+        <ClipboardList size={36} className="mx-auto text-muted-foreground/40 mb-3" />
+        <h3 className="font-bold text-sm text-foreground">No Vendor Quotations Yet</h3>
+        <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
+          Get multiple vendor quotes before ordering to negotiate best rates and fulfill requirements.
+        </p>
+        {onOpenAddQuotation && (
+          <button 
+            onClick={onOpenAddQuotation}
+            className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 bg-[#2648E7] text-white text-xs font-bold rounded-xl shadow-sm hover:bg-[#2648E7]/90 transition-all"
+          >
+            <Plus size={14} /> Add First Quotation
+          </button>
+        )}
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-3">
-      {quotations.map((q) => (
-        <Card key={q.id} className="p-4">
-          <div className="flex items-start justify-between mb-3">
+    <div className="space-y-4">
+      {/* Price Variance & Negotiation Savings Card */}
+      {varianceMetrics.itemsTracked > 0 && (
+        <Card className="p-4 bg-gradient-to-r from-blue-50 via-indigo-50/50 to-emerald-50/50 border border-blue-200/80">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <p className="font-bold text-foreground">{q.vendor}</p>
-              <p className="text-sm text-muted-foreground mt-0.5">{q.material}</p>
+              <span className="text-[10px] font-black uppercase tracking-wider text-blue-900 block">
+                Procurement Cost Intelligence · Price Variance Tracker
+              </span>
+              <h4 className="text-sm font-bold text-foreground mt-0.5">
+                Quoted Price vs Final Agreed Purchase Price
+              </h4>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Negotiation savings across {varianceMetrics.itemsTracked} ordered materials.
+              </p>
             </div>
-            <div className="text-right">
-              <p className="text-xl font-bold text-foreground">{q.rate}/unit</p>
-              <p className="text-sm text-muted-foreground">Total: {q.total}</p>
+
+            <div className="flex items-center gap-3">
+              <div className="text-right">
+                <span className="text-[10px] text-muted-foreground block">Net Negotiation Savings</span>
+                <span className={`text-base font-black ${varianceMetrics.savings >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                  {varianceMetrics.savings >= 0 ? `+₹${varianceMetrics.savings.toLocaleString('en-IN')}` : `-₹${Math.abs(varianceMetrics.savings).toLocaleString('en-IN')}`}
+                </span>
+              </div>
+              <button
+                onClick={() => handleDownloadPriceVariancePDF(orders, projectName)}
+                className="flex items-center gap-1 px-3 py-1.5 bg-[#2648E7] text-white text-xs font-bold rounded-xl shadow-sm hover:bg-[#2648E7]/90 transition-all"
+              >
+                <Download size={13} /> PDF Report
+              </button>
             </div>
-          </div>
-          <div className="flex items-center justify-between text-xs font-semibold">
-            <span className={`px-2.5 py-1 rounded-full ${q.status === 'SUBMITTED' ? 'bg-amber-50 text-amber-700' : 'bg-blue-50 text-[#2648E7]'}`}>
-              {q.status}
-            </span>
           </div>
         </Card>
-      ))}
+      )}
+
+      {/* Comparison by Material */}
+      {Object.entries(groupedByMaterial).map(([materialName, quotes]) => {
+        // Find best quote (lowest rate or max fulfillment)
+        const sortedQuotes = [...quotes].sort((a, b) => (a.numericRate || 0) - (b.numericRate || 0));
+        const bestRateQuoteId = sortedQuotes[0]?.id;
+
+        return (
+          <div key={materialName} className="space-y-2.5">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                <Package size={15} className="text-[#2648E7]" />
+                {materialName}
+                <span className="text-[11px] font-normal text-muted-foreground">
+                  ({quotes.length} vendor {quotes.length === 1 ? 'quote' : 'quotes'})
+                </span>
+              </h3>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {quotes.map((q) => {
+                const isBestRate = q.id === bestRateQuoteId && quotes.length > 1;
+                const isAccepted = q.status === 'ACCEPTED';
+
+                return (
+                  <Card key={q.id} className={`p-4 transition-all relative ${isAccepted ? 'bg-emerald-50/40 border-emerald-300' : isBestRate ? 'border-blue-300 bg-blue-50/20' : 'hover:border-border'}`}>
+                    <div className="flex items-start justify-between mb-2">
+                      <div>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <p className="font-bold text-sm text-foreground">{q.vendor}</p>
+                          {q.vendorPhone && <span className="text-[10px] text-muted-foreground">({q.vendorPhone})</span>}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Delivery: <strong className="text-foreground">{q.deliveryTime || 'Standard'}</strong>
+                          {q.quantity ? ` · Qty: ${q.quantity} ${q.unit || ''}` : ''}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-base font-extrabold text-foreground">{q.rate}/unit</p>
+                        <p className="text-xs text-muted-foreground">Total: {q.total}</p>
+                      </div>
+                    </div>
+
+                    {/* Recommendation Badges */}
+                    <div className="flex items-center gap-1.5 flex-wrap my-2.5">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                        ⭐ 100% Requirements Fulfilled
+                      </span>
+                      {isBestRate && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-[#2648E7] border border-blue-200">
+                          💰 Lowest Quoted Rate
+                        </span>
+                      )}
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isAccepted ? 'bg-emerald-600 text-white' : 'bg-muted text-muted-foreground'}`}>
+                        {isAccepted ? 'ACCEPTED IN PO' : q.status}
+                      </span>
+                    </div>
+
+                    {/* Order Action Button */}
+                    <div className="pt-2 border-t border-border flex items-center justify-between">
+                      <span className="text-[11px] text-muted-foreground">
+                        {q.date || 'Received'}
+                      </span>
+                      {isAccepted ? (
+                        <span className="text-xs font-bold text-emerald-700 flex items-center gap-1">
+                          <CheckCircle2 size={14} /> PO Generated
+                        </span>
+                      ) : onAcceptQuote ? (
+                        <button
+                          type="button"
+                          onClick={() => onAcceptQuote(q)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-[#2648E7] hover:bg-[#2648E7]/90 text-white text-xs font-bold rounded-xl transition-all shadow-sm"
+                        >
+                          <ShoppingCart size={13} /> Accept & Order
+                        </button>
+                      ) : null}
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
 
 function OrdersTab({ 
   orders, 
+  projectName = 'Project',
   onReceiveOrder 
 }: { 
   orders: OrderSummary[]; 
+  projectName?: string;
   onReceiveOrder?: (poId: string) => void;
 }) {
   const [filter, setFilter] = useState<'pending' | 'delivered' | 'all'>('pending');
@@ -452,40 +740,72 @@ function OrdersTab({
 
   const displayedOrders = filter === 'pending' ? pendingOrders : filter === 'delivered' ? deliveredOrders : orders;
 
+  // Calculate total negotiated savings across all orders
+  const totalSavings = useMemo(() => {
+    let saved = 0;
+    orders.forEach(o => {
+      (o.items || []).forEach(it => {
+        if (it.quotedPrice && it.quotedPrice > (it.unitPrice || 0)) {
+          saved += (it.quotedPrice - (it.unitPrice || 0)) * (it.orderedQty || 1);
+        }
+      });
+    });
+    return saved;
+  }, [orders]);
+
   if (orders.length === 0) return <div className="text-center text-muted-foreground py-10">No orders found.</div>;
 
   return (
     <div className="space-y-4">
-      <div className="flex p-1 bg-muted rounded-xl gap-1">
+      {/* Top Controls: Filter Pills & Download Price Variance Report */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
+        <div className="flex p-1 bg-muted rounded-xl gap-1 flex-1">
+          <button
+            type="button"
+            onClick={() => setFilter('pending')}
+            className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 ${filter === 'pending' ? 'bg-background shadow text-[#2648E7]' : 'text-muted-foreground hover:text-foreground'}`}
+          >
+            <span>Active Orders</span>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${filter === 'pending' ? 'bg-[#2648E7]/10 text-[#2648E7]' : 'bg-muted-foreground/20'}`}>
+              {pendingOrders.length}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilter('delivered')}
+            className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 ${filter === 'delivered' ? 'bg-background shadow text-emerald-700' : 'text-muted-foreground hover:text-foreground'}`}
+          >
+            <span>Delivered / Received</span>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${filter === 'delivered' ? 'bg-emerald-100 text-emerald-800' : 'bg-muted-foreground/20'}`}>
+              {deliveredOrders.length}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilter('all')}
+            className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 ${filter === 'all' ? 'bg-background shadow text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+          >
+            <span>All</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted-foreground/20">
+              {orders.length}
+            </span>
+          </button>
+        </div>
+
+        {/* Download Price Variance Report Button */}
         <button
           type="button"
-          onClick={() => setFilter('pending')}
-          className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 ${filter === 'pending' ? 'bg-background shadow text-[#2648E7]' : 'text-muted-foreground hover:text-foreground'}`}
+          onClick={() => handleDownloadPriceVariancePDF(orders, projectName)}
+          className="flex items-center justify-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl bg-white border border-border hover:bg-slate-50 text-foreground transition-all shadow-2xs shrink-0"
+          title="Download Quoted Price vs Final Bought Price Variance Report"
         >
-          <span>Active Orders</span>
-          <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${filter === 'pending' ? 'bg-[#2648E7]/10 text-[#2648E7]' : 'bg-muted-foreground/20'}`}>
-            {pendingOrders.length}
-          </span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setFilter('delivered')}
-          className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 ${filter === 'delivered' ? 'bg-background shadow text-emerald-700' : 'text-muted-foreground hover:text-foreground'}`}
-        >
-          <span>Delivered / Received</span>
-          <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${filter === 'delivered' ? 'bg-emerald-100 text-emerald-800' : 'bg-muted-foreground/20'}`}>
-            {deliveredOrders.length}
-          </span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setFilter('all')}
-          className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 ${filter === 'all' ? 'bg-background shadow text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-        >
-          <span>All</span>
-          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted-foreground/20">
-            {orders.length}
-          </span>
+          <Download size={13} className="text-[#2648E7]" />
+          <span>Price Variance PDF Report</span>
+          {totalSavings > 0 && (
+            <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-emerald-100 text-emerald-800 font-bold">
+              Saved ₹{totalSavings.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+            </span>
+          )}
         </button>
       </div>
 
@@ -503,29 +823,74 @@ function OrdersTab({
         <div className="space-y-3">
           {displayedOrders.map((o) => {
             const isDelivered = o.status === "DELIVERED" || (o.items && o.items.length > 0 && o.items.every(i => (i.pendingQty ?? 0) <= 0));
+            const isApproved = o.status === "APPROVED";
+
             return (
               <Card key={o.id} className="p-4">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1 min-w-0 pr-3">
-                    <p className="font-bold text-foreground">{o.name}</p>
-                    <p className="text-sm text-muted-foreground">{o.vendor}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-bold text-foreground">{o.name}</p>
+                      {o.poNumber && (
+                        <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                          {o.poNumber}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-0.5">{o.vendor}</p>
                   </div>
                   <div className="text-right shrink-0">
                     <p className="font-bold text-foreground">{o.amount}</p>
-                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${isDelivered ? "bg-emerald-50 text-emerald-700" : "bg-blue-50 text-[#2648E7]"}`}>
-                      {isDelivered ? "DELIVERED" : o.status}
-                    </span>
+                    <div className="flex items-center justify-end gap-1 mt-1">
+                      {isDelivered ? (
+                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          DELIVERED
+                        </span>
+                      ) : isApproved ? (
+                        <span 
+                          className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300 flex items-center gap-1"
+                          title="Approved purchase orders are legally locked against tampering"
+                        >
+                          🔒 APPROVED · LOCKED
+                        </span>
+                      ) : (
+                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-[#2648E7]">
+                          {o.status}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 
+                {/* Items & Price Variance Breakdown */}
                 {o.items && o.items.length > 0 && (
-                  <div className="mb-3 p-2.5 bg-muted/40 rounded-xl space-y-1.5 border border-border/50">
+                  <div className="mb-3 p-3 bg-muted/40 rounded-xl space-y-2 border border-border/50">
                     {o.items.map((it, idx) => {
                       const itReceived = (it.receivedQty || 0) >= it.orderedQty || (it.pendingQty !== undefined && it.pendingQty <= 0);
+                      const hasVariance = it.quotedPrice && it.unitPrice && it.quotedPrice !== it.unitPrice;
+                      const isSaved = hasVariance && (it.unitPrice || 0) < (it.quotedPrice || 0);
+
                       return (
-                        <div key={idx} className="flex items-center justify-between text-xs">
-                          <span className="font-medium text-foreground">{it.materialName}</span>
-                          <span className={`font-bold text-[11px] px-2 py-0.5 rounded-md ${itReceived ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
+                        <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between text-xs gap-1.5 py-1 border-b border-border/40 last:border-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-semibold text-foreground">{it.materialName}</span>
+                            <span className="text-muted-foreground font-medium">({it.orderedQty} {it.unit})</span>
+                            
+                            {/* Price Quoted vs Bought Variance Indicator */}
+                            {it.quotedPrice ? (
+                              <span className="text-[10px] text-muted-foreground bg-white px-2 py-0.5 rounded-md border border-border/60">
+                                Quoted: ₹{it.quotedPrice} → Final: ₹{it.unitPrice}
+                              </span>
+                            ) : null}
+
+                            {hasVariance && (
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${isSaved ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
+                                {isSaved ? `Negotiated Saving: -₹${((it.quotedPrice! - it.unitPrice!) * it.orderedQty).toLocaleString('en-IN')}` : `+₹${((it.unitPrice! - it.quotedPrice!) * it.orderedQty).toLocaleString('en-IN')} Price Variance`}
+                              </span>
+                            )}
+                          </div>
+
+                          <span className={`font-bold text-[11px] px-2 py-0.5 rounded-md self-start sm:self-center shrink-0 ${itReceived ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
                             {itReceived ? `✓ Received (${it.receivedQty} ${it.unit})` : `Pending: ${it.pendingQty ?? it.orderedQty} ${it.unit}`}
                           </span>
                         </div>
@@ -777,7 +1142,7 @@ function PurchaseModals({
   onRefresh: () => void; 
   projectId: string; 
   data: PurchaseSummaryResponse | null;
-  orderPrefill?: { materialName: string; quantity: number } | null;
+  orderPrefill?: any;
   initialPoId?: string | null;
 }) {
   const [loading, setLoading] = useState(false);
@@ -895,19 +1260,25 @@ function PurchaseModals({
     if (activeModal === 'orders' && orderPrefill) {
       const matchingBoq = data?.boq_items?.find(b => b.name === orderPrefill.materialName);
       setFormData({
+        vendorId: orderPrefill.vendorId || '',
+        quotationId: orderPrefill.quotationId || '',
+        requestId: orderPrefill.requestId || '',
+        orderMode: orderPrefill.quotationId ? 'quotation' : 'direct',
         items: [{
-          materialName: orderPrefill.materialName,
-          quantity: orderPrefill.quantity,
-          unit: matchingBoq?.unit || 'bags',
-          rate: matchingBoq?.rate || '',
-          plannedRem: matchingBoq ? Math.max(0, matchingBoq.planned - matchingBoq.used) : undefined
+          materialName: orderPrefill.materialName || '',
+          quantity: orderPrefill.quantity || '',
+          unit: orderPrefill.unit || matchingBoq?.unit || 'bags',
+          rate: orderPrefill.quotedRate || matchingBoq?.rate || '',
+          quotedRate: orderPrefill.quotedRate || undefined,
+          plannedRem: matchingBoq ? Math.max(0, matchingBoq.planned - matchingBoq.used) : undefined,
+          boqItem: matchingBoq || null
         }]
       });
       return;
     }
 
     if (['quotations', 'orders'].includes(activeModal)) {
-      setFormData({ items: [{}] });
+      setFormData({ orderMode: 'direct', items: [{}] });
       return;
     }
 
@@ -957,9 +1328,19 @@ function PurchaseModals({
   };
 
   const handleItemChange = (index: number, field: string, value: any) => {
-    const newItems = [...(formData.items || [])];
-    newItems[index] = { ...newItems[index], [field]: value };
-    setFormData({ ...formData, items: newItems });
+    setFormData((prev: any) => {
+      const newItems = [...(prev.items || [])];
+      newItems[index] = { ...newItems[index], [field]: value };
+      return { ...prev, items: newItems };
+    });
+  };
+
+  const updateItemRow = (index: number, updates: Record<string, any>) => {
+    setFormData((prev: any) => {
+      const newItems = [...(prev.items || [])];
+      newItems[index] = { ...newItems[index], ...updates };
+      return { ...prev, items: newItems };
+    });
   };
 
   const getAvailableStock = (item: any): number => {
@@ -978,10 +1359,10 @@ function PurchaseModals({
     const existingItems = formData.items || [];
     
     if (!quantity || isNaN(qty) || qty <= 0) {
-      setFormData({
-        ...formData,
-        items: existingItems.filter((i: any) => (i.inventoryItemId ? i.inventoryItemId !== inventoryItemId : i.materialName !== materialName))
-      });
+      setFormData((prev: any) => ({
+        ...prev,
+        items: (prev.items || []).filter((i: any) => (i.inventoryItemId ? i.inventoryItemId !== inventoryItemId : i.materialName !== materialName))
+      }));
       return;
     }
 
@@ -993,34 +1374,39 @@ function PurchaseModals({
 
     const cappedQty = Math.min(qty, Math.max(0, maxStock));
     if (cappedQty <= 0) {
-      setFormData({
-        ...formData,
-        items: existingItems.filter((i: any) => (i.inventoryItemId ? i.inventoryItemId !== inventoryItemId : i.materialName !== materialName))
-      });
+      setFormData((prev: any) => ({
+        ...prev,
+        items: (prev.items || []).filter((i: any) => (i.inventoryItemId ? i.inventoryItemId !== inventoryItemId : i.materialName !== materialName))
+      }));
       return;
     }
 
-    const idx = existingItems.findIndex((i: any) => (i.inventoryItemId ? i.inventoryItemId === inventoryItemId : i.materialName === materialName));
-    if (idx >= 0) {
-      const newItems = [...existingItems];
-      newItems[idx].quantity = cappedQty;
-      newItems[idx].inventoryItemId = inventoryItemId;
-      newItems[idx].materialName = materialName;
-      setFormData({ ...formData, items: newItems });
-    } else {
-      setFormData({ ...formData, items: [...existingItems, { inventoryItemId, materialName, quantity: cappedQty }] });
-    }
+    setFormData((prev: any) => {
+      const itemsList = [...(prev.items || [])];
+      const idx = itemsList.findIndex((i: any) => (i.inventoryItemId ? i.inventoryItemId === inventoryItemId : i.materialName === materialName));
+      if (idx >= 0) {
+        itemsList[idx] = { ...itemsList[idx], quantity: cappedQty, inventoryItemId, materialName };
+      } else {
+        itemsList.push({ inventoryItemId, materialName, quantity: cappedQty });
+      }
+      return { ...prev, items: itemsList };
+    });
   };
 
   const addItemRow = () => {
-    setFormData({ ...formData, items: [...(formData.items || []), {}] });
+    setFormData((prev: any) => ({
+      ...prev,
+      items: [...(prev.items || []), {}]
+    }));
   };
 
   const removeItemRow = (index: number) => {
-    const newItems = [...(formData.items || [])];
-    if (newItems.length === 1) return; // Keep at least one
-    newItems.splice(index, 1);
-    setFormData({ ...formData, items: newItems });
+    setFormData((prev: any) => {
+      const newItems = [...(prev.items || [])];
+      if (newItems.length === 1) return prev; // Keep at least one
+      newItems.splice(index, 1);
+      return { ...prev, items: newItems };
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -1086,8 +1472,11 @@ function PurchaseModals({
           quantity: cleanNumeric(it.quantity),
           unit: normalizeUnit(it.unit || 'nos'),
           rate: cleanNumeric(it.rate),
+          quotedRate: it.quotedRate ? cleanNumeric(it.quotedRate) : (cleanNumeric(it.rate) || 0),
           varianceReason: it.varianceReason || undefined
         }));
+        if (formData.quotationId) payload.quotationId = formData.quotationId;
+        if (formData.requestId) payload.requestId = formData.requestId;
 
         // Auto-register any custom items into Quantity of Materials baseline
         for (const it of (formData.items || [])) {
@@ -1494,6 +1883,87 @@ function PurchaseModals({
 
             {(activeModal === 'quotations' || activeModal === 'orders') && (
               <>
+                {/* Mode Selector for Orders: Direct PO vs From Quotation */}
+                {activeModal === 'orders' && (
+                  <div className="p-3 bg-muted/40 border border-border rounded-2xl space-y-2">
+                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block">
+                      Order Source
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setFormData((prev: any) => ({ ...prev, orderMode: 'direct', quotationId: '' }))}
+                        className={`py-2 px-3 text-xs font-bold rounded-xl border transition-all ${
+                          formData.orderMode !== 'quotation'
+                            ? 'bg-[#2648E7] text-white border-[#2648E7] shadow-sm'
+                            : 'bg-white text-muted-foreground border-border hover:bg-muted/50'
+                        }`}
+                      >
+                        Direct Purchase Order
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFormData((prev: any) => ({ ...prev, orderMode: 'quotation' }))}
+                        className={`py-2 px-3 text-xs font-bold rounded-xl border transition-all flex items-center justify-center gap-1.5 ${
+                          formData.orderMode === 'quotation'
+                            ? 'bg-[#2648E7] text-white border-[#2648E7] shadow-sm'
+                            : 'bg-white text-muted-foreground border-border hover:bg-muted/50'
+                        }`}
+                      >
+                        <FileText size={13} />
+                        From Vendor Quotation {data?.quotations?.length ? `(${data.quotations.length})` : ''}
+                      </button>
+                    </div>
+
+                    {formData.orderMode === 'quotation' && (
+                      <div className="pt-2 animate-in fade-in">
+                        <label className="text-xs font-bold text-foreground block mb-1">
+                          Select Received Quotation
+                        </label>
+                        {(!data?.quotations || data.quotations.length === 0) ? (
+                          <p className="text-xs text-amber-700 bg-amber-50 p-2.5 rounded-xl border border-amber-200">
+                            No vendor quotations available yet. You can place a Direct PO or record a quote in the Quotations tab first.
+                          </p>
+                        ) : (
+                          <select
+                            className="w-full bg-white border border-border rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:border-[#2648E7] text-gray-900"
+                            value={formData.quotationId || ''}
+                            onChange={(e) => {
+                              const qId = e.target.value;
+                              const chosenQuote = data.quotations?.find(q => q.id === qId);
+                              if (chosenQuote) {
+                                const matchingVendor = data?.vendors?.find(v => v.name.toLowerCase() === chosenQuote.vendor.toLowerCase());
+                                const matchingBoq = data?.boq_items?.find(b => b.name.toLowerCase() === chosenQuote.material.toLowerCase());
+                                setFormData((prev: any) => ({
+                                  ...prev,
+                                  quotationId: qId,
+                                  vendorId: matchingVendor ? matchingVendor.id : (chosenQuote.vendorId || prev.vendorId),
+                                  items: [{
+                                    materialName: chosenQuote.material,
+                                    quantity: chosenQuote.quantity || 1,
+                                    unit: matchingBoq?.unit || 'nos',
+                                    quotedRate: chosenQuote.numericRate || 0,
+                                    rate: chosenQuote.numericRate || 0,
+                                    plannedRem: matchingBoq ? Math.max(0, matchingBoq.planned - matchingBoq.used) : undefined,
+                                    boqItem: matchingBoq || null
+                                  }]
+                                }));
+                              }
+                            }}
+                          >
+                            <option value="">-- Choose a Vendor Quotation --</option>
+                            {data.quotations.map(q => (
+                              <option key={q.id} value={q.id}>
+                                {q.vendor} — {q.material} ({q.rate}) · {q.status}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div className="space-y-1.5">
                   <label className="text-sm font-bold text-foreground">Vendor</label>
                   <select required className="w-full bg-white border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900" value={formData.vendorId || ''} onChange={e => setFormData({ ...formData, vendorId: e.target.value })}>
@@ -1536,29 +2006,34 @@ function PurchaseModals({
                             categories={data?.boq_categories || []}
                             onSelect={(selected, custom) => {
                               if (custom) {
-                                handleItemChange(idx, 'isCustom', true);
-                                handleItemChange(idx, 'materialName', selected?.name || '');
-                                handleItemChange(idx, 'unit', selected?.unit || 'nos');
-                                handleItemChange(idx, 'plannedRem', undefined);
-                                handleItemChange(idx, 'boqItem', null);
-                                handleItemChange(idx, 'varianceReason', '');
+                                updateItemRow(idx, {
+                                  isCustom: true,
+                                  materialName: selected?.name || '',
+                                  unit: selected?.unit || 'nos',
+                                  plannedRem: undefined,
+                                  boqItem: null,
+                                  varianceReason: ''
+                                });
                               } else if (selected) {
-                                handleItemChange(idx, 'isCustom', false);
-                                handleItemChange(idx, 'materialName', selected.name);
-                                handleItemChange(idx, 'unit', selected.unit || 'nos');
-                                if (selected.rate && selected.rate > 0) {
-                                  handleItemChange(idx, 'rate', selected.rate);
-                                }
                                 const rem = Math.max(0, (selected.planned || 0) - (selected.used || 0));
-                                handleItemChange(idx, 'plannedRem', rem);
                                 const found = data?.boq_items?.find(b => b.name === selected.name) || null;
-                                handleItemChange(idx, 'boqItem', found);
-                                handleItemChange(idx, 'varianceReason', '');
+                                updateItemRow(idx, {
+                                  isCustom: false,
+                                  materialName: selected.name,
+                                  unit: selected.unit || 'nos',
+                                  rate: (selected.rate && selected.rate > 0) ? selected.rate : (item.rate || ''),
+                                  plannedRem: rem,
+                                  boqItem: found,
+                                  varianceReason: ''
+                                });
                               } else {
-                                handleItemChange(idx, 'isCustom', false);
-                                handleItemChange(idx, 'materialName', '');
-                                handleItemChange(idx, 'boqItem', null);
-                                handleItemChange(idx, 'varianceReason', '');
+                                updateItemRow(idx, {
+                                  isCustom: false,
+                                  materialName: '',
+                                  unit: 'nos',
+                                  boqItem: null,
+                                  varianceReason: ''
+                                });
                               }
                             }}
                             placeholder="-- Search or pick item --"
@@ -1574,10 +2049,10 @@ function PurchaseModals({
                                 value={item.materialName || ''}
                                 onChange={e => {
                                   const val = e.target.value;
-                                  handleItemChange(idx, 'materialName', val);
-                                  if (!item.userOverrodeCategory) {
-                                    handleItemChange(idx, 'customCategory', detectDiscipline(val));
-                                  }
+                                  updateItemRow(idx, {
+                                    materialName: val,
+                                    customCategory: item.userOverrodeCategory ? item.customCategory : detectDiscipline(val)
+                                  });
                                 }}
                               />
                               <div className="grid grid-cols-2 gap-2">
@@ -1586,8 +2061,10 @@ function PurchaseModals({
                                   <select
                                     value={item.customCategory || detectDiscipline(item.materialName || '')}
                                     onChange={e => {
-                                      handleItemChange(idx, 'customCategory', e.target.value);
-                                      handleItemChange(idx, 'userOverrodeCategory', true);
+                                      updateItemRow(idx, {
+                                        customCategory: e.target.value,
+                                        userOverrodeCategory: true
+                                      });
                                     }}
                                     className="w-full bg-white border border-border rounded-lg px-2.5 py-1.5 text-xs text-gray-900 font-medium focus:outline-none focus:border-[#2648E7]"
                                   >
@@ -1601,7 +2078,7 @@ function PurchaseModals({
                                     <input
                                       type="checkbox"
                                       checked={item.addToBoq !== false}
-                                      onChange={e => handleItemChange(idx, 'addToBoq', e.target.checked)}
+                                      onChange={e => updateItemRow(idx, { addToBoq: e.target.checked })}
                                       className="rounded text-[#2648E7] size-3.5"
                                     />
                                     <span>Auto-register to QOM</span>
@@ -1612,35 +2089,110 @@ function PurchaseModals({
                           )}
                         </div>
 
-                        <div className="grid grid-cols-3 gap-3">
-                          <div>
-                            <label className="text-[11px] font-bold text-muted-foreground mb-1 block">Quantity</label>
-                            <input required type="number" min="0.01" step="any" className="w-full bg-white border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900 font-bold" placeholder="0" value={item.quantity || ''} onChange={e => handleItemChange(idx, 'quantity', e.target.value)} />
+                        {activeModal === 'orders' ? (
+                          <div className="space-y-2">
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label className="text-[11px] font-bold text-muted-foreground mb-1 block">Quantity</label>
+                                <input required type="number" min="0.01" step="any" className="w-full bg-white border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900 font-bold" placeholder="0" value={item.quantity || ''} onChange={e => handleItemChange(idx, 'quantity', e.target.value)} />
+                              </div>
+                              <div>
+                                <label className="text-[11px] font-bold text-muted-foreground mb-1 block">Unit</label>
+                                <select required className="w-full bg-white border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900 font-medium" value={item.unit || ''} onChange={e => handleItemChange(idx, 'unit', e.target.value)}>
+                                  <option value="" disabled>Unit</option>
+                                  <option value="kg">kg</option>
+                                  <option value="bags">bags</option>
+                                  <option value="cum">cum</option>
+                                  <option value="cft">cft</option>
+                                  <option value="Tonnes">Tonnes</option>
+                                  <option value="Running meter">Running meter</option>
+                                  <option value="m">m</option>
+                                  <option value="nos">nos/pieces</option>
+                                  <option value="sqft">sqft</option>
+                                  <option value="sqm">sqm</option>
+                                  <option value="Ltr">Ltr</option>
+                                  <option value="set">set</option>
+                                  <option value="lumpsum">lumpsum</option>
+                                </select>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label className="text-[11px] font-bold text-muted-foreground mb-1 block">Quoted Rate (₹) [Optional]</label>
+                                <input type="number" min="0" step="any" className="w-full bg-slate-50 border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#2648E7] text-gray-700 font-medium" placeholder="e.g. 350" value={item.quotedRate !== undefined ? item.quotedRate : ''} onChange={e => handleItemChange(idx, 'quotedRate', e.target.value)} />
+                              </div>
+                              <div>
+                                <label className="text-[11px] font-bold text-[#2648E7] mb-1 block">Final Bought Rate (₹) *</label>
+                                <input required type="number" min="0" step="any" className="w-full bg-white border-2 border-blue-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900 font-bold" placeholder="0" value={item.rate || ''} onChange={e => handleItemChange(idx, 'rate', e.target.value)} />
+                              </div>
+                            </div>
+
+                            {/* Live Price Variance Savings / Difference Display */}
+                            {item.quotedRate !== undefined && item.quotedRate !== '' && item.rate !== undefined && item.rate !== '' && (
+                              (() => {
+                                const qRate = Number(item.quotedRate) || 0;
+                                const bRate = Number(item.rate) || 0;
+                                const qty = Number(item.quantity) || 1;
+                                const diff = bRate - qRate;
+                                const totalSaved = Math.abs(diff) * qty;
+
+                                if (qRate <= 0) return null;
+                                return (
+                                  <div className={`p-2 rounded-xl text-xs flex items-center justify-between font-semibold border ${
+                                    diff < 0
+                                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                      : diff > 0
+                                      ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                      : 'bg-blue-50 text-blue-800 border-blue-200'
+                                  }`}>
+                                    <span>
+                                      {diff < 0 
+                                        ? `🎉 Negotiated Savings: ₹${Math.abs(diff).toLocaleString()}/${item.unit || 'unit'} below quote` 
+                                        : diff > 0 
+                                        ? `⚠️ Price Increase: +₹${diff.toLocaleString()}/${item.unit || 'unit'} above quote` 
+                                        : `⚡ Exactly matches vendor quotation`}
+                                    </span>
+                                    {diff !== 0 && (
+                                      <span className="font-bold">
+                                        Total {diff < 0 ? 'Saved' : 'Cost'}: ₹{totalSaved.toLocaleString()}
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })()
+                            )}
                           </div>
-                          <div>
-                            <label className="text-[11px] font-bold text-muted-foreground mb-1 block">Unit</label>
-                            <select required className="w-full bg-white border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900 font-medium" value={item.unit || ''} onChange={e => handleItemChange(idx, 'unit', e.target.value)}>
-                              <option value="" disabled>Unit</option>
-                              <option value="kg">kg</option>
-                              <option value="bags">bags</option>
-                              <option value="cum">cum</option>
-                              <option value="cft">cft</option>
-                              <option value="Tonnes">Tonnes</option>
-                              <option value="Running meter">Running meter</option>
-                              <option value="m">m</option>
-                              <option value="nos">nos/pieces</option>
-                              <option value="sqft">sqft</option>
-                              <option value="sqm">sqm</option>
-                              <option value="Ltr">Ltr</option>
-                              <option value="set">set</option>
-                              <option value="lumpsum">lumpsum</option>
-                            </select>
+                        ) : (
+                          <div className="grid grid-cols-3 gap-3">
+                            <div>
+                              <label className="text-[11px] font-bold text-muted-foreground mb-1 block">Quantity</label>
+                              <input required type="number" min="0.01" step="any" className="w-full bg-white border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900 font-bold" placeholder="0" value={item.quantity || ''} onChange={e => handleItemChange(idx, 'quantity', e.target.value)} />
+                            </div>
+                            <div>
+                              <label className="text-[11px] font-bold text-muted-foreground mb-1 block">Unit</label>
+                              <select required className="w-full bg-white border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900 font-medium" value={item.unit || ''} onChange={e => handleItemChange(idx, 'unit', e.target.value)}>
+                                <option value="" disabled>Unit</option>
+                                <option value="kg">kg</option>
+                                <option value="bags">bags</option>
+                                <option value="cum">cum</option>
+                                <option value="cft">cft</option>
+                                <option value="Tonnes">Tonnes</option>
+                                <option value="Running meter">Running meter</option>
+                                <option value="m">m</option>
+                                <option value="nos">nos/pieces</option>
+                                <option value="sqft">sqft</option>
+                                <option value="sqm">sqm</option>
+                                <option value="Ltr">Ltr</option>
+                                <option value="set">set</option>
+                                <option value="lumpsum">lumpsum</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="text-[11px] font-bold text-muted-foreground mb-1 block">Quoted Rate (₹)</label>
+                              <input required type="number" min="0" step="any" className="w-full bg-white border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900 font-bold" placeholder="0" value={item.rate || ''} onChange={e => handleItemChange(idx, 'rate', e.target.value)} />
+                            </div>
                           </div>
-                          <div>
-                            <label className="text-[11px] font-bold text-muted-foreground mb-1 block">Rate (₹)</label>
-                            <input required type="number" min="0" step="any" className="w-full bg-white border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900 font-bold" placeholder="0" value={item.rate || ''} onChange={e => handleItemChange(idx, 'rate', e.target.value)} />
-                          </div>
-                        </div>
+                        )}
 
                         {/* Real-time Cost Intelligence Card for this line item */}
                         {(() => {

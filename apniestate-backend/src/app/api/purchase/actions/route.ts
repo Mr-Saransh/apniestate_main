@@ -354,7 +354,7 @@ export const POST = withAuth(async (request: Request, user: any) => {
     }
 
     if (action === 'CREATE_PO') {
-      const { projectId, vendorId, eta, items } = payload;
+      const { projectId, vendorId, eta, items, requestId, quotationId, notes } = payload;
       let site = await prisma.site.findFirst({ where: { project_id: projectId } });
       if (!site) {
         site = await prisma.site.create({
@@ -364,6 +364,8 @@ export const POST = withAuth(async (request: Request, user: any) => {
       
       let totalAmount = 0;
       const poItemsData = [];
+      const priceVariances = [];
+
       for (const item of items) {
         if (!item.materialName) continue;
         let material = await prisma.material.findFirst({ where: { name: item.materialName } });
@@ -374,13 +376,24 @@ export const POST = withAuth(async (request: Request, user: any) => {
         }
         const parsedQty = Number(item.quantity) || 1;
         const parsedRate = Number(item.rate) || 0;
+        const quotedRate = Number(item.quotedRate) !== undefined && !isNaN(Number(item.quotedRate)) ? Number(item.quotedRate) : parsedRate;
         const total = parsedQty * parsedRate;
         totalAmount += total;
+
         poItemsData.push({
           material_id: material.id,
           quantity: parsedQty,
           unit_price: parsedRate,
           total: total
+        });
+
+        priceVariances.push({
+          materialName: item.materialName,
+          materialId: material.id,
+          quotedRate: quotedRate,
+          boughtRate: parsedRate,
+          quantity: parsedQty,
+          varianceAmount: (parsedRate - quotedRate) * parsedQty
         });
       }
 
@@ -389,6 +402,15 @@ export const POST = withAuth(async (request: Request, user: any) => {
       }
 
       const poNumber = `PO-${Math.floor(Math.random() * 100000)}`;
+
+      // Serialized metadata to store quotation and price variance tracking
+      const poMeta = JSON.stringify({
+        userNotes: notes || '',
+        quotationId: quotationId || null,
+        requestId: requestId || null,
+        priceVariances
+      });
+
       const po = await prisma.purchaseOrder.create({
         data: {
           po_number: poNumber,
@@ -400,11 +422,88 @@ export const POST = withAuth(async (request: Request, user: any) => {
           total_amount: totalAmount,
           company_id: user.company_id,
           delivery_date: eta ? new Date(eta) : null,
+          notes: poMeta,
           items: {
             create: poItemsData
           }
         }
       });
+
+      // 1. Update QoM (Quantity of Materials) used_quantity baseline for each ordered item
+      try {
+        for (const item of items) {
+          if (!item.materialName) continue;
+          const parsedQty = Number(item.quantity) || 0;
+          if (parsedQty <= 0) continue;
+
+          const boqItems = await prisma.bOQItem.findMany({
+            where: {
+              OR: [
+                { description: { equals: item.materialName.trim(), mode: 'insensitive' } },
+                { code: item.materialName.trim() }
+              ],
+              category: { boq: { project_id: projectId } }
+            }
+          });
+
+          if (boqItems.length > 0) {
+            await prisma.bOQItem.update({
+              where: { id: boqItems[0].id },
+              data: { used_quantity: { increment: parsedQty } }
+            });
+          }
+        }
+      } catch (boqErr) {
+        console.error("Auto BOQ used_quantity increment error:", boqErr);
+      }
+
+      // 2. Lock Material Requirement (Indent) so it cannot be ordered again
+      try {
+        if (requestId) {
+          await prisma.materialRequest.update({
+            where: { id: requestId },
+            data: {
+              status: 'ORDERED',
+              notes: `Order placed via PO ${poNumber}`
+            }
+          });
+        } else {
+          // If no explicit requestId was passed, check if there are approved requirements for these materials in this project
+          for (const item of items) {
+            if (!item.materialName) continue;
+            const matchingReq = await prisma.materialRequest.findFirst({
+              where: {
+                site_id: site.id,
+                status: 'APPROVED',
+                material: { name: { equals: item.materialName.trim(), mode: 'insensitive' } }
+              }
+            });
+            if (matchingReq) {
+              await prisma.materialRequest.update({
+                where: { id: matchingReq.id },
+                data: {
+                  status: 'ORDERED',
+                  notes: `Auto-linked and locked via PO ${poNumber}`
+                }
+              });
+            }
+          }
+        }
+      } catch (reqErr) {
+        console.error("Auto requirement status update error:", reqErr);
+      }
+
+      // 3. If ordered from a Quotation, mark that Quotation as ACCEPTED
+      try {
+        if (quotationId) {
+          await prisma.quotation.update({
+            where: { id: quotationId },
+            data: { status: 'ACCEPTED' }
+          });
+        }
+      } catch (qErr) {
+        console.error("Auto quotation accept error:", qErr);
+      }
 
       // Automatically add as Due in Finance
       try {
@@ -435,6 +534,25 @@ export const POST = withAuth(async (request: Request, user: any) => {
       }
 
       return NextResponse.json({ success: true, po });
+    }
+
+    if (action === 'UPDATE_PO_STATUS') {
+      const { poId, status } = payload;
+      const existingPo = await prisma.purchaseOrder.findUnique({ where: { id: poId } });
+      if (!existingPo) return NextResponse.json({ error: 'Purchase order not found' }, { status: 404 });
+
+      // Enforce immutability: approved orders cannot be arbitrarily edited
+      if (['APPROVED', 'DELIVERED', 'PARTIAL'].includes(existingPo.status) && status === 'DRAFT') {
+        return NextResponse.json({
+          error: `Purchase order ${existingPo.po_number} is already APPROVED and locked against modification.`
+        }, { status: 400 });
+      }
+
+      const updated = await prisma.purchaseOrder.update({
+        where: { id: poId },
+        data: { status }
+      });
+      return NextResponse.json({ success: true, po: updated });
     }
 
     if (action === 'RECEIVE_GOODS') {

@@ -6,6 +6,9 @@ export interface BOQItemSummary {
   unit: string;
   planned: number;
   used: number;
+  ordered?: number;
+  received?: number;
+  remaining?: number;
   rate?: number;
   amount?: number;
   category?: string;
@@ -24,7 +27,11 @@ export interface MaterialRequestSummary {
   name: string;
   stage: string;
   qty: string;
+  quantity?: number;
+  unit?: string;
   date: string;
+  priority?: string;
+  notes?: string | null;
 }
 
 export interface OrderItemSummary {
@@ -36,17 +43,25 @@ export interface OrderItemSummary {
   receivedQty: number;
   pendingQty: number;
   unitPrice?: number;
+  quotedPrice?: number;
+  priceVariance?: number;
 }
 
 export interface OrderSummary {
   id: string;
+  poNumber?: string;
   name: string;
   vendor: string;
   amount: string;
+  numericAmount?: number;
   status: string;
   date: string;
   eta: string;
   items?: OrderItemSummary[];
+  quotationId?: string | null;
+  totalQuotedAmount?: number;
+  totalNegotiatedSavings?: number;
+  notes?: string;
 }
 
 export interface VendorSummary {
@@ -71,11 +86,26 @@ export interface ReceivedSummary {
 
 export interface QuotationSummary {
   id: string;
+  vendorId?: string;
   vendor: string;
+  vendorPhone?: string;
   material: string;
   rate: string;
+  numericRate?: number;
+  quantity?: number;
+  unit?: string;
   total: string;
+  numericTotal?: number;
+  deliveryTime?: string;
   status: string;
+  date?: string;
+  items?: {
+    materialId?: string;
+    materialName: string;
+    quantity: number;
+    rate: number;
+    unit?: string;
+  }[];
 }
 
 export interface InventorySummary {
@@ -111,3 +141,4 @@ export const purchaseApi = {
   getSummary: (projectId: string) => api.get<PurchaseSummaryResponse>(`/purchase/summary?project_id=${projectId}`),
   performAction: (action: string, payload: any) => api.post<{success: boolean}>(`/purchase/actions`, { action, payload }),
 };
+

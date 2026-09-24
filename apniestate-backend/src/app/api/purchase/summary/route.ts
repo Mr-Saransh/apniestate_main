@@ -34,49 +34,101 @@ export const GET = withAuth(async (request: Request, user: any) => {
       take: 1
     });
 
+    // We need to find sites for this project
+    const sites = await prisma.site.findMany({ where: { project_id: projectId }, select: { id: true } });
+    const siteIds = sites.map(s => s.id);
+
+    // Purchase Orders (Orders Tab)
+    const orders = await prisma.purchaseOrder.findMany({
+      where: { OR: [{ project_id: projectId }, { site_id: { in: siteIds } }] },
+      include: { vendor: true, items: { include: { material: true } } },
+      orderBy: { created_at: 'desc' },
+    });
+
+    // Calculate project-wide cumulative ordered and received quantities per material
+    const materialOrderedMap = new Map<string, number>();
+    const materialReceivedMap = new Map<string, number>();
+
+    orders.forEach(o => {
+      if (o.status === 'CANCELLED') return;
+      o.items.forEach(i => {
+        const matName = (i.material?.name || '').trim().toLowerCase();
+        const matId = i.material_id;
+        const qty = Number(i.quantity) || 0;
+        const recQty = Number(i.received_quantity) || 0;
+
+        if (matName) {
+          materialOrderedMap.set(matName, (materialOrderedMap.get(matName) || 0) + qty);
+          materialReceivedMap.set(matName, (materialReceivedMap.get(matName) || 0) + recQty);
+        }
+        if (matId) {
+          materialOrderedMap.set(matId, (materialOrderedMap.get(matId) || 0) + qty);
+          materialReceivedMap.set(matId, (materialReceivedMap.get(matId) || 0) + recQty);
+        }
+      });
+    });
+
     const boqCategories = boqs.length > 0
       ? boqs[0].categories.map(c => ({
           id: c.id,
           name: c.name,
-          items: c.items.map(i => ({
-            id: i.id,
-            name: i.material?.name || i.description,
-            unit: i.unit,
-            planned: i.quantity,
-            used: i.used_quantity,
-            rate: i.total_rate || i.material_rate || 0,
-            amount: i.total_amount || ((i.quantity || 0) * (i.total_rate || i.material_rate || 0)),
-            remarks: i.remarks || null,
-            code: i.code || null,
-            category: c.name
-          }))
+          items: c.items.map(i => {
+            const matName = (i.material?.name || i.description || '').trim().toLowerCase();
+            const ordQty = materialOrderedMap.get(matName) || (i.material_id ? materialOrderedMap.get(i.material_id) : 0) || 0;
+            const recQty = materialReceivedMap.get(matName) || (i.material_id ? materialReceivedMap.get(i.material_id) : 0) || 0;
+            const effectiveUsed = Math.max(Number(i.used_quantity) || 0, ordQty);
+            const remaining = Math.max(0, (i.quantity || 0) - effectiveUsed);
+
+            return {
+              id: i.id,
+              name: i.material?.name || i.description,
+              unit: i.unit,
+              planned: i.quantity,
+              used: effectiveUsed,
+              ordered: ordQty,
+              received: recQty,
+              remaining: remaining,
+              rate: i.total_rate || i.material_rate || 0,
+              amount: i.total_amount || ((i.quantity || 0) * (i.total_rate || i.material_rate || 0)),
+              remarks: i.remarks || null,
+              code: i.code || null,
+              category: c.name
+            };
+          })
         }))
       : [];
 
     const boqItems = boqs.length > 0 
       ? boqs[0].categories.flatMap(c => 
-          c.items.map(i => ({
-            id: i.id,
-            name: i.material?.name || i.description,
-            unit: i.unit,
-            planned: i.quantity,
-            used: i.used_quantity,
-            rate: i.total_rate || i.material_rate || 0,
-            amount: i.total_amount || ((i.quantity || 0) * (i.total_rate || i.material_rate || 0)),
-            remarks: i.remarks || null,
-            code: i.code || null,
-            category: c.name
-          }))
+          c.items.map(i => {
+            const matName = (i.material?.name || i.description || '').trim().toLowerCase();
+            const ordQty = materialOrderedMap.get(matName) || (i.material_id ? materialOrderedMap.get(i.material_id) : 0) || 0;
+            const recQty = materialReceivedMap.get(matName) || (i.material_id ? materialReceivedMap.get(i.material_id) : 0) || 0;
+            const effectiveUsed = Math.max(Number(i.used_quantity) || 0, ordQty);
+            const remaining = Math.max(0, (i.quantity || 0) - effectiveUsed);
+
+            return {
+              id: i.id,
+              name: i.material?.name || i.description,
+              unit: i.unit,
+              planned: i.quantity,
+              used: effectiveUsed,
+              ordered: ordQty,
+              received: recQty,
+              remaining: remaining,
+              rate: i.total_rate || i.material_rate || 0,
+              amount: i.total_amount || ((i.quantity || 0) * (i.total_rate || i.material_rate || 0)),
+              remarks: i.remarks || null,
+              code: i.code || null,
+              category: c.name
+            };
+          })
         )
       : [];
 
     console.log(`[API /purchase/summary] Found ${boqs.length} BOQs. boqItems:`, boqItems.length, 'categories:', boqCategories.length);
 
     // Material Requests
-    // We need to find sites for this project
-    const sites = await prisma.site.findMany({ where: { project_id: projectId }, select: { id: true } });
-    const siteIds = sites.map(s => s.id);
-
     const requests = await prisma.materialRequest.findMany({
       where: { site_id: { in: siteIds } },
       include: { material: true },
@@ -88,20 +140,39 @@ export const GET = withAuth(async (request: Request, user: any) => {
       name: r.material.name,
       stage: r.status, // "DRAFT", "PENDING_APPROVAL", "QUOTATION", "ORDERED", "APPROVED"
       qty: `${r.quantity} ${r.material.unit}`,
+      quantity: r.quantity,
+      unit: r.material.unit,
       date: new Date(r.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
+      priority: r.priority,
+      notes: r.notes
     }));
 
-    // Purchase Orders (Orders Tab)
-    const orders = await prisma.purchaseOrder.findMany({
-      where: { OR: [{ project_id: projectId }, { site_id: { in: siteIds } }] },
-      include: { vendor: true, items: { include: { material: true } } },
-      orderBy: { created_at: 'desc' },
-    });
-
     const formattedOrders = orders.map(o => {
+      let meta: any = null;
+      if (o.notes) {
+        try {
+          if (o.notes.startsWith('{')) {
+            meta = JSON.parse(o.notes);
+          }
+        } catch {}
+      }
+
+      let totalQuotedAmount = 0;
+      let totalBoughtAmount = 0;
+
       const items = o.items.map(i => {
         const received = i.received_quantity || 0;
         const pending = Math.max(0, i.quantity - received);
+
+        const varianceInfo = meta?.priceVariances?.find((v: any) =>
+          v.materialName?.trim().toLowerCase() === i.material.name?.trim().toLowerCase()
+        );
+        const quotedPrice = varianceInfo?.quotedRate !== undefined ? Number(varianceInfo.quotedRate) : i.unit_price;
+        const priceVariance = (i.unit_price - quotedPrice);
+
+        totalQuotedAmount += (quotedPrice * i.quantity);
+        totalBoughtAmount += (i.unit_price * i.quantity);
+
         return {
           id: i.id,
           materialId: i.material_id,
@@ -110,7 +181,9 @@ export const GET = withAuth(async (request: Request, user: any) => {
           orderedQty: i.quantity,
           receivedQty: received,
           pendingQty: pending,
-          unitPrice: i.unit_price
+          unitPrice: i.unit_price,
+          quotedPrice: quotedPrice,
+          priceVariance: priceVariance
         };
       });
 
@@ -119,14 +192,20 @@ export const GET = withAuth(async (request: Request, user: any) => {
 
       return {
         id: o.id,
+        poNumber: o.po_number,
         name: o.items.length > 0 ? `${o.items[0].material.name} — ${o.items[0].quantity} ${o.items[0].material.unit}${o.items.length > 1 ? ` +${o.items.length - 1} more` : ''}` : o.po_number,
         vendor: o.vendor.name,
         amount: `₹${o.total_amount.toLocaleString()}`,
+        numericAmount: o.total_amount,
         status: isDelivered ? 'DELIVERED' : o.status,
         date: new Date(o.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
         eta: o.delivery_date ? new Date(o.delivery_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : 'Pending',
         items,
-        pendingItemsCount: pendingItems.length
+        pendingItemsCount: pendingItems.length,
+        quotationId: meta?.quotationId || null,
+        totalQuotedAmount: totalQuotedAmount > 0 ? totalQuotedAmount : o.total_amount,
+        totalNegotiatedSavings: totalQuotedAmount > 0 ? (totalQuotedAmount - totalBoughtAmount) : 0,
+        notes: meta?.userNotes || o.notes || ''
       };
     });
 
@@ -189,20 +268,38 @@ export const GET = withAuth(async (request: Request, user: any) => {
       };
     });
 
-    // Quotations
+    // Quotations with full vendor quote details
     const dbQuotations = await prisma.quotation.findMany({
       where: { rfq: { project_id: projectId } },
       include: { vendor: true, items: { include: { material: true } } },
       orderBy: { created_at: 'desc' }
     });
-    const formattedQuotations = dbQuotations.map(q => ({
-      id: q.id,
-      vendor: q.vendor.name,
-      material: q.items.length > 0 ? q.items[0].material.name : 'Multiple Items',
-      rate: `₹${q.items.length > 0 ? q.items[0].rate.toLocaleString() : 0}`,
-      total: `₹${q.total_amount.toLocaleString()}`,
-      status: q.status
-    }));
+    const formattedQuotations = dbQuotations.map(q => {
+      const firstItem = q.items[0];
+      return {
+        id: q.id,
+        vendorId: q.vendor_id,
+        vendor: q.vendor.name,
+        vendorPhone: q.vendor.phone,
+        material: firstItem ? firstItem.material.name : 'Multiple Items',
+        rate: `₹${firstItem ? firstItem.rate.toLocaleString() : 0}`,
+        numericRate: firstItem ? firstItem.rate : 0,
+        quantity: firstItem ? firstItem.quantity : 0,
+        unit: firstItem?.material?.unit || 'units',
+        total: `₹${q.total_amount.toLocaleString()}`,
+        numericTotal: q.total_amount,
+        deliveryTime: q.delivery_time || '7 Days',
+        status: q.status,
+        date: new Date(q.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
+        items: q.items.map(it => ({
+          materialId: it.material_id,
+          materialName: it.material.name,
+          quantity: it.quantity,
+          rate: it.rate,
+          unit: it.material.unit
+        }))
+      };
+    });
 
     // Inventory
     const dbInventory = await prisma.inventoryItem.findMany({
