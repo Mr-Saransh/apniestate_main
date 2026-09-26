@@ -4,12 +4,28 @@ import { CreateVendorSchema, UpdateVendorSchema } from "./vendors.schema";
 
 export async function getVendors(userId: string, companyId?: string | null) {
   if (!companyId) return [];
-  return prisma.vendor.findMany({
+  const vendors = await prisma.vendor.findMany({
     where: { company_id: companyId },
     include: {
-      _count: { select: { invoices: true, payments: true } },
+      ratings: {
+        select: { id: true, score: true, comment: true, created_at: true, user: { select: { name: true } } },
+        orderBy: { created_at: "desc" },
+      },
+      _count: { select: { invoices: true, payments: true, ratings: true } },
     },
     orderBy: { name: "asc" },
+  });
+
+  return vendors.map(v => {
+    const ratingCount = v.ratings?.length || 0;
+    const avgRating = ratingCount > 0
+      ? Number((v.ratings.reduce((sum, r) => sum + r.score, 0) / ratingCount).toFixed(1))
+      : 0;
+    return {
+      ...v,
+      ratingCount,
+      avgRating,
+    };
   });
 }
 

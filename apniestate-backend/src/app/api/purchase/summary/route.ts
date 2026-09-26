@@ -247,12 +247,30 @@ export const GET = withAuth(async (request: Request, user: any) => {
 
     const formattedGrns = grns.map(g => {
       const bill = attachments.find(a => a.entity_id === g.id);
+
+      let deliveryTime = '';
+      let deliverySpeed = 'ON_TIME';
+      if (g.date) {
+        deliveryTime = new Date(g.date).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+      }
+      if (g.remarks) {
+        const timeMatch = g.remarks.match(/\[Time:\s*([^\]]+)\]/i);
+        if (timeMatch) deliveryTime = timeMatch[1].trim();
+
+        const speedMatch = g.remarks.match(/\[Speed:\s*([^\]]+)\]/i);
+        if (speedMatch) deliverySpeed = speedMatch[1].trim();
+      }
+
       return {
         id: g.id,
         name: g.items.length > 0 ? `${g.items[0].material.name} — ${g.items[0].received_qty} ${g.items[0].material.unit}${g.items.length > 1 ? ` +${g.items.length - 1} more` : ''}` : 'Items',
         vendor: g.purchase_order.vendor.name,
+        vendorId: g.purchase_order.vendor.id,
         amount: `₹${g.purchase_order.total_amount.toLocaleString()}`, // Approximate for GRN
         received: new Date(g.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
+        receivedTime: deliveryTime,
+        deliverySpeed,
+        remarks: g.remarks,
         quality: g.quality_status, // GOOD, REJECTED, PARTIAL
         billUrl: bill?.secure_url || null,
         fullItems: g.items.map(i => {

@@ -60,6 +60,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
         { id: "/finance", label: t('sidebar.finance', 'Finance'), icon: Wallet },
         { id: "/operations", label: t('sidebar.operations', 'Operations'), icon: Users },
         { id: "/progress", label: t('sidebar.progress', 'Progress'), icon: BarChart2 },
+        { id: "/project-intelligence", label: "Intelligence", icon: Sparkles },
       ]
     },
     {

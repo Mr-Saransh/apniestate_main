@@ -556,7 +556,7 @@ export const POST = withAuth(async (request: Request, user: any) => {
     }
 
     if (action === 'RECEIVE_GOODS') {
-      const { projectId, poId, quality, items, billUrl } = payload;
+      const { projectId, poId, quality, items, billUrl, deliveryDate, deliveryTime, deliverySpeed, remarks } = payload;
       const po = await prisma.purchaseOrder.findUnique({ 
         where: { id: poId },
         include: { items: { include: { material: true } } }
@@ -640,12 +640,32 @@ export const POST = withAuth(async (request: Request, user: any) => {
         
         if (grnItemsData.length === 0) throw new Error("No valid items to receive or received quantity is 0");
 
+        let deliveryTimestamp = new Date();
+        if (deliveryDate) {
+          if (deliveryTime) {
+            const parsedDt = new Date(`${deliveryDate}T${deliveryTime}`);
+            if (!isNaN(parsedDt.getTime())) deliveryTimestamp = parsedDt;
+            else deliveryTimestamp = new Date(deliveryDate);
+          } else {
+            deliveryTimestamp = new Date(deliveryDate);
+          }
+        }
+
+        const speedTag = deliverySpeed ? `[Speed: ${deliverySpeed}]` : '';
+        const timeTag = deliveryTime ? `[Time: ${deliveryTime}]` : '';
+        const metaPrefix = [timeTag, speedTag].filter(Boolean).join(' ');
+        const combinedRemarks = metaPrefix 
+          ? `${metaPrefix} ${remarks || ''}`.trim() 
+          : (remarks || null);
+
         const newGrn = await tx.goodsReceiptNote.create({
           data: {
             po_id: poId,
             site_id: siteId,
             received_by: user.sub,
+            date: deliveryTimestamp,
             quality_status: quality || "GOOD",
+            remarks: combinedRemarks,
             items: {
               create: grnItemsData
             }

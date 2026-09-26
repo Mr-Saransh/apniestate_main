@@ -48,9 +48,9 @@ interface ProjectSummary {
   recentActivity: { id: string; type: string; action: string; description: string; time: string; metadata: any }[];
 }
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
+function SectionLabel({ children, className = "mb-3" }: { children: React.ReactNode; className?: string }) {
   return (
-    <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-3">{children}</p>
+    <p className={`text-[11px] font-bold text-muted-foreground uppercase tracking-widest ${className}`}>{children}</p>
   );
 }
 
@@ -166,7 +166,16 @@ export default function ProjectCommandCenter() {
 
       {/* Practical Project Intelligence */}
       <div>
-        <SectionLabel>Project Intelligence</SectionLabel>
+        <div className="flex items-center justify-between mb-3">
+          <SectionLabel className="mb-0">Project Intelligence</SectionLabel>
+          <button
+            onClick={() => navigate('/project-intelligence?tab=intelligence')}
+            className="text-xs font-semibold text-[#2648E7] hover:text-[#1e3bbd] hover:underline flex items-center gap-1 transition-colors"
+          >
+            <span>View Detailed Analysis</span>
+            <ChevronRight size={14} />
+          </button>
+        </div>
         <div className="grid grid-cols-3 gap-3">
           <Card className="p-3.5 flex flex-col justify-between">
             <div className="flex items-center justify-between mb-1">

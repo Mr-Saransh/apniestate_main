@@ -4,10 +4,12 @@ import { useProject } from '@/context/ProjectContext';
 import { useAuth } from '@/context/AuthContext';
 import {
   ShoppingCart, Plus, FileSpreadsheet, Package, ClipboardList,
-  CheckCircle2, Archive, Truck, X, Trash2, Download, UploadCloud, Edit3, ArrowRight, PackageCheck, Layers, FileText
+  CheckCircle2, Archive, Truck, X, Trash2, Download, UploadCloud, Edit3, ArrowRight, PackageCheck, Layers, FileText,
+  Star, Clock, Calendar
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { purchaseApi, type PurchaseSummaryResponse, type BOQItemSummary, type MaterialRequestSummary, type OrderSummary, type ReceivedSummary, type VendorSummary, type ConsumptionLog } from '@/api/purchase';
+import { vendorsApi } from '@/api/vendors';
 import ImportEstimationModal from '@/components/purchase/ImportEstimationModal';
 import QuantityOfMaterialsTab from '@/components/purchase/QuantityOfMaterialsTab';
 import SmartMaterialSelect, { CostIntelligenceCard } from '@/components/purchase/SmartMaterialSelect';
@@ -47,6 +49,15 @@ export default function PurchaseWorkspace() {
   const [orderPrefill, setOrderPrefill] = useState<any | null>(null);
   const [receivePoId, setReceivePoId] = useState<string | null>(null);
   const [showImportModal, setShowImportModal] = useState(false);
+
+  // Quick Rate Vendor state from ReceivedTab
+  const [rateVendorTarget, setRateVendorTarget] = useState<{ id: string; name: string } | null>(null);
+  const [vendorRatingScore, setVendorRatingScore] = useState(5);
+  const [vendorRatingHover, setVendorRatingHover] = useState(0);
+  const [vendorRatingComment, setVendorRatingComment] = useState('');
+  const [selectedRatingTags, setSelectedRatingTags] = useState<string[]>([]);
+  const [submittingVendorRating, setSubmittingVendorRating] = useState(false);
+  const [ratingSuccessMsg, setRatingSuccessMsg] = useState<string | null>(null);
 
   const refreshData = () => {
     if (!activeProjectId) return;
@@ -205,7 +216,19 @@ export default function PurchaseWorkspace() {
               }}
             />
           )}
-          {tab === 'received' && <ReceivedTab received={data?.received || []} />}
+          {tab === 'received' && (
+            <ReceivedTab 
+              received={data?.received || []} 
+              onRateVendor={(vendorId, vendorName) => {
+                setRateVendorTarget({ id: vendorId, name: vendorName });
+                setVendorRatingScore(5);
+                setVendorRatingHover(0);
+                setVendorRatingComment('');
+                setSelectedRatingTags([]);
+                setRatingSuccessMsg(null);
+              }}
+            />
+          )}
           {tab === 'inventory' && <InventoryTab items={data?.inventory || []} logs={data?.consumption_logs || []} />}
           {tab === 'vendors' && <VendorsPage />}
         </div>
@@ -230,6 +253,161 @@ export default function PurchaseWorkspace() {
         orderPrefill={orderPrefill} 
         initialPoId={receivePoId}
       />
+
+      {/* Quick Rate Vendor Modal from ReceivedTab */}
+      {rateVendorTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-card w-full max-w-md rounded-2xl border border-border shadow-2xl overflow-hidden flex flex-col">
+            <div className="flex justify-between items-center p-4 border-b border-border bg-muted/20">
+              <div className="flex items-center gap-2">
+                <div className="size-8 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600">
+                  <Star size={16} className="fill-amber-500" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-foreground">Rate {rateVendorTarget.name}</h3>
+                  <p className="text-[10px] text-muted-foreground">Goods Receipt Supplier Review</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setRateVendorTarget(null)} 
+                className="size-7 rounded-full bg-muted flex items-center justify-center text-muted-foreground hover:bg-muted/80 cursor-pointer"
+              >
+                <X size={14} />
+              </button>
+            </div>
+
+            <div className="p-4 space-y-3">
+              {ratingSuccessMsg ? (
+                <div className="p-4 text-center space-y-2">
+                  <div className="size-10 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto">
+                    <CheckCircle2 size={20} />
+                  </div>
+                  <p className="font-bold text-sm text-emerald-800">{ratingSuccessMsg}</p>
+                </div>
+              ) : (
+                <>
+                  <div className="text-center p-3 bg-muted/30 rounded-xl border border-border/80">
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">
+                      Delivery & Performance Rating
+                    </p>
+                    <div className="flex items-center justify-center gap-1.5">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          type="button"
+                          onMouseEnter={() => setVendorRatingHover(star)}
+                          onMouseLeave={() => setVendorRatingHover(0)}
+                          onClick={() => setVendorRatingScore(star)}
+                          className="p-1 hover:scale-110 transition-transform cursor-pointer"
+                        >
+                          <Star
+                            size={28}
+                            className={`${
+                              star <= (vendorRatingHover || vendorRatingScore)
+                                ? 'text-amber-500 fill-amber-500'
+                                : 'text-muted-foreground/30'
+                            }`}
+                          />
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-xs font-bold text-foreground mt-1.5">
+                      {vendorRatingScore === 5 && '⭐⭐⭐⭐⭐ 5/5 — On-Time & Prompt'}
+                      {vendorRatingScore === 4 && '⭐⭐⭐⭐ 4/5 — Good Service'}
+                      {vendorRatingScore === 3 && '⭐⭐⭐ 3/5 — Average'}
+                      {vendorRatingScore === 2 && '⭐⭐ 2/5 — Slow Provider / Delayed'}
+                      {vendorRatingScore === 1 && '⭐ 1/5 — Critical Delay or Damage'}
+                    </p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-muted-foreground">Quick Tags</label>
+                    <div className="flex flex-wrap gap-1">
+                      {[
+                        '⚡ On-Time',
+                        '🐢 Slow Provider',
+                        '⏳ Arrived Late',
+                        '📦 Good Quality',
+                        '⚠️ Damaged',
+                        '🤝 Helpful Driver'
+                      ].map((tag) => {
+                        const isSelected = selectedRatingTags.includes(tag);
+                        return (
+                          <button
+                            key={tag}
+                            type="button"
+                            onClick={() => {
+                              setSelectedRatingTags(prev => 
+                                isSelected ? prev.filter(t => t !== tag) : [...prev, tag]
+                              );
+                            }}
+                            className={`px-2 py-0.5 rounded-full text-[11px] font-medium border transition-colors cursor-pointer ${
+                              isSelected
+                                ? 'bg-[#2648E7] text-white border-[#2648E7]'
+                                : 'bg-muted/50 text-muted-foreground border-border hover:bg-muted'
+                            }`}
+                          >
+                            {tag}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-foreground">Delivery Comments</label>
+                    <textarea
+                      rows={2}
+                      value={vendorRatingComment}
+                      onChange={(e) => setVendorRatingComment(e.target.value)}
+                      placeholder="e.g. Arrived 2 hours late. Truck driver was slow to deliver..."
+                      className="w-full bg-white border border-border rounded-xl p-2.5 text-xs focus:outline-none focus:border-[#2648E7] text-gray-900"
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="p-3 border-t border-border flex justify-end gap-2 bg-muted/10">
+              <button
+                type="button"
+                onClick={() => setRateVendorTarget(null)}
+                className="px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-muted rounded-lg cursor-pointer"
+              >
+                Close
+              </button>
+              {!ratingSuccessMsg && (
+                <button
+                  type="button"
+                  disabled={submittingVendorRating}
+                  onClick={async () => {
+                    if (!rateVendorTarget) return;
+                    setSubmittingVendorRating(true);
+                    try {
+                      const tags = selectedRatingTags.length > 0 ? `[${selectedRatingTags.join(', ')}] ` : '';
+                      const comment = `${tags}${vendorRatingComment.trim()}`.trim() || undefined;
+                      await vendorsApi.rateVendor(rateVendorTarget.id, vendorRatingScore, comment);
+                      setRatingSuccessMsg(`Rating saved! ${vendorRatingScore} stars recorded for ${rateVendorTarget.name}.`);
+                      setTimeout(() => {
+                        setRateVendorTarget(null);
+                        setRatingSuccessMsg(null);
+                      }, 1200);
+                    } catch (err: any) {
+                      console.error('Failed to submit rating', err);
+                      alert(err?.message || 'Failed to submit rating');
+                    } finally {
+                      setSubmittingVendorRating(false);
+                    }
+                  }}
+                  className="px-4 py-1.5 text-xs font-bold bg-[#2648E7] text-white rounded-lg hover:bg-[#1d38b8] shadow-sm disabled:opacity-50 cursor-pointer"
+                >
+                  {submittingVendorRating ? 'Saving...' : 'Submit Rating'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -923,7 +1101,13 @@ function OrdersTab({
   );
 }
 
-function ReceivedTab({ received }: { received: ReceivedSummary[] }) {
+function ReceivedTab({ 
+  received, 
+  onRateVendor 
+}: { 
+  received: ReceivedSummary[]; 
+  onRateVendor?: (vendorId: string, vendorName: string) => void;
+}) {
   const handleDownloadPDF = async (r: ReceivedSummary) => {
     const doc = new jsPDF();
     const pageW = doc.internal.pageSize.getWidth();
@@ -938,7 +1122,7 @@ function ReceivedTab({ received }: { received: ReceivedSummary[] }) {
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(22);
     doc.setFont('helvetica', 'bold');
-    doc.text("GOODS RECEIPT NOTE", 14, 24);
+    doc.text("GOODS RECEIPT NOTE (GRN)", 14, 24);
 
     doc.setFontSize(10);
     doc.setTextColor(180, 195, 255);
@@ -953,26 +1137,27 @@ function ReceivedTab({ received }: { received: ReceivedSummary[] }) {
     // Details Section
     doc.setTextColor(15, 23, 42);
     doc.setFontSize(11);
-    doc.text("Vendor Details", 14, 55);
+    doc.text("Delivery & Vendor Details", 14, 55);
     
     doc.setDrawColor(38, 72, 231);
     doc.setLineWidth(1);
-    doc.line(14, 58, 40, 58);
+    doc.line(14, 58, 55, 58);
 
     doc.setFontSize(10);
     doc.setTextColor(100, 116, 139);
     doc.setFont('helvetica', 'bold');
     doc.text("Vendor Name:", 14, 68);
-    doc.text("Date Received:", 14, 76);
-    doc.text("Total Amount:", 110, 68);
-    doc.text("Quality Status:", 110, 76);
+    doc.text("Delivery Date & Time:", 14, 76);
+    doc.text("Total Value:", 110, 68);
+    doc.text("Quality & Speed:", 110, 76);
 
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(15, 23, 42);
     doc.text(r.vendor, 45, 68);
-    doc.text(r.received, 45, 76);
-    doc.text(r.amount, 140, 68);
-    doc.text(r.quality, 140, 76);
+    doc.text(`${r.received}${r.receivedTime ? ` at ${r.receivedTime}` : ''}`, 55, 76);
+    doc.text(r.amount, 145, 68);
+    const speedLabel = r.deliverySpeed === 'SLOW' ? 'Slow Provider' : r.deliverySpeed === 'DELAYED' ? 'Delayed' : 'On-Time';
+    doc.text(`${r.quality} (${speedLabel})`, 145, 76);
 
     let currentY = 85;
 
@@ -997,10 +1182,10 @@ function ReceivedTab({ received }: { received: ReceivedSummary[] }) {
       doc.setTextColor(15, 23, 42);
       doc.setFontSize(11);
       doc.setFont('helvetica', 'bold');
-      doc.text("Attached Bill", 14, currentY + 15);
+      doc.text("Attached Bill / Challan", 14, currentY + 15);
       doc.setDrawColor(38, 72, 231);
       doc.setLineWidth(1);
-      doc.line(14, currentY + 18, 40, currentY + 18);
+      doc.line(14, currentY + 18, 55, currentY + 18);
 
       try {
         const img = new Image();
@@ -1008,7 +1193,7 @@ function ReceivedTab({ received }: { received: ReceivedSummary[] }) {
         img.src = r.billUrl;
         await new Promise((resolve) => {
           img.onload = resolve;
-          img.onerror = resolve; // Continue even if image fails
+          img.onerror = resolve;
         });
 
         const maxWidth = 180;
@@ -1037,7 +1222,7 @@ function ReceivedTab({ received }: { received: ReceivedSummary[] }) {
       doc.setFontSize(8);
       doc.setTextColor(148, 163, 184);
       doc.setFont('helvetica', 'normal');
-      doc.text('Apni Estate - Premium Construction Management System', 14, pageH - 8);
+      doc.text('Apni Estate - Premium Construction ERP', 14, pageH - 8);
       doc.text(`Page ${i} of ${pageCount}`, pageW - 14, pageH - 8, { align: 'right' });
     }
 
@@ -1049,18 +1234,69 @@ function ReceivedTab({ received }: { received: ReceivedSummary[] }) {
     <div className="space-y-3">
       {received.map((r) => (
         <Card key={r.id} className="p-4">
-          <div className="flex items-center gap-3">
-            <div className={`size-10 rounded-xl flex items-center justify-center shrink-0 ${r.quality === "GOOD" ? "bg-emerald-50" : "bg-red-50"}`}>
-              {r.quality === "GOOD" ? <CheckCircle2 size={18} className="text-emerald-600" /> : <Archive size={18} className="text-red-500" />}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-start gap-3 min-w-0">
+              <div className={`size-10 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${r.quality === "GOOD" ? "bg-emerald-50" : "bg-red-50"}`}>
+                {r.quality === "GOOD" ? <CheckCircle2 size={18} className="text-emerald-600" /> : <Archive size={18} className="text-red-500" />}
+              </div>
+              <div className="min-w-0">
+                <p className="font-bold text-sm text-foreground truncate">{r.name}</p>
+                <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                  <span className="font-semibold text-foreground">{r.vendor}</span>
+                  <span>·</span>
+                  <span className="flex items-center gap-1 font-medium">
+                    <Calendar size={11} className="text-muted-foreground" />
+                    {r.received}
+                  </span>
+                  {r.receivedTime && (
+                    <span className="flex items-center gap-1 font-medium bg-muted/60 px-1.5 py-0.5 rounded text-[11px] text-foreground">
+                      <Clock size={11} className="text-[#2648E7]" />
+                      {r.receivedTime}
+                    </span>
+                  )}
+                  {r.deliverySpeed === 'SLOW' && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1 shadow-2xs">
+                      <span>🐢</span> Slow Provider
+                    </span>
+                  )}
+                  {r.deliverySpeed === 'DELAYED' && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-900 border border-rose-300 flex items-center gap-1">
+                      <span>⏳</span> Delayed Delivery
+                    </span>
+                  )}
+                  {r.deliverySpeed === 'ON_TIME' && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                      <span>⚡</span> On-Time
+                    </span>
+                  )}
+                </div>
+                {r.remarks && (
+                  <p className="text-[11px] text-muted-foreground mt-1 italic line-clamp-1">
+                    Note: {r.remarks.replace(/\[(Time|Speed):[^\]]+\]/g, '').trim() || r.remarks}
+                  </p>
+                )}
+              </div>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-bold text-sm text-foreground">{r.name}</p>
-              <p className="text-xs text-muted-foreground">{r.vendor} · {r.received}</p>
-            </div>
-            <div className="flex flex-col items-end gap-2">
-              <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${r.quality === "GOOD" ? "text-emerald-600 bg-emerald-50" : "text-red-600 bg-red-50"}`}>{r.quality}</span>
-              <button onClick={() => handleDownloadPDF(r)} className="text-[#2648E7] hover:text-blue-800 flex items-center gap-1 text-xs font-semibold">
-                <Download size={14} /> PDF
+
+            <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+              <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${r.quality === "GOOD" ? "text-emerald-600 bg-emerald-50 border border-emerald-200" : "text-red-600 bg-red-50 border border-red-200"}`}>
+                {r.quality}
+              </span>
+              {onRateVendor && (
+                <button
+                  type="button"
+                  onClick={() => onRateVendor(r.vendorId || '', r.vendor)}
+                  className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                  title="Rate this supplier's punctuality and performance"
+                >
+                  <Star size={12} className="text-amber-500 fill-amber-500" /> Rate
+                </button>
+              )}
+              <button 
+                onClick={() => handleDownloadPDF(r)} 
+                className="px-2.5 py-1 text-[#2648E7] hover:bg-blue-50 border border-blue-200/60 rounded-lg flex items-center gap-1 text-xs font-semibold transition-colors cursor-pointer"
+              >
+                <Download size={13} /> PDF
               </button>
             </div>
           </div>
@@ -1225,6 +1461,10 @@ function PurchaseModals({
     }
 
     if (activeModal === 'received') {
+      const now = new Date();
+      const defaultTime = now.toTimeString().slice(0, 5); // "HH:mm"
+      const defaultDate = now.toISOString().slice(0, 10); // "YYYY-MM-DD"
+
       const allOrders = data?.orders || [];
       const targetPo = (initialPoId ? allOrders.find(o => o.id === initialPoId) : null) || eligibleOrders[0];
       if (targetPo) {
@@ -1249,10 +1489,21 @@ function PurchaseModals({
         setFormData({
           poId: targetPo.id,
           quality: 'GOOD',
+          deliveryDate: defaultDate,
+          deliveryTime: defaultTime,
+          deliverySpeed: 'ON_TIME',
+          remarks: '',
           items: prefilledItems
         });
       } else {
-        setFormData({ quality: 'GOOD', items: [] });
+        setFormData({
+          quality: 'GOOD',
+          deliveryDate: defaultDate,
+          deliveryTime: defaultTime,
+          deliverySpeed: 'ON_TIME',
+          remarks: '',
+          items: []
+        });
       }
       return;
     }
@@ -1521,6 +1772,10 @@ function PurchaseModals({
           return;
         }
         payload.items = validItems;
+        payload.deliveryDate = formData.deliveryDate || new Date().toISOString().slice(0, 10);
+        payload.deliveryTime = formData.deliveryTime || new Date().toTimeString().slice(0, 5);
+        payload.deliverySpeed = formData.deliverySpeed || 'ON_TIME';
+        payload.remarks = formData.remarks || '';
       }
 
       if (activeModal === 'inventory') {
@@ -2246,6 +2501,87 @@ function PurchaseModals({
                   )}
                 </div>
 
+                {/* Delivery Date & Arrival Time */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-bold text-foreground flex items-center gap-1.5">
+                      <Calendar size={14} className="text-[#2648E7]" />
+                      <span>Delivery Date</span>
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      className="w-full bg-white border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900 font-medium"
+                      value={formData.deliveryDate || ''}
+                      onChange={e => setFormData({ ...formData, deliveryDate: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-bold text-foreground flex items-center gap-1.5">
+                      <Clock size={14} className="text-[#2648E7]" />
+                      <span>Delivery Time (Arrival)</span>
+                    </label>
+                    <input
+                      type="time"
+                      required
+                      className="w-full bg-white border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900 font-medium"
+                      value={formData.deliveryTime || ''}
+                      onChange={e => setFormData({ ...formData, deliveryTime: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                {/* Delivery Speed / Punctuality Assessment */}
+                <div className="space-y-2 p-3.5 bg-blue-50/50 border border-blue-100 rounded-2xl">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                      <span>Delivery Punctuality & Speed</span>
+                    </label>
+                    <span className="text-[11px] text-muted-foreground font-medium">
+                      Flags slow providers
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, deliverySpeed: 'ON_TIME' })}
+                      className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                        formData.deliverySpeed === 'ON_TIME' || !formData.deliverySpeed
+                          ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                          : 'bg-white border-border text-muted-foreground hover:border-emerald-300'
+                      }`}
+                    >
+                      <span>⚡ On-Time</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, deliverySpeed: 'SLOW' })}
+                      className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                        formData.deliverySpeed === 'SLOW'
+                          ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
+                          : 'bg-white border-border text-muted-foreground hover:border-amber-300'
+                      }`}
+                    >
+                      <span>🐢 Slow Provider</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, deliverySpeed: 'DELAYED' })}
+                      className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                        formData.deliverySpeed === 'DELAYED'
+                          ? 'bg-rose-500 text-white border-rose-500 shadow-sm'
+                          : 'bg-white border-border text-muted-foreground hover:border-rose-300'
+                      }`}
+                    >
+                      <span>⏳ Delayed</span>
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Capturing arrival time and provider speed flags unpunctual vendors across your projects.
+                  </p>
+                </div>
+
                 <div className="space-y-1.5">
                   <label className="text-sm font-bold text-foreground">Quality Status</label>
                   <select
@@ -2257,6 +2593,17 @@ function PurchaseModals({
                     <option value="PARTIAL">Partial Damage</option>
                     <option value="REJECTED">Rejected</option>
                   </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-sm font-bold text-foreground">Delivery Remarks / Gate Notes (Optional)</label>
+                  <input
+                    type="text"
+                    className="w-full bg-white border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900 font-medium"
+                    placeholder="e.g. Challan #9821, truck DL-1AB-2291, arrived 2 hours late"
+                    value={formData.remarks || ''}
+                    onChange={e => setFormData({ ...formData, remarks: e.target.value })}
+                  />
                 </div>
 
                 <div className="mt-4 mb-2 flex items-center justify-between">

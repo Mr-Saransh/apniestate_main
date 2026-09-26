@@ -51,6 +51,7 @@ const PurchaseWorkspace = lazy(() => import('@/pages/PurchaseWorkspace'));
 const FinanceWorkspace = lazy(() => import('@/pages/FinanceWorkspace'));
 const OperationsWorkspace = lazy(() => import('@/pages/OperationsWorkspace'));
 const CrmWorkspace = lazy(() => import('@/pages/CrmWorkspace'));
+const ProjectIntelligencePage = lazy(() => import('@/pages/ProjectIntelligencePage'));
 
 function PageFallback() {
   return (
@@ -142,6 +143,7 @@ export default function App() {
                         <Route path="/milestones" element={<Navigate to="/progress?tab=milestones" replace />} />
                         <Route path="/dpr" element={<Navigate to="/progress?tab=dpr" replace />} />
                         <Route path="/calendar" element={<Navigate to="/progress?tab=calendar" replace />} />
+                        <Route path="/project-intelligence" element={<ProjectIntelligencePage />} />
                       </Route>
 
                       {/* Purchase Workspace */}

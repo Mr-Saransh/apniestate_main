@@ -77,8 +77,12 @@ export interface ReceivedSummary {
   id: string;
   name: string;
   vendor: string;
+  vendorId?: string;
   amount: string;
   received: string;
+  receivedTime?: string;
+  deliverySpeed?: 'ON_TIME' | 'SLOW' | 'DELAYED' | string;
+  remarks?: string | null;
   quality: string;
   billUrl?: string | null;
   fullItems?: { name: string; qty: number; unit: string; price: number; total: number }[];

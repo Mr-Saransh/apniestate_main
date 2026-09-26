@@ -395,7 +395,7 @@ export default function SmartProjectHealth({
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-sm sm:text-base font-bold text-foreground tracking-tight">
-                  Project Health Intelligence
+                  Construction Health Intelligence
                 </h3>
                 <span className={`text-[10px] sm:text-xs font-bold px-2.5 py-0.5 rounded-full border ${ratingTheme.badgeBg}`}>
                   {ratingLabel}
@@ -415,6 +415,17 @@ export default function SmartProjectHealth({
               </span>
               <span className="text-[11px] text-muted-foreground font-semibold">/100</span>
             </div>
+
+            {/* View Construction Health link */}
+            <button
+              type="button"
+              onClick={() => navigate('/project-intelligence?tab=construction-health')}
+              className="px-2.5 py-1.5 bg-[#2648E7]/10 hover:bg-[#2648E7]/20 text-[#2648E7] rounded-lg transition-colors flex items-center gap-1 text-xs font-semibold"
+              title="View Detailed Construction Health"
+            >
+              <span>View Construction Health</span>
+              <ArrowUpRight size={14} />
+            </button>
 
             {/* Expand / Collapse toggle */}
             <button

@@ -2556,3 +2556,37 @@ model DuePayment {
   @@index([company_id], name: "idx_duepayment_company")
   @@map("due_payments")
 }
+
+// ─── Project Intelligence Suggestions ─────────────────────
+
+enum SuggestionStatus {
+  SUGGESTED
+  APPROVED
+  REMOVED
+}
+
+model IntelligenceSuggestion {
+  id              String           @id @default(cuid())
+  project_id      String
+  company_id      String?
+  type            String           @default("MILESTONE") // MILESTONE, ACTION, etc.
+  name            String
+  description     String?
+  suggested_start DateTime?
+  suggested_end   DateTime?
+  duration_days   Int?
+  reason          String?          // Why this was suggested
+  source          String?          // "AUTO_GENERATED", "TEMPLATE", etc.
+  status          SuggestionStatus @default(SUGGESTED)
+  approved_at     DateTime?
+  approved_by     String?
+  milestone_id    String?          // Links to official milestone after approval
+  sort_order      Int              @default(0)
+  created_at      DateTime         @default(now())
+  updated_at      DateTime         @updatedAt
+
+  @@index([project_id], name: "idx_suggestion_project")
+  @@index([company_id], name: "idx_suggestion_company")
+  @@index([status], name: "idx_suggestion_status")
+  @@map("intelligence_suggestions")
+}

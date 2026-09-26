@@ -180,7 +180,7 @@ export function ProjectHealthWidget({ projects, loading }: { projects?: ProjectH
 
   return (
     <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '20px', padding: '24px' }}>
-      <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--color-text)', marginBottom: '16px' }}>Project Health & Intelligence</h3>
+      <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--color-text)', marginBottom: '16px' }}>Construction Health & Intelligence</h3>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         {projects.map((project) => (
           <div key={project.id} style={{ padding: '16px', border: '1px solid var(--color-border)', borderRadius: '14px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
