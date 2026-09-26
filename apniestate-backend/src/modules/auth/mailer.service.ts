@@ -1,20 +1,36 @@
 import nodemailer from 'nodemailer';
 
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || "smtp.zoho.in",
-  port: Number(process.env.SMTP_PORT) || 465,
-  secure: true,
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-});
+function getSmtpConfig() {
+  const host = (process.env.SMTP_HOST || "smtp.zoho.in").replace(/^["']|["']$/g, '').trim();
+  const port = Number((process.env.SMTP_PORT || "465").toString().replace(/^["']|["']$/g, '').trim()) || 465;
+  const user = (process.env.SMTP_USER || "tech@apniestate.com").replace(/^["']|["']$/g, '').trim();
+  const pass = (process.env.SMTP_PASS || "").replace(/^["']|["']$/g, '').trim();
+  return { host, port, user, pass };
+}
+
+function getTransporter() {
+  const cfg = getSmtpConfig();
+  return nodemailer.createTransport({
+    host: cfg.host,
+    port: cfg.port,
+    secure: cfg.port === 465,
+    auth: {
+      user: cfg.user,
+      pass: cfg.pass,
+    },
+    tls: {
+      rejectUnauthorized: false
+    }
+  });
+}
 
 export const mailerService = {
   async sendOtpEmail(to: string, otp: string) {
     try {
+      const cfg = getSmtpConfig();
+      const transporter = getTransporter();
       const mailOptions = {
-        from: '"Apniestate Tech" <tech@apniestate.com>',
+        from: `"Apniestate Tech" <${cfg.user}>`,
         to,
         subject: "Your OTP Code for Apniestate",
         html: `
@@ -28,7 +44,7 @@ export const mailerService = {
       };
 
       const info = await transporter.sendMail(mailOptions);
-      console.log("Email sent: %s", info.messageId);
+      console.log("OTP Email sent to %s: %s", to, info.messageId);
       return true;
     } catch (error) {
       console.error("Error sending OTP email:", error);
@@ -42,8 +58,10 @@ export const mailerService = {
         console.warn("Skipping channel partner email: invalid email address", to);
         return false;
       }
+      const cfg = getSmtpConfig();
+      const transporter = getTransporter();
       const mailOptions = {
-        from: '"Apniestate Partnerships" <tech@apniestate.com>',
+        from: `"Apniestate Partnerships" <${cfg.user}>`,
         to,
         subject: `Welcome as Channel Partner - Your Referral Code: ${referralCode}`,
         html: `
@@ -77,10 +95,81 @@ export const mailerService = {
       };
 
       const info = await transporter.sendMail(mailOptions);
-      console.log("Channel partner welcome email sent: %s", info.messageId);
+      console.log("Channel partner welcome email sent to %s: %s", to, info.messageId);
       return true;
     } catch (error) {
       console.error("Error sending channel partner welcome email:", error);
+      return false;
+    }
+  },
+
+  async sendUserInvitationEmail(data: {
+    to: string;
+    role: string;
+    companyName: string;
+    inviterName: string;
+    inviteLink?: string;
+  }) {
+    try {
+      const { to, role, companyName, inviterName } = data;
+      if (!to || !to.includes('@')) {
+        console.warn("Skipping invitation email: invalid email address", to);
+        return false;
+      }
+      const cfg = getSmtpConfig();
+      const transporter = getTransporter();
+      const inviteUrl = data.inviteLink || `${process.env.FRONTEND_URL || 'https://build.apniestate.com'}/auth/register?email=${encodeURIComponent(to)}`;
+      const formattedRole = role.replace(/_/g, ' ');
+
+      const mailOptions = {
+        from: `"Apniestate" <${cfg.user}>`,
+        to,
+        subject: `You've been invited to join ${companyName} on Apniestate`,
+        html: `
+          <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: auto; padding: 30px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff;">
+            <div style="text-align: center; margin-bottom: 24px;">
+              <h2 style="color: #0f172a; margin: 0; font-size: 24px;">Join ${companyName} on Apniestate</h2>
+              <p style="color: #64748b; font-size: 14px; margin-top: 6px;">Construction ERP & Real Estate Platform</p>
+            </div>
+
+            <p style="color: #334155; font-size: 15px;">Hello,</p>
+            <p style="color: #334155; font-size: 15px; line-height: 1.6;">
+              <strong>${inviterName}</strong> has invited you to collaborate in <strong>${companyName}</strong> on the Apniestate platform with the role of:
+            </p>
+
+            <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 1px solid #bbf7d0; border-radius: 12px; padding: 16px; text-align: center; margin: 20px 0;">
+              <span style="font-size: 12px; font-weight: bold; color: #166534; text-transform: uppercase; letter-spacing: 1px;">Assigned Role</span>
+              <h3 style="color: #15803d; font-size: 20px; margin: 4px 0 0 0;">${formattedRole}</h3>
+            </div>
+
+            <p style="color: #334155; font-size: 14px; line-height: 1.5;">
+              Click below to activate your account or sign in to accept your invitation:
+            </p>
+
+            <div style="text-align: center; margin: 28px 0;">
+              <a href="${inviteUrl}" style="background-color: #2563eb; color: #ffffff; padding: 12px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px; display: inline-block; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);">
+                Accept Invitation & Access Workspace
+              </a>
+            </div>
+
+            <p style="color: #94a3b8; font-size: 12px; line-height: 1.5; word-break: break-all;">
+              Or copy this link into your browser:<br/>
+              <a href="${inviteUrl}" style="color: #2563eb;">${inviteUrl}</a>
+            </p>
+
+            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
+            <p style="color: #94a3b8; font-size: 11px; text-align: center; margin: 0;">
+              &copy; ${new Date().getFullYear()} ${companyName}. Powered by Apniestate.
+            </p>
+          </div>
+        `,
+      };
+
+      const info = await transporter.sendMail(mailOptions);
+      console.log("User invitation email sent successfully to %s: %s", to, info.messageId);
+      return true;
+    } catch (error) {
+      console.error("Error sending user invitation email:", error);
       return false;
     }
   },

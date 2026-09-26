@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import type { Role } from "@/types";
 import { notifyUsers } from "@/modules/notifications/notifications.service";
+import { mailerService } from "@/modules/auth/mailer.service";
 
 export async function createInvitation(data: {
   company_id: string;
@@ -60,9 +61,20 @@ export async function createInvitation(data: {
     }
   });
 
+  const company = await prisma.company.findUnique({ where: { id: data.company_id } });
+  const inviter = await prisma.user.findUnique({ where: { id: data.invited_by }, select: { name: true, email: true } });
+
+  // Send invitation email to new user
+  mailerService.sendUserInvitationEmail({
+    to: emailLower,
+    role: data.role,
+    companyName: company?.name || "Apniestate",
+    inviterName: inviter?.name || inviter?.email || "Team Administrator",
+    inviteLink: `${process.env.FRONTEND_URL || "https://build.apniestate.com"}/auth/register?email=${encodeURIComponent(emailLower)}`,
+  }).catch((err) => console.error("Async user invitation email error:", err));
+
   if (user) {
-    // Notify the user in-app if they have an account
-    const company = await prisma.company.findUnique({ where: { id: data.company_id } });
+    // Also notify the user in-app if they already have an account
     await notifyUsers(
       [user.id],
       "New Company Invitation",
@@ -217,10 +229,21 @@ export async function resendInvitation(invitationId: string, companyId: string) 
     data: { status: "PENDING", expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) }
   });
   
-  // Re-notify user
+  // Re-send invitation email
+  const company = await prisma.company.findUnique({ where: { id: companyId } });
+  const inviter = await prisma.user.findUnique({ where: { id: invitation.invited_by }, select: { name: true, email: true } });
+
+  mailerService.sendUserInvitationEmail({
+    to: invitation.email.toLowerCase(),
+    role: invitation.role,
+    companyName: company?.name || "Apniestate",
+    inviterName: inviter?.name || inviter?.email || "Team Administrator",
+    inviteLink: `${process.env.FRONTEND_URL || "https://build.apniestate.com"}/auth/register?email=${encodeURIComponent(invitation.email)}`,
+  }).catch((err) => console.error("Async user re-invitation email error:", err));
+
+  // Re-notify user in-app if registered
   const user = await prisma.user.findUnique({ where: { email: invitation.email } });
   if (user) {
-    const company = await prisma.company.findUnique({ where: { id: companyId } });
     await notifyUsers(
       [user.id],
       "Company Invitation Reminder",

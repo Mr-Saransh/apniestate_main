@@ -1068,6 +1068,11 @@ function ProjectIntelligenceTab({ data, onRefresh }: { data: ProjectIntelligence
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3500);
+  };
+
   useEffect(() => {
     if (data?.suggestions) setSuggestions(data.suggestions);
   }, [data?.suggestions]);
