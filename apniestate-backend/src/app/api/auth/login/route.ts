@@ -27,12 +27,13 @@ export async function POST(req: NextRequest) {
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/api/auth",
-    maxAge: 7 * 24 * 60 * 60,
+    maxAge: 30 * 24 * 60 * 60,
   });
 
   const response = ok(
     {
       accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
       user: result.user,
       memberships: result.memberships,
     },

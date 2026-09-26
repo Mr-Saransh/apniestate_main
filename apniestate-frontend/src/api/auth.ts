@@ -60,6 +60,7 @@ export interface Membership {
 
 export interface AuthResponse {
   accessToken: string;
+  refreshToken?: string;
   user: AuthUser;
   memberships?: Membership[];
   needsSelection?: boolean;
@@ -73,6 +74,9 @@ export const authApi = {
 
   signup: (credentials: SignupCredentials) =>
     apiClient.post<AuthResponse>('/auth/signup', credentials),
+
+  refreshToken: (token?: string) =>
+    apiClient.post<AuthResponse>('/auth/refresh', { refreshToken: token }),
 
   sendOtp: (email: string) =>
     apiClient.post<{success: boolean, message: string}>('/auth/send-otp', { email }),

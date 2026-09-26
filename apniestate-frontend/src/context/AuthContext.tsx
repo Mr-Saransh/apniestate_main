@@ -39,11 +39,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!token || !user) {
+    if (token && !user) {
+      authApi.refreshToken().then((res) => {
+        if (res.data?.user) {
+          setUser(res.data.user);
+          localStorage.setItem('user', JSON.stringify(res.data.user));
+        }
+      }).catch(() => {
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        setToken(null);
+      }).finally(() => {
+        setIsLoading(false);
+      });
+      return;
+    }
+    if (!token && !user) {
       localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
       localStorage.removeItem('user');
-      setToken(null);
-      setUser(null);
     }
     setIsLoading(false);
   }, [token, user]);
@@ -60,31 +74,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } else {
       setPermissions([]);
     }
-  }, [token]); // Reload permissions when token changes
+  }, [token]);
 
   useEffect(() => {
+    let timer: any = null;
     const handleUnauthorized = () => {
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('user');
-      setToken(null);
-      setUser(null);
-      setPermissions([]);
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
-      }
+      if (timer) return;
+      timer = setTimeout(() => {
+        const latestToken = localStorage.getItem('access_token');
+        // If a token refresh happened concurrently, do not log out
+        if (latestToken && latestToken !== token) {
+          setToken(latestToken);
+          timer = null;
+          return;
+        }
+
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        localStorage.removeItem('user');
+        setToken(null);
+        setUser(null);
+        setPermissions([]);
+        if (window.location.pathname !== '/login' && window.location.pathname !== '/landing') {
+          window.location.href = '/login';
+        }
+        timer = null;
+      }, 600);
     };
 
     window.addEventListener('auth:unauthorized', handleUnauthorized);
-    return () => window.removeEventListener('auth:unauthorized', handleUnauthorized);
-  }, []);
+    return () => {
+      window.removeEventListener('auth:unauthorized', handleUnauthorized);
+      if (timer) clearTimeout(timer);
+    };
+  }, [token]);
 
   const login = useCallback(async (credentials: LoginCredentials) => {
     const response = await authApi.login(credentials);
     if (response.success && response.data) {
-      const { accessToken, user: userData } = response.data;
+      const { accessToken, refreshToken, user: userData } = response.data;
       setToken(accessToken);
       setUser(userData);
       localStorage.setItem('access_token', accessToken);
+      if (refreshToken) localStorage.setItem('refresh_token', refreshToken);
       localStorage.setItem('user', JSON.stringify(userData));
     }
     return response.data as AuthResponse;
@@ -93,15 +125,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signup = useCallback(async (credentials: SignupCredentials) => {
     const response = await authApi.signup(credentials);
     if (response.success && response.data) {
-      const { accessToken, user: userData } = response.data;
+      const { accessToken, refreshToken, user: userData } = response.data;
       setToken(accessToken);
       setUser(userData);
       localStorage.setItem('access_token', accessToken);
+      if (refreshToken) localStorage.setItem('refresh_token', refreshToken);
       localStorage.setItem('user', JSON.stringify(userData));
     }
     return response.data as AuthResponse;
   }, []);
-
 
   const setAuthSession = useCallback((newToken: string, newUser: AuthUser) => {
     setToken(newToken);
@@ -119,6 +151,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null);
       setPermissions([]);
       localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
       localStorage.removeItem('user');
     }
   }, []);

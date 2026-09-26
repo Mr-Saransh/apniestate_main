@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import { Role } from "@/types";
 import { prisma } from "@/lib/prisma";
-import { signAccessToken, signRefreshToken } from "@/lib/jwt";
+import { signAccessToken, signRefreshToken, verifyRefreshToken } from "@/lib/jwt";
 import { hashToken } from "./token.util";
 import type { LoginInput } from "./auth.schema";
 
@@ -153,6 +153,72 @@ export async function logoutUser(userId: string, tokenId?: string) {
   } else {
     await prisma.refreshToken.updateMany({ where: { user_id: userId }, data: { revoked: true } });
   }
+}
+
+export async function refreshUserTokens(token: string) {
+  const payload = verifyRefreshToken(token);
+  if (!payload || !payload.sub) return null;
+
+  const user = await prisma.user.findUnique({
+    where: { id: payload.sub },
+    include: {
+      memberships: {
+        where: { status: "ACTIVE" },
+        include: { company: true },
+      },
+    },
+  });
+
+  if (!user) return null;
+
+  const memberships = user.memberships || [];
+  const primaryMembership = user.company_id
+    ? memberships.find((m) => m.company_id === user.company_id)
+    : memberships[0];
+
+  const activeRole = primaryMembership?.roles[0] || user.role;
+  const activeCrmRole = (primaryMembership?.roles.find(r => ["BUILDER", "CRM_MANAGER", "TELECALLER"].includes(r)) as any) || (["BUILDER", "CRM_MANAGER", "TELECALLER"].includes(user.role) ? user.role : null);
+
+  const accessToken = signAccessToken({
+    sub: user.id,
+    email: user.email || user.username || "",
+    role: activeRole as Role,
+    crm_role: activeCrmRole,
+    company_id: user.company_id,
+  });
+
+  const newRefreshToken = signRefreshToken(user.id);
+
+  return {
+    accessToken,
+    refreshToken: newRefreshToken,
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email || user.username || "",
+      role: activeRole as Role,
+      crm_role: activeCrmRole,
+      company_id: user.company_id,
+      onboarded: user.onboarded,
+      profile_completed: user.profile_completed,
+      subscription_status: user.subscription_status,
+      phone: user.phone,
+      city: user.city,
+      state: user.state,
+    },
+    memberships: memberships.map(m => ({
+      id: m.id,
+      user_id: m.user_id,
+      company_id: m.company_id,
+      roles: m.roles,
+      status: m.status,
+      last_active_at: m.last_active_at,
+      company: {
+        id: m.company.id,
+        name: m.company.name,
+      }
+    })),
+  };
 }
 
 export async function signupUser(input: import("./auth.schema").SignupInput) {

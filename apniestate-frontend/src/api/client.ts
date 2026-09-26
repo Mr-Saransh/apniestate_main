@@ -25,9 +25,49 @@ class ApiClient {
   private cache = new Map<string, CacheEntry<any>>();
   private inFlightRequests = new Map<string, Promise<ApiResponse<any>>>();
   private defaultTtl = 30000; // 30 seconds default in-memory cache
+  private refreshPromise: Promise<string | null> | null = null;
 
   private getToken(): string | null {
     return localStorage.getItem('access_token');
+  }
+
+  private async tryRefreshToken(): Promise<string | null> {
+    if (this.refreshPromise) {
+      return this.refreshPromise;
+    }
+
+    this.refreshPromise = (async () => {
+      try {
+        const storedRefreshToken = localStorage.getItem('refresh_token');
+        const res = await fetch(`${API_BASE}/auth/refresh`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(storedRefreshToken ? { 'Authorization': `Bearer ${storedRefreshToken}` } : {})
+          },
+          body: JSON.stringify({ refreshToken: storedRefreshToken || undefined }),
+          credentials: 'include',
+        });
+
+        if (!res.ok) return null;
+        const json = await res.json();
+        const newAccessToken = json?.data?.accessToken || json?.accessToken;
+        const newRefreshToken = json?.data?.refreshToken || json?.refreshToken;
+
+        if (newAccessToken) {
+          localStorage.setItem('access_token', newAccessToken);
+          if (newRefreshToken) localStorage.setItem('refresh_token', newRefreshToken);
+          return newAccessToken;
+        }
+        return null;
+      } catch {
+        return null;
+      } finally {
+        this.refreshPromise = null;
+      }
+    })();
+
+    return this.refreshPromise;
   }
 
   /**
@@ -95,8 +135,22 @@ class ApiClient {
       }
 
       if (!response.ok) {
-        if (response.status === 401 && !endpoint.includes('/auth/login')) {
-          window.dispatchEvent(new CustomEvent('auth:unauthorized'));
+        // Automatic silent token refresh & retry on 401
+        if (response.status === 401 && !endpoint.includes('/auth/login') && !endpoint.includes('/auth/refresh') && retries > 0) {
+          const refreshedToken = await this.tryRefreshToken();
+          if (refreshedToken) {
+            const retriedOptions = {
+              ...options,
+              headers: {
+                ...headers,
+                'Authorization': `Bearer ${refreshedToken}`,
+              },
+            };
+            return this.request<T>(endpoint, retriedOptions, retries - 1);
+          } else {
+            // Only fire unauthorized if silent refresh genuinely failed
+            window.dispatchEvent(new CustomEvent('auth:unauthorized'));
+          }
         }
         const errorMsg =
           (typeof json?.error === 'string' ? json.error : json?.error?.message) ||

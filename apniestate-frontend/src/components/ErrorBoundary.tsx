@@ -43,25 +43,46 @@ export class ErrorBoundary extends Component<Props, State> {
           <p style={{ color: '#64748b', maxWidth: '500px', marginBottom: '32px' }}>
             We encountered an unexpected error. This might be due to a network issue or a temporary service disruption.
           </p>
-          <button
-            onClick={() => window.location.reload()}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              backgroundColor: '#3b82f6',
-              color: 'white',
-              padding: '12px 24px',
-              borderRadius: '8px',
-              border: 'none',
-              fontWeight: '600',
-              cursor: 'pointer',
-              transition: 'background-color 0.2s'
-            }}
-          >
-            <RefreshCcw size={18} />
-            Reload Application
-          </button>
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
+            <button
+              onClick={() => this.setState({ hasError: false })}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                backgroundColor: '#2648E7',
+                color: 'white',
+                padding: '12px 24px',
+                borderRadius: '12px',
+                border: 'none',
+                fontWeight: '600',
+                cursor: 'pointer',
+              }}
+            >
+              <RefreshCcw size={18} />
+              Try Again
+            </button>
+            <button
+              onClick={() => {
+                this.setState({ hasError: false });
+                window.location.href = '/dashboard';
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                backgroundColor: '#f1f5f9',
+                color: '#1e293b',
+                padding: '12px 24px',
+                borderRadius: '12px',
+                border: '1px solid #cbd5e1',
+                fontWeight: '600',
+                cursor: 'pointer',
+              }}
+            >
+              Return to Dashboard
+            </button>
+          </div>
         </div>
       );
     }
