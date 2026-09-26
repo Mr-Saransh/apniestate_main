@@ -17,6 +17,7 @@ import VendorsPage from './VendorsPage';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { normalizeUnit, cleanNumeric, detectDiscipline } from '@/utils/constructionIntelligence';
+import ChallanCameraUpload from '@/components/shared/ChallanCameraUpload';
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -1197,9 +1198,10 @@ function ReceivedTab({
         });
 
         const maxWidth = 180;
-        const scale = maxWidth / img.width;
-        const width = img.width * scale;
-        const height = img.height * scale;
+        const maxHeight = pageH - 60;
+        const scale = Math.min(maxWidth / (img.width || 1), maxHeight / (img.height || 1));
+        const width = (img.width || 100) * scale;
+        const height = (img.height || 100) * scale;
 
         if (currentY + 25 + height > pageH - 20) {
           doc.addPage();
@@ -2712,13 +2714,19 @@ function PurchaseModals({
                   )}
                 </div>
 
-                <div className="space-y-1.5 mt-4">
-                  <label className="text-sm font-bold text-foreground">Upload Bill / Challan (Optional)</label>
-                  <input
-                    type="file"
-                    accept="image/*,.pdf"
-                    className="w-full bg-white border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#2648E7] text-gray-900 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-bold file:bg-[#2648E7]/10 file:text-[#2648E7] hover:file:bg-[#2648E7]/20 transition-all cursor-pointer"
-                    onChange={e => setFormData({ ...formData, billFile: e.target.files?.[0] })}
+                <div className="mt-4">
+                  <ChallanCameraUpload
+                    label="Delivery Challan / Vendor Bill (Optional)"
+                    helperText="Snap a photo using your device camera or upload a file to attach it to this GRN and print inside the generated PDF"
+                    value={formData.billFile}
+                    currentUrl={formData.billUrl}
+                    onChange={(file, previewUrl) => {
+                      setFormData((prev: any) => ({
+                        ...prev,
+                        billFile: file,
+                        billPreviewUrl: previewUrl || null,
+                      }));
+                    }}
                   />
                 </div>
               </>

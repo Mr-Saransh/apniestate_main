@@ -117,6 +117,7 @@ export const POST = withAuth(async (req: NextRequest, user) => {
     grand_total: grandTotal,
     terms: body.terms || "1. Payment terms: 50% advance, balance on completion.\n2. Validity: 15 days from date of issue.",
     notes: body.notes || "",
+    attachment_url: body.attachment_url || null,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
   };

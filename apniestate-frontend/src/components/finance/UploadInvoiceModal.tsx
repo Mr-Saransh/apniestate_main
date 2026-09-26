@@ -4,6 +4,7 @@ import { invoicesApi, type Invoice } from '@/api/invoices';
 import { vendorsApi, type Vendor } from '@/api/vendors';
 import { duesApi } from '@/api/dues';
 import { apiClient } from '@/api/client';
+import ChallanCameraUpload from '@/components/shared/ChallanCameraUpload';
 
 interface UploadInvoiceModalProps {
   isOpen: boolean;
@@ -236,38 +237,24 @@ export default function UploadInvoiceModal({
             </button>
           </div>
 
-          {/* File input area */}
+          {/* File & Camera input area */}
           <div>
-            <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">
-              Invoice File (PDF or Image) <span className="text-red-500">*</span>
-            </label>
-            <label className="border-2 border-dashed border-border hover:border-[#2648E7] rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer transition-colors bg-muted/20 hover:bg-[#2648E7]/5">
-              <input
-                type="file"
-                accept="application/pdf,image/*"
-                onChange={handleFileChange}
-                className="hidden"
-                required={!file}
-              />
-              {file ? (
-                <div className="flex flex-col items-center text-center">
-                  <div className="size-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mb-1">
-                    <CheckCircle2 size={20} />
-                  </div>
-                  <p className="text-xs font-bold text-foreground max-w-xs truncate">{file.name}</p>
-                  <p className="text-[10px] text-muted-foreground">{(file.size / 1024).toFixed(1)} KB · Click to replace</p>
-                  {previewUrl && (
-                    <img src={previewUrl} alt="Preview" className="mt-2 max-h-28 rounded-lg border border-border object-contain" />
-                  )}
-                </div>
-              ) : (
-                <div className="flex flex-col items-center text-center">
-                  <FileText size={28} className="text-[#2648E7] mb-1" />
-                  <p className="text-xs font-bold text-foreground">Click to browse or drag file here</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">Supports PDF, PNG, JPG (max 10MB)</p>
-                </div>
-              )}
-            </label>
+            <ChallanCameraUpload
+              label="Invoice / Bill Document (PDF or Photo)"
+              helperText="Snap a photo of the vendor bill using your camera or choose a file from your device"
+              value={file}
+              onChange={(newFile, preview) => {
+                setFile(newFile);
+                setError('');
+                if (preview) {
+                  setPreviewUrl(preview);
+                } else if (newFile && newFile.type.startsWith('image/')) {
+                  setPreviewUrl(URL.createObjectURL(newFile));
+                } else {
+                  setPreviewUrl(null);
+                }
+              }}
+            />
           </div>
 
           {mode === 'EXISTING' ? (

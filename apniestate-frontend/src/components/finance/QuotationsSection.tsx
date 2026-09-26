@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { 
   FileText, Plus, Download, Trash2, Edit3, CheckCircle2, 
-  X, Eye, Send, Printer, User, Phone, Mail, Calendar, Percent
+  X, Eye, Send, Printer, User, Phone, Mail, Calendar, Percent, Camera
 } from 'lucide-react';
 import { apiClient } from '@/api/client';
 import { useProject } from '@/context/ProjectContext';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import ChallanCameraUpload from '@/components/shared/ChallanCameraUpload';
 
 export interface QuotationItem {
   id?: string;
@@ -40,6 +41,7 @@ export interface ClientQuotation {
   grand_total: number;
   terms?: string;
   notes?: string;
+  attachment_url?: string;
   created_at: string;
 }
 
@@ -67,6 +69,8 @@ export default function QuotationsSection() {
   const [taxRate, setTaxRate] = useState<number>(18);
   const [terms, setTerms] = useState('1. 50% advance along with work order.\n2. 40% running payment on stage completion.\n3. 10% on final handover.\n4. Quote valid for 15 days.');
   const [notes, setNotes] = useState('Thank you for choosing Apni Estate ERP.');
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
+  const [attachmentUrl, setAttachmentUrl] = useState<string>('');
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
 
@@ -102,6 +106,8 @@ export default function QuotationsSection() {
     setTaxRate(18);
     setTerms('1. 50% advance along with work order.\n2. 40% running payment on stage completion.\n3. 10% on final handover.\n4. Quote valid for 15 days.');
     setNotes('Thank you for choosing Apni Estate ERP.');
+    setAttachmentFile(null);
+    setAttachmentUrl('');
     setFormError('');
   };
 
@@ -125,6 +131,8 @@ export default function QuotationsSection() {
     setTaxRate(q.tax_rate ?? 18);
     setTerms(q.terms || '');
     setNotes(q.notes || '');
+    setAttachmentFile(null);
+    setAttachmentUrl(q.attachment_url || '');
     setShowModal(true);
   };
 
@@ -150,7 +158,7 @@ export default function QuotationsSection() {
   };
 
   // Calculations
-  const subtotal = items.reduce((sum, it) => sum + (Number(it.quantity || 0) * Number(it.rate || 0)), 0);
+  const subtotal = items.reduce((sum: number, it: QuotationItem) => sum + (Number(it.quantity || 0) * Number(it.rate || 0)), 0);
   const discountAmount = discountType === 'PERCENT' ? (subtotal * (discountValue / 100)) : discountValue;
   const taxable = Math.max(0, subtotal - discountAmount);
   const taxAmount = (taxable * taxRate) / 100;
@@ -162,7 +170,7 @@ export default function QuotationsSection() {
       setFormError('Client name is required.');
       return;
     }
-    const validItems = items.filter(it => it.description.trim());
+    const validItems = items.filter((it: QuotationItem) => it.description.trim());
     if (validItems.length === 0) {
       setFormError('Please add at least one line item with description.');
       return;
@@ -170,6 +178,27 @@ export default function QuotationsSection() {
 
     setSaving(true);
     setFormError('');
+
+    let finalAttachmentUrl = attachmentUrl;
+    if (attachmentFile) {
+      try {
+        const uploadData = new FormData();
+        uploadData.append('file', attachmentFile);
+        const token = localStorage.getItem('access_token') || localStorage.getItem('token');
+        const API_BASE = import.meta.env.VITE_API_URL || '/api';
+        const uploadRes = await fetch(`${API_BASE}/cloudinary/upload`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          body: uploadData,
+        });
+        if (uploadRes.ok) {
+          const cloudJson = await uploadRes.json();
+          finalAttachmentUrl = cloudJson.result?.secure_url || finalAttachmentUrl;
+        }
+      } catch (uploadErr) {
+        console.warn('Failed to upload quotation document to Cloudinary:', uploadErr);
+      }
+    }
 
     const payload = {
       project_id: activeProjectId,
@@ -185,7 +214,8 @@ export default function QuotationsSection() {
       discount_value: discountValue,
       tax_rate: taxRate,
       terms,
-      notes
+      notes,
+      attachment_url: finalAttachmentUrl || undefined,
     };
 
     try {
@@ -224,7 +254,7 @@ export default function QuotationsSection() {
   };
 
   // Generate Branded PDF using jsPDF + autoTable
-  const generatePDF = (q: ClientQuotation) => {
+  const generatePDF = async (q: ClientQuotation) => {
     const doc = new jsPDF();
     const primaryColor: [number, number, number] = [38, 72, 231]; // #2648E7
 
@@ -386,6 +416,56 @@ export default function QuotationsSection() {
     doc.text('Authorized Signatory', 168, pageHeight - 25, { align: 'center' });
     doc.text('Thank you for your business!', 14, pageHeight - 15);
 
+    // If an attachment/challan/bill photo is present, render it onto an attached page in the PDF
+    if (q.attachment_url) {
+      doc.addPage();
+      const pageW = doc.internal.pageSize.getWidth();
+      const pageH = doc.internal.pageSize.getHeight();
+
+      // Top Accent Bar
+      doc.setFillColor(...primaryColor);
+      doc.rect(0, 0, pageW, 8, 'F');
+
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...primaryColor);
+      doc.text('ATTACHED QUOTATION DOCUMENT / BILL PHOTO', 14, 22);
+
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(100, 100, 100);
+      doc.text(`Reference for Quotation #: ${q.quotation_number} (${q.client_name})`, 14, 28);
+      doc.text(`Attached on: ${new Date(q.created_at || Date.now()).toLocaleDateString('en-GB')}`, 14, 33);
+
+      doc.setDrawColor(220, 220, 225);
+      doc.line(14, 37, pageW - 14, 37);
+
+      try {
+        const img = new Image();
+        img.crossOrigin = "Anonymous";
+        img.src = q.attachment_url;
+        await new Promise((resolve) => {
+          img.onload = resolve;
+          img.onerror = resolve;
+        });
+
+        const maxWidth = pageW - 28;
+        const maxHeight = pageH - 65;
+        const scale = Math.min(maxWidth / (img.width || 1), maxHeight / (img.height || 1));
+        const width = (img.width || 100) * scale;
+        const height = (img.height || 100) * scale;
+
+        doc.addImage(img, 'JPEG', 14, 45, width, height);
+
+        // Verification stamp
+        doc.setFontSize(8);
+        doc.setTextColor(140, 140, 140);
+        doc.text("Official document photo verified and attached via Apni Estate ERP", 14, pageH - 12);
+      } catch (err) {
+        console.error("Failed to render attachment onto quotation PDF:", err);
+      }
+    }
+
     // Save PDF
     doc.save(`${q.quotation_number}_${q.client_name.replace(/\s+/g, '_')}.pdf`);
   };
@@ -438,7 +518,7 @@ export default function QuotationsSection() {
         </div>
       ) : (
         <div className="space-y-3">
-          {quotations.map((q) => {
+          {quotations.map((q: ClientQuotation) => {
             const sc = statusColors[q.status] || statusColors.DRAFT;
             return (
               <div
@@ -461,6 +541,13 @@ export default function QuotationsSection() {
                     {q.client_phone && ` · ${q.client_phone}`}
                     {q.valid_until && ` · Valid till: ${new Date(q.valid_until).toLocaleDateString('en-GB')}`}
                   </p>
+                  {q.attachment_url && (
+                    <div className="mt-1">
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+                        <Camera size={11} /> Photo / Challan Attached (In PDF)
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-border">
@@ -652,7 +739,7 @@ export default function QuotationsSection() {
                 </div>
 
                 <div className="space-y-2.5">
-                  {items.map((it, idx) => (
+                  {items.map((it: QuotationItem, idx: number) => (
                     <div key={idx} className="p-3 bg-muted/40 border border-border rounded-xl space-y-2">
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-[10px] font-bold text-muted-foreground">Item #{idx + 1}</span>
@@ -818,6 +905,20 @@ export default function QuotationsSection() {
                     className="w-full p-2.5 border border-border rounded-xl text-xs focus:outline-none focus:border-[#2648E7]"
                   />
                 </div>
+              </div>
+
+              {/* Quotation Challan / Bill Document Camera Upload */}
+              <div className="pt-2">
+                <ChallanCameraUpload
+                  label="Quotation Slip / Bill / Reference Drawing (Optional)"
+                  helperText="Snap a photo using your device camera or upload a file to attach directly to this Quotation and print inside the generated PDF"
+                  value={attachmentFile}
+                  currentUrl={attachmentUrl}
+                  onChange={(file, previewUrl) => {
+                    setAttachmentFile(file);
+                    if (!file && !previewUrl) setAttachmentUrl('');
+                  }}
+                />
               </div>
 
               {/* Action Buttons */}
