@@ -19,7 +19,7 @@ export const PATCH = withAuth(async (req: NextRequest, user, { params }: { param
   if ("error" in parsed) return parsed.error;
 
   try {
-    const updated = await updateDpr(id, parsed.data, user.company_id || undefined);
+    const updated = await updateDpr(id, parsed.data, user.company_id || undefined, user.sub);
     return ok(updated);
   } catch (error: any) {
     return new Response(JSON.stringify({ success: false, error: { message: error.message } }), {

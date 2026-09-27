@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useProject } from '@/context/ProjectContext';
 import {
   BarChart2,
@@ -29,8 +29,15 @@ function Card({ children, className = "" }: { children: React.ReactNode; classNa
 
 export default function ProgressWorkspace() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const { activeProjectId } = useProject();
   const view = searchParams.get('tab') || 'timeline';
+
+  useEffect(() => {
+    if (view === 'dpr') {
+      navigate('/dpr', { replace: true });
+    }
+  }, [view, navigate]);
 
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [dprs, setDprs] = useState<any[]>([]);

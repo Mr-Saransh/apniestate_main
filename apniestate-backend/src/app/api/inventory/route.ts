@@ -8,7 +8,8 @@ import { ok, created } from "@/lib/response";
 export const GET = withAuth(async (req, user) => {
   const url = new URL(req.url);
   const projectId = url.searchParams.get("project_id") || undefined;
-  const items = await getInventoryItems(user.sub, user.role, projectId);
+  const siteId = url.searchParams.get("site_id") || undefined;
+  const items = await getInventoryItems(user.sub, user.role, projectId, siteId);
   return ok(items);
 });
 

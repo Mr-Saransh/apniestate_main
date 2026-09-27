@@ -1,8 +1,20 @@
 {
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "CommonJS",
+    "esModuleInterop": true,
+    "downlevelIteration": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
+  },
   "ts-node": {
     "compilerOptions": {
+      "target": "es2020",
       "module": "CommonJS",
-      "esModuleInterop": true
+      "esModuleInterop": true,
+      "downlevelIteration": true
     }
   }
 }

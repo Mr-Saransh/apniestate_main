@@ -269,7 +269,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
               if (['/cashbook', '/expenses', '/invoices', '/payments', '/budgets'].includes(item.id)) {
                 targetPath = `/finance?tab=${item.id.replace('/', '')}`;
               }
-              if (['/timeline', '/milestones', '/dpr', '/calendar'].includes(item.id)) {
+              if (['/timeline', '/milestones', '/calendar'].includes(item.id)) {
                 targetPath = `/progress?tab=${item.id.replace('/', '')}`;
               }
               if (['/attendance', '/equipment', '/sites', '/contractors', '/workers'].includes(item.id)) {

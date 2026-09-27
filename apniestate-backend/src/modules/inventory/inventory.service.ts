@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+import { prisma } from "../../lib/prisma";
 import { InventoryTransactionType } from "@prisma/client";
 
 // Industry-standard default consumption rates for common construction materials
@@ -32,11 +32,14 @@ function getDefaultRate(materialName: string): number | null {
 const STOCK_IN_TYPES = ["IN", "GRN_RECEIPT", "RETURN", "TRANSFER_IN"];
 const STOCK_OUT_TYPES = ["OUT", "MATERIAL_ISSUE", "DAMAGE", "TRANSFER_OUT"];
 
-export async function getInventoryItems(userId: string, role?: string, projectId?: string) {
+export async function getInventoryItems(userId: string, role?: string, projectId?: string, siteId?: string) {
   const where: any = {};
 
-  // Project scoping — always filter by project if provided
-  if (projectId) {
+  // Site scoping takes highest priority if specified
+  if (siteId) {
+    where.site_id = siteId;
+  } else if (projectId) {
+    // Project scoping — filter by project if provided
     where.site = { project_id: projectId };
   } else if (role === "BUILDER" || role === "ADMIN") {
     // see all across company (only on company dashboard)
@@ -62,7 +65,8 @@ export async function getInventoryItems(userId: string, role?: string, projectId
     const stockIn = item.transactions.filter(t => STOCK_IN_TYPES.includes(t.type)).reduce((s, t) => s + t.quantity, 0);
     const stockOut = item.transactions.filter(t => STOCK_OUT_TYPES.includes(t.type)).reduce((s, t) => s + t.quantity, 0);
     const adjust = item.transactions.filter(t => t.type === "ADJUST").reduce((s, t) => s + t.quantity, 0);
-    const availableStock = stockIn - stockOut + adjust;
+    const computedStock = stockIn - stockOut + adjust;
+    const availableStock = stockIn > 0 ? Math.max(0, computedStock) : Math.max(0, item.quantity);
 
     // Average daily usage: total OUT in last 30 days divided by 30
     const thirtyDaysAgo = new Date();
@@ -129,7 +133,8 @@ export async function getInventoryById(id: string) {
   const stockIn = item.transactions.filter(t => STOCK_IN_TYPES.includes(t.type)).reduce((s, t) => s + t.quantity, 0);
   const stockOut = item.transactions.filter(t => STOCK_OUT_TYPES.includes(t.type)).reduce((s, t) => s + t.quantity, 0);
   const adjust = item.transactions.filter(t => t.type === "ADJUST").reduce((s, t) => s + t.quantity, 0);
-  const availableStock = stockIn - stockOut + adjust;
+  const computedStock = stockIn - stockOut + adjust;
+  const availableStock = stockIn > 0 ? Math.max(0, computedStock) : Math.max(0, item.quantity);
 
   return {
     ...item,

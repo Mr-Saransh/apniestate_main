@@ -33,6 +33,15 @@ export const CreateDprSchema = z.object({
   materials_consumed: z.any().optional().nullable(),
   issues_faced: z.any().optional().nullable(),
   photos: z.any().optional().nullable(),
+  // Smart DPR Consumptions
+  consumptions: z.array(z.object({
+    material_id: z.string().min(1, "material_id is required"),
+    quantity: z.number().positive("Quantity must be greater than 0"),
+    unit: z.string().optional().nullable(),
+    name: z.string().optional().nullable(),
+    notes: z.string().optional().nullable(),
+    source: z.enum(["explicit", "inferred", "manual"]).optional().nullable(),
+  })).optional().nullable(),
 });
 
 export const UpdateDprSchema = CreateDprSchema.partial();
