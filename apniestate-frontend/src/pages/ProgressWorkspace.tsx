@@ -15,9 +15,11 @@ import {
   ChevronRight,
   CalendarDays,
   Flag,
+  Sparkles,
 } from 'lucide-react';
 import { apiClient } from '@/api/client';
 import { milestonesApi, type Milestone } from '@/api/milestones';
+import SmartDprModal from '@/components/dpr/SmartDprModal';
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-3">{children}</p>;
@@ -34,10 +36,11 @@ export default function ProgressWorkspace() {
   const view = searchParams.get('tab') || 'timeline';
 
   useEffect(() => {
-    if (view === 'dpr') {
-      navigate('/dpr', { replace: true });
+    if (view === 'dpr' || searchParams.get('action') === 'dpr') {
+      setShowDprModal(true);
+      setSearchParams({ tab: 'timeline' }, { replace: true });
     }
-  }, [view, navigate]);
+  }, [view, searchParams, setSearchParams]);
 
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [dprs, setDprs] = useState<any[]>([]);
@@ -59,13 +62,6 @@ export default function ProgressWorkspace() {
   const [mTargetDate, setMTargetDate] = useState('');
   const [isCreatingMilestone, setIsCreatingMilestone] = useState(false);
 
-  // Submit DPR Form
-  const [dprSiteId, setDprSiteId] = useState('');
-  const [dprSummary, setDprSummary] = useState('');
-  const [dprPercentage, setDprPercentage] = useState(0);
-  const [dprPhotoUrl, setDprPhotoUrl] = useState('');
-  const [isUploading, setIsUploading] = useState(false);
-
   const fetchData = async () => {
     if (!activeProjectId) return;
     try {
@@ -83,9 +79,6 @@ export default function ProgressWorkspace() {
       if (sitesRes.success) {
         const sitesData = Array.isArray(sitesRes.data) ? sitesRes.data : [];
         setSites(sitesData);
-        if (sitesData.length > 0 && !dprSiteId) {
-          setDprSiteId(sitesData[0].id);
-        }
       }
     } catch (err) {
       console.error(err);
@@ -129,61 +122,7 @@ export default function ProgressWorkspace() {
     }
   };
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
 
-    try {
-      setIsUploading(true);
-      const token = localStorage.getItem('access_token');
-      const formData = new FormData();
-      formData.append("file", file);
-      
-      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
-      const res = await fetch(`${baseUrl}/cloudinary/upload`, {
-        method: "POST",
-        headers: token ? { "Authorization": `Bearer ${token}` } : {},
-        body: formData
-      });
-      const data = await res.json();
-      if (data.success && data.result?.secure_url) {
-        setDprPhotoUrl(data.result.secure_url);
-      }
-    } catch (err) {
-      alert("Failed to upload image");
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  const handleSubmitDpr = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!dprSiteId || !dprSummary) return;
-
-    try {
-      const payload: any = {
-        project_id: activeProjectId,
-        site_id: dprSiteId,
-        report_date: new Date().toISOString(),
-        summary: dprSummary,
-        completion_percentage: dprPercentage,
-        milestone_id: selectedMilestone ? selectedMilestone.id : undefined,
-      };
-
-      if (dprPhotoUrl) {
-        payload.photos = [dprPhotoUrl];
-      }
-      
-      await apiClient.post('/dpr', payload);
-      setShowDprModal(false);
-      setDprSummary('');
-      setDprPercentage(0);
-      setDprPhotoUrl('');
-      fetchData();
-    } catch (err) {
-      alert("Failed to submit DPR");
-    }
-  };
 
   const handleDateClick = (date: Date) => {
     setSelectedDate(date);
@@ -295,12 +234,20 @@ export default function ProgressWorkspace() {
             <>
               <div className="flex justify-between items-center mb-4">
                 <SectionLabel>Milestones</SectionLabel>
-                <button 
-                  onClick={() => { setMTargetDate(''); setShowAddMilestone(true); }}
-                  className="text-xs font-bold bg-[#2648E7]/10 text-[#2648E7] px-3 py-1.5 rounded-lg flex items-center gap-1"
-                >
-                  <Plus size={14} /> Add Milestone
-                </button>
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={() => { setSelectedMilestone(null); setShowDprModal(true); }}
+                    className="text-xs font-bold bg-[#2648E7] text-white px-3 py-1.5 rounded-lg flex items-center gap-1.5 hover:bg-[#1a35b3] shadow-xs cursor-pointer transition-colors"
+                  >
+                    <Sparkles size={14} /> Submit DPR
+                  </button>
+                  <button 
+                    onClick={() => { setMTargetDate(''); setShowAddMilestone(true); }}
+                    className="text-xs font-bold bg-[#2648E7]/10 text-[#2648E7] px-3 py-1.5 rounded-lg flex items-center gap-1 hover:bg-[#2648E7]/20 transition-colors cursor-pointer"
+                  >
+                    <Plus size={14} /> Add Milestone
+                  </button>
+                </div>
               </div>
               
               <div className="space-y-0">
@@ -631,75 +578,19 @@ export default function ProgressWorkspace() {
         </div>
       )}
 
-      {/* Submit DPR Modal */}
+      {/* Smart DPR Modal */}
       {showDprModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
-            <div className="flex items-center justify-between p-4 border-b border-border shrink-0">
-              <h3 className="font-bold text-lg">Submit DPR</h3>
-              <button onClick={() => setShowDprModal(false)} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground"><X size={18} /></button>
-            </div>
-            <form onSubmit={handleSubmitDpr} className="p-4 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
-              {selectedMilestone && (
-                <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3 mb-4">
-                  <p className="text-xs text-indigo-600 font-bold uppercase tracking-wider mb-1">Applying to Milestone</p>
-                  <p className="font-semibold text-indigo-900">{selectedMilestone.name}</p>
-                </div>
-              )}
-              
-              <div>
-                <label className="block text-sm font-semibold mb-1.5">Select Site</label>
-                <select required value={dprSiteId} onChange={e => setDprSiteId(e.target.value)} className="w-full bg-muted border border-transparent rounded-xl px-4 py-2.5 text-sm outline-none focus:border-[#2648E7] focus:bg-white">
-                  {sites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-semibold mb-1.5">Summary of Work</label>
-                <textarea required rows={3} value={dprSummary} onChange={e => setDprSummary(e.target.value)} className="w-full bg-muted border border-transparent rounded-xl px-4 py-2.5 text-sm outline-none focus:border-[#2648E7] focus:bg-white" placeholder="Describe the work done today..." />
-              </div>
-              
-              {selectedMilestone && (
-                <div>
-                  <label className="block text-sm font-semibold mb-1.5 flex justify-between">
-                    <span>% Completed Today</span>
-                    <span className="text-[#2648E7]">{dprPercentage}%</span>
-                  </label>
-                  <input type="range" min="0" max="100" value={dprPercentage} onChange={e => setDprPercentage(Number(e.target.value))} className="w-full accent-[#2648E7]" />
-                  <p className="text-xs text-muted-foreground mt-1">How much of the milestone was finished today?</p>
-                </div>
-              )}
-
-              <div>
-                <label className="block text-sm font-semibold mb-1.5">Photo Evidence</label>
-                {dprPhotoUrl ? (
-                  <div className="relative rounded-xl overflow-hidden aspect-video border border-border">
-                    <img src={dprPhotoUrl} alt="DPR" className="w-full h-full object-cover" />
-                    <button type="button" onClick={() => setDprPhotoUrl('')} className="absolute top-2 right-2 bg-black/50 text-white p-1.5 rounded-full hover:bg-black/70">
-                      <X size={14} />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="relative">
-                    <input type="file" accept="image/*" onChange={handleImageUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
-                    <div className="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-border rounded-xl p-6 bg-muted/50 text-muted-foreground">
-                      {isUploading ? (
-                        <div className="animate-pulse flex flex-col items-center gap-2"><UploadCloud size={24} /><span>Uploading...</span></div>
-                      ) : (
-                        <><UploadCloud size={24} /><span className="text-sm font-medium">Tap to upload photo</span></>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </form>
-            <div className="p-4 border-t border-border shrink-0 flex justify-end">
-              <button onClick={handleSubmitDpr} className="bg-[#2648E7] text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md hover:bg-[#1a35b3] w-full flex justify-center items-center gap-2">
-                <CheckCircle2 size={16} /> Submit Progress Report
-              </button>
-            </div>
-          </div>
-        </div>
+        <SmartDprModal
+          isOpen={showDprModal}
+          onClose={() => setShowDprModal(false)}
+          projectId={activeProjectId}
+          sites={sites}
+          milestones={milestones}
+          initialMilestone={selectedMilestone}
+          onSuccess={() => {
+            fetchData();
+          }}
+        />
       )}
 
 

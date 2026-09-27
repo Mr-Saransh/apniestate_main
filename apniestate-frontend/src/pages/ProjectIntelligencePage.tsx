@@ -545,6 +545,143 @@ function ConstructionHealthTab({ data }: { data: ProjectIntelligenceData | null 
         </Card>
       </div>
 
+      {/* ─── MONEY LEAKAGE & COST INTELLIGENCE SECTION ─── */}
+      {data.moneyLeakage && data.moneyLeakage.items && data.moneyLeakage.items.length > 0 && (
+        <Card className="p-4 sm:p-5 border-rose-200 bg-rose-50/20">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-3.5 pb-3 border-b border-rose-100">
+            <div className="flex items-center gap-2.5">
+              <div className="size-8 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+                <AlertTriangle size={18} />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-rose-900 flex items-center gap-2">
+                  Money Leakage Warnings
+                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-rose-600 text-white">
+                    {data.moneyLeakage.leakageCount} Detected
+                  </span>
+                </h4>
+                <p className="text-[11px] text-rose-700 mt-0.5">
+                  Identified cost overruns, premature advance spending, and material waste for this project
+                </p>
+              </div>
+            </div>
+
+            <div className="text-left sm:text-right">
+              <span className="text-[10px] font-bold uppercase text-rose-500">Estimated Cost Impact</span>
+              <p className="text-base sm:text-lg font-black text-rose-700">
+                {fmt(data.moneyLeakage.totalLeakageAmount)}
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {data.moneyLeakage.items.map((leak, idx) => (
+              <div
+                key={leak.id || idx}
+                className="p-3 rounded-xl bg-white border border-rose-200/80 shadow-2xs space-y-1.5"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <span className="text-xs font-bold text-foreground">
+                    {leak.title}
+                  </span>
+                  <span className={`text-[9px] font-black px-1.5 py-0.5 rounded uppercase shrink-0 ${
+                    leak.severity === 'CRITICAL'
+                      ? 'bg-rose-100 text-rose-800'
+                      : 'bg-amber-100 text-amber-800'
+                  }`}>
+                    {leak.severity}
+                  </span>
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  {leak.reason}
+                </p>
+                <div className="pt-1.5 border-t border-gray-100 flex items-center gap-1.5 text-[11px] font-bold text-[#2648E7]">
+                  <Wrench size={12} className="shrink-0" />
+                  <span className="line-clamp-1">{leak.action}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* ─── CATEGORY BUDGET TRACKING (LABOUR, MATERIALS, ETC.) ─── */}
+      {data.moneyLeakage?.categoryBreakdown && data.moneyLeakage.categoryBreakdown.length > 0 && (
+        <Card className="p-4 sm:p-5">
+          <div className="flex items-center justify-between mb-3.5">
+            <div>
+              <h4 className="text-sm font-bold text-foreground flex items-center gap-2">
+                <Wallet size={16} className="text-[#2648E7]" />
+                Connected Category Budgets
+              </h4>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                Target budgets configured for Labour, Materials, and Equipment with live actual spending
+              </p>
+            </div>
+            <a
+              href="/finance?tab=budgets"
+              className="text-[11px] font-bold text-[#2648E7] hover:underline flex items-center gap-1"
+            >
+              <span>Manage Budgets</span>
+              <ArrowUpRight size={12} />
+            </a>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {data.moneyLeakage.categoryBreakdown.map((cat) => {
+              const isOverrun = cat.isOverrun;
+              return (
+                <div
+                  key={cat.category}
+                  className={`p-3 rounded-xl border ${
+                    isOverrun ? 'bg-rose-50/30 border-rose-200' : 'bg-muted/20 border-border'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs font-bold text-foreground truncate max-w-[150px]">
+                      {cat.name}
+                    </span>
+                    <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded ${
+                      isOverrun
+                        ? 'bg-rose-100 text-rose-800'
+                        : cat.utilization >= 80
+                        ? 'bg-amber-100 text-amber-800'
+                        : 'bg-emerald-100 text-emerald-800'
+                    }`}>
+                      {isOverrun ? 'Overrun' : `${cat.utilization}%`}
+                    </span>
+                  </div>
+
+                  <div className="flex items-baseline justify-between text-[11px] text-muted-foreground my-1">
+                    <span>Spent: <strong className="text-foreground">{fmt(cat.spent)}</strong></span>
+                    <span>Budget: <strong>{fmt(cat.allocated)}</strong></span>
+                  </div>
+
+                  <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden mt-1.5">
+                    <div
+                      className={`h-full rounded-full ${
+                        isOverrun ? 'bg-rose-500' : cat.utilization >= 80 ? 'bg-amber-500' : 'bg-emerald-500'
+                      }`}
+                      style={{ width: `${Math.min(100, cat.utilization)}%` }}
+                    />
+                  </div>
+
+                  {isOverrun ? (
+                    <p className="text-[10px] text-rose-600 font-bold mt-1.5">
+                      Over limit by {fmt(cat.overrunAmount)}
+                    </p>
+                  ) : (
+                    <p className="text-[10px] text-muted-foreground mt-1.5">
+                      {fmt(cat.remaining)} remaining
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
+
       {/* Construction Health Dimensions */}
       <div>
         <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-3">Construction Health Dimensions</p>
@@ -1253,7 +1390,15 @@ function ProjectIntelligenceTab({ data, onRefresh }: { data: ProjectIntelligence
           <div className="bg-muted/40 rounded-xl p-3 text-center">
             <p className="text-[9px] uppercase text-muted-foreground">Budget Used</p>
             <p className="text-lg font-bold text-foreground">{data.health.budgetUtilization}%</p>
-            <p className="text-[10px] text-muted-foreground">{data.hasBudget ? fmt(data.health.actualSpend) : 'No budget'}</p>
+            <p className="text-[10px] text-muted-foreground">
+              {data.moneyLeakage && data.moneyLeakage.leakageCount > 0 ? (
+                <span className="text-rose-600 font-bold">{data.moneyLeakage.leakageCount} money risk(s)</span>
+              ) : data.hasBudget ? (
+                fmt(data.health.actualSpend)
+              ) : (
+                'No budget'
+              )}
+            </p>
           </div>
           <div className="bg-muted/40 rounded-xl p-3 text-center">
             <p className="text-[9px] uppercase text-muted-foreground">Work Tables</p>
@@ -1272,6 +1417,67 @@ function ProjectIntelligenceTab({ data, onRefresh }: { data: ProjectIntelligence
           </div>
         </div>
       </Card>
+
+      {/* ─── MONEY LEAKAGE INTELLIGENCE ─── */}
+      {data.moneyLeakage && data.moneyLeakage.items && data.moneyLeakage.items.length > 0 && (
+        <Card className="p-4 sm:p-5 border-rose-200 bg-rose-50/20">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-3.5 pb-3 border-b border-rose-100">
+            <div className="flex items-center gap-2.5">
+              <div className="size-8 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+                <AlertTriangle size={18} />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-rose-900 flex items-center gap-2">
+                  Money Leakage Detection
+                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-rose-600 text-white">
+                    {data.moneyLeakage.leakageCount} Active Warnings
+                  </span>
+                </h4>
+                <p className="text-[11px] text-rose-700 mt-0.5">
+                  Overrun costs and premature spending detected against configured project budgets
+                </p>
+              </div>
+            </div>
+
+            <div className="text-left sm:text-right">
+              <span className="text-[10px] font-bold uppercase text-rose-500">Estimated Money at Risk</span>
+              <p className="text-base sm:text-lg font-black text-rose-700">
+                {fmt(data.moneyLeakage.totalLeakageAmount)}
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            {data.moneyLeakage.items.map((leak, idx) => (
+              <div
+                key={leak.id || idx}
+                className="p-3 rounded-xl bg-white border border-rose-200/90 shadow-2xs space-y-1.5"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-bold text-foreground">{leak.title}</span>
+                    <span className="text-[9px] font-semibold text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                      {leak.category}
+                    </span>
+                  </div>
+                  <span className={`text-[9px] font-black px-1.5 py-0.5 rounded uppercase shrink-0 ${
+                    leak.severity === 'CRITICAL'
+                      ? 'bg-rose-100 text-rose-800'
+                      : 'bg-amber-100 text-amber-800'
+                  }`}>
+                    {leak.severity}
+                  </span>
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">{leak.reason}</p>
+                <div className="pt-1.5 border-t border-gray-100 flex items-center gap-1.5 text-[11px] font-bold text-[#2648E7]">
+                  <Wrench size={12} className="shrink-0" />
+                  <span>Recommended Action: {leak.action}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {/* QOM By Work Table */}
       <WorkTablesSection data={data} />

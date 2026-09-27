@@ -71,7 +71,7 @@ export default function DailyLogsPage() {
           <SrchBar placeholder="Search logs..." />
         </div>
         <button 
-          onClick={() => navigate('/dpr')}
+          onClick={() => navigate('/progress?tab=timeline&action=dpr')}
           className="px-3 py-2 bg-primary text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 flex-shrink-0 hover:bg-primary/90 transition-colors"
         >
           <Plus className="w-3 h-3" /> New Log

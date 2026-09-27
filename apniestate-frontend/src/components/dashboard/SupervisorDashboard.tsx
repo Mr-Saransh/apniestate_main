@@ -88,7 +88,7 @@ export default function SupervisorDashboard() {
                   <p className="text-xs font-bold text-gray-900">Today's DPR</p>
                   <p className="text-[10px] text-gray-500">Not submitted yet</p>
                 </div>
-                <a href="/dpr" className="text-[10px] font-bold bg-primary text-white px-3 py-1.5 rounded hover:bg-primary/90">
+                <a href="/progress?tab=timeline&action=dpr" className="text-[10px] font-bold bg-primary text-white px-3 py-1.5 rounded hover:bg-primary/90">
                   Submit Now
                 </a>
               </div>

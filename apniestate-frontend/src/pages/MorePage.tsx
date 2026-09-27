@@ -26,7 +26,7 @@ const moreItems = [
   { to: '/contractors', icon: Layers, label: 'Contractors', color: '#9333EA', bg: '#F3E8FF' },
   { to: '/leaves', icon: Calendar, label: 'Leaves', color: '#F59E0B', bg: '#FEF3C7' },
   { to: '/payroll', icon: Calculator, label: 'Payroll', color: '#10B981', bg: '#D1FAE5' },
-  { to: '/dpr', icon: ClipboardList, label: 'DPR Logs', color: '#475569', bg: '#F1F5F9' },
+  { to: '/progress?tab=timeline', icon: ClipboardList, label: 'Daily Progress Report', color: '#475569', bg: '#F1F5F9' },
   { to: '/attendance', icon: UserCheck, label: 'Attendance', color: '#1B6EF3', bg: 'rgba(27,110,243,0.06)' },
   { to: '/materials', icon: Boxes, label: 'Materials', color: '#7C3AED', bg: '#F5F3FF' },
   { to: '/sites', icon: MapPin, label: 'Sites', color: '#0EA5E9', bg: '#F0F9FF' },

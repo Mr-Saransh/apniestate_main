@@ -272,6 +272,9 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
               if (['/timeline', '/milestones', '/calendar'].includes(item.id)) {
                 targetPath = `/progress?tab=${item.id.replace('/', '')}`;
               }
+              if (item.id === '/dpr') {
+                targetPath = '/progress?tab=timeline';
+              }
               if (['/attendance', '/equipment', '/sites', '/contractors', '/workers'].includes(item.id)) {
                 targetPath = `/operations?tab=${item.id.replace('/', '')}`;
               }
@@ -291,7 +294,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
               return (
                 <div key={item.id} className={`px-2 ${item.hideOnMobile || group.hideOnMobile ? 'hidden lg:block' : ''}`}>
                   <NavLink
-                    to={item.id}
+                    to={item.id === '/dpr' ? '/progress?tab=timeline' : item.id}
                     onClick={() => onClose && onClose()}
                     className={`group flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
                       isActive 

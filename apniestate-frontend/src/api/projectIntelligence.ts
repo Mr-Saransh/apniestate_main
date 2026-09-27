@@ -113,6 +113,37 @@ export interface IntelligenceSuggestion {
   updated_at: string;
 }
 
+export interface MoneyLeakageItem {
+  id: string;
+  type: string;
+  severity: 'CRITICAL' | 'WARNING' | 'INFO';
+  category: string;
+  title: string;
+  amount: number;
+  reason: string;
+  action: string;
+}
+
+export interface CategoryBudgetDetail {
+  id?: string;
+  category: string;
+  name: string;
+  allocated: number;
+  spent: number;
+  remaining: number;
+  utilization: number;
+  isOverrun: boolean;
+  overrunAmount: number;
+}
+
+export interface MoneyLeakageData {
+  totalLeakageAmount: number;
+  leakageCount: number;
+  riskLevel: 'OPTIMAL' | 'WATCH' | 'HIGH' | 'CRITICAL';
+  items: MoneyLeakageItem[];
+  categoryBreakdown: CategoryBudgetDetail[];
+}
+
 export interface ProjectIntelligenceData {
   project: {
     id: string;
@@ -136,10 +167,11 @@ export interface ProjectIntelligenceData {
     budgetUtilization: number;
     actualSpend: number;
     totalBudget: number;
-    budgetBreakdown: { category: string; allocated: number; spent: number; utilization: number }[];
+    budgetBreakdown: CategoryBudgetDetail[];
     pendingPaymentExposure: number;
     pendingPaymentCount: number;
   };
+  moneyLeakage?: MoneyLeakageData;
   qomVariances: QomVariance[];
   workTables?: WorkTableSummary[];
   workTableStats?: WorkTableStats;

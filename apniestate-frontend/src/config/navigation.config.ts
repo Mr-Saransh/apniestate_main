@@ -90,7 +90,7 @@ const masterSidebar: NavigationSection[] = [
       { to: '/daily-logs', icon: ClipboardList, label: 'Daily Logs' },
       { to: '/attendance', icon: UserCheck, label: 'Attendance' },
       { to: '/workers', icon: HardHat, label: 'Workers' },
-      { to: '/dpr', icon: ClipboardCheck, label: 'Daily Progress Report' },
+      { to: '/progress?tab=timeline', icon: ClipboardCheck, label: 'Daily Progress Report' },
     ],
   },
   {
@@ -184,7 +184,7 @@ const pmBottomNav: NavigationItem[] = [
 const supervisorBottomNav: NavigationItem[] = [
   { to: '/dashboard', icon: Home, label: 'Home' },
   { to: '/attendance', icon: UserCheck, label: 'Attend' },
-  { to: '/dpr', icon: ClipboardCheck, label: 'DPR' },
+  { to: '/progress?tab=timeline', icon: ClipboardCheck, label: 'DPR' },
   { to: '/notifications', icon: Bell, label: 'Alerts', badge: true },
   { to: '/settings', icon: User, label: 'Profile' },
 ];
@@ -219,7 +219,7 @@ const masterFab: FabAction[] = [
   { label: 'Create Project', icon: Plus, path: '/projects?create=true', color: '#FFFFFF', bg: '#0891B2' },
   { label: 'Create Task', icon: ClipboardList, path: '/tasks', color: '#FFFFFF', bg: '#3B82F6' },
   { label: 'Mark Attendance', icon: UserCheck, path: '/attendance', color: '#FFFFFF', bg: '#16A34A' },
-  { label: 'Create DPR', icon: ClipboardCheck, path: '/dpr', color: '#0D1117', bg: '#FCC300' },
+  { label: 'Create DPR', icon: ClipboardCheck, path: '/progress?tab=timeline', color: '#0D1117', bg: '#FCC300' },
   { label: 'Record Expense', icon: Receipt, path: '/finance', color: '#FFFFFF', bg: '#DC2626' },
   { label: 'Req Material', icon: Package, path: '/material-requests', color: '#FFFFFF', bg: '#8B5CF6' },
 ];
@@ -234,7 +234,7 @@ const masterQA: QuickAction[] = [
   { label: 'Approvals', icon: CheckCircle, path: '/approvals', color: '#FCC300', bg: 'rgba(252, 195, 0, 0.1)' },
   { label: 'New Project', icon: FolderKanban, path: '/projects?create=true', color: '#0891B2', bg: 'rgba(8, 145, 178, 0.1)' },
   { label: 'Attendance', icon: UserCheck, path: '/attendance', color: '#2648E7', bg: 'rgba(38, 72, 231, 0.1)' },
-  { label: 'DPR', icon: ClipboardCheck, path: '/dpr', color: '#16A34A', bg: 'rgba(22, 163, 74, 0.1)' },
+  { label: 'DPR', icon: ClipboardCheck, path: '/progress?tab=timeline', color: '#16A34A', bg: 'rgba(22, 163, 74, 0.1)' },
 ];
 
 export function getQuickActionsConfig(role: string): QuickAction[] {

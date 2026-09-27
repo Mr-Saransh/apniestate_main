@@ -142,7 +142,7 @@ export default function App() {
                         <Route path="/progress" element={<ProgressWorkspace />} />
                         <Route path="/timeline" element={<Navigate to="/progress?tab=timeline" replace />} />
                         <Route path="/milestones" element={<Navigate to="/progress?tab=milestones" replace />} />
-                        <Route path="/dpr" element={<DprPage />} />
+                        <Route path="/dpr" element={<Navigate to="/progress?tab=timeline" replace />} />
                         <Route path="/calendar" element={<Navigate to="/progress?tab=calendar" replace />} />
                         <Route path="/project-intelligence" element={<ProjectIntelligencePage />} />
                       </Route>

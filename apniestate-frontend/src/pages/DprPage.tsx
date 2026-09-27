@@ -104,7 +104,10 @@ export default function DprPage() {
   const [isListening, setIsListening] = useState(false);
   const [speechLang, setSpeechLang] = useState<'en-IN' | 'hi-IN'>('en-IN');
   const [speechSupported, setSpeechSupported] = useState(true);
+  const [speechError, setSpeechError] = useState<string | null>(null);
   const recognitionRef = useRef<any>(null);
+  const userWantsListeningRef = useRef(false);
+  const restartTimeoutRef = useRef<any>(null);
 
   // Site inventory & Consumptions
   const [siteInventory, setSiteInventory] = useState<SiteInventoryItem[]>([]);
@@ -221,12 +224,44 @@ export default function DprPage() {
       };
 
       recognition.onerror = (event: any) => {
-        console.warn('Speech recognition error:', event.error);
-        setIsListening(false);
+        if (event.error === 'no-speech') {
+          // Normal silence timeout in Chrome/Edge, not a fatal error
+          return;
+        }
+        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+          userWantsListeningRef.current = false;
+          setIsListening(false);
+          setSpeechError('Microphone permission blocked. Please allow microphone access in your browser address bar.');
+          return;
+        }
+        if (event.error === 'audio-capture') {
+          userWantsListeningRef.current = false;
+          setIsListening(false);
+          setSpeechError('No microphone detected. Please check your mic connection.');
+          return;
+        }
+        if (event.error === 'network') {
+          userWantsListeningRef.current = false;
+          setIsListening(false);
+          setSpeechError('Voice recognition network timeout. Please check your internet connection.');
+          return;
+        }
+        console.warn('Speech recognition notice:', event.error);
       };
 
       recognition.onend = () => {
-        setIsListening(false);
+        if (userWantsListeningRef.current) {
+          if (restartTimeoutRef.current) clearTimeout(restartTimeoutRef.current);
+          restartTimeoutRef.current = setTimeout(() => {
+            if (userWantsListeningRef.current && recognitionRef.current) {
+              try {
+                recognitionRef.current.start();
+              } catch (_) {}
+            }
+          }, 150);
+        } else {
+          setIsListening(false);
+        }
       };
 
       recognitionRef.current = recognition;
@@ -236,33 +271,56 @@ export default function DprPage() {
     }
 
     return () => {
+      if (restartTimeoutRef.current) clearTimeout(restartTimeoutRef.current);
       if (recognitionRef.current) {
         try {
-          recognitionRef.current.stop();
+          recognitionRef.current.abort();
         } catch (_) {}
       }
     };
   }, [speechLang]);
 
-  const toggleSpeechRecognition = () => {
+  const toggleSpeechRecognition = async () => {
     if (!speechSupported || !recognitionRef.current) {
       alert('Voice input is unavailable in this browser. Please use text input instead.');
       return;
     }
 
     if (isListening) {
+      userWantsListeningRef.current = false;
+      setIsListening(false);
+      if (restartTimeoutRef.current) clearTimeout(restartTimeoutRef.current);
       try {
         recognitionRef.current.stop();
       } catch (_) {}
-      setIsListening(false);
     } else {
+      setSpeechError(null);
+      if (typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          stream.getTracks().forEach((t) => t.stop());
+        } catch (permErr: any) {
+          if (permErr.name === 'NotAllowedError' || permErr.name === 'PermissionDeniedError') {
+            setSpeechError('Microphone permission blocked. Please allow microphone access in your browser address bar.');
+            return;
+          }
+        }
+      }
+
       try {
+        userWantsListeningRef.current = true;
+        setIsListening(true);
         recognitionRef.current.lang = speechLang;
         recognitionRef.current.start();
-        setIsListening(true);
-      } catch (err) {
-        console.error('Error starting speech recognition:', err);
-        setIsListening(false);
+      } catch (err: any) {
+        if (err.name === 'InvalidStateError') {
+          userWantsListeningRef.current = true;
+          setIsListening(true);
+        } else {
+          userWantsListeningRef.current = false;
+          setIsListening(false);
+          setSpeechError('Could not start microphone. Please try clicking again.');
+        }
       }
     }
   };

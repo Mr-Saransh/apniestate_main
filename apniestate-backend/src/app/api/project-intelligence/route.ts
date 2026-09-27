@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 import { withAuth } from "@/middleware/auth.middleware";
 import { prisma } from "@/lib/prisma";
 import { ok } from "@/lib/response";
+import { calculateProjectCategorySpending } from "@/modules/budgets/budgets.service";
 
 /**
  * GET /api/project-intelligence?project_id=xxx
@@ -148,14 +149,49 @@ export const GET = withAuth(async (req: NextRequest, user) => {
     const totalBudget = project.budget || 0;
     const budgetUtilization = totalBudget > 0 ? Math.round((actualSpend / totalBudget) * 100) : 0;
 
-    // Budget breakdown by category
+    // Live connected spending per category across labour logs, purchase orders, equipment, expenses, and cashbook
+    const categorySpending = await calculateProjectCategorySpending(projectId);
     const budgets = await prisma.budget.findMany({ where: { project_id: projectId } });
-    const budgetBreakdown = budgets.map((b) => ({
-      category: b.category,
-      allocated: b.allocated,
-      spent: b.spent,
-      utilization: b.allocated > 0 ? Math.round((b.spent / b.allocated) * 100) : 0,
-    }));
+
+    const categoryLabels: Record<string, string> = {
+      MATERIALS: "Materials (Cement, Steel, Sand)",
+      MATERIAL: "Materials (Cement, Steel, Sand)",
+      LABOUR: "Labour & Workforce",
+      EQUIPMENT: "Equipment & Machinery",
+      SUBCONTRACT: "Subcontracts & Contractors",
+      SUBCONTRACTS: "Subcontracts & Contractors",
+      OVERHEAD: "Site Overheads & Office",
+      GENERAL: "Site Overheads & Office",
+      OFFICE: "Site Overheads & Office",
+      CONTINGENCY: "Contingency & Buffer",
+      OTHER: "Other Expenses",
+    };
+
+    const budgetBreakdown = budgets.map((b) => {
+      let normCat = b.category.toString().toUpperCase();
+      if (normCat === "MATERIAL") normCat = "MATERIALS";
+      if (normCat === "SUBCONTRACTS") normCat = "SUBCONTRACT";
+      if (normCat === "GENERAL" || normCat === "OFFICE") normCat = "OVERHEAD";
+
+      const spent = categorySpending[normCat] ?? (categorySpending[b.category] || b.spent || 0);
+      const remaining = b.allocated - spent;
+      const utilization = b.allocated > 0 ? Math.round((spent / b.allocated) * 100) : 0;
+      const isOverrun = spent > b.allocated && b.allocated > 0;
+      const overrunAmount = isOverrun ? spent - b.allocated : 0;
+
+      return {
+        id: b.id,
+        category: b.category,
+        name: categoryLabels[b.category] || b.category,
+        allocated: b.allocated,
+        spent,
+        remaining,
+        utilization,
+        isOverrun,
+        overrunAmount,
+      };
+    });
+
 
     // Pending payment exposure
     const unpaidInvoices = await prisma.invoice.findMany({
@@ -479,9 +515,114 @@ export const GET = withAuth(async (req: NextRequest, user) => {
     }
 
     // ═══════════════════════════════════════════════════════════
-    // 8. INSIGHTS & RECOMMENDED ACTIONS
+    // 8. MONEY LEAKAGE & COST OVERRUN DETECTION
+    // ═══════════════════════════════════════════════════════════
+    const moneyLeakageItems: any[] = [];
+
+    // 1. Direct Category Overruns
+    for (const b of budgetBreakdown) {
+      if (b.isOverrun && b.overrunAmount > 0) {
+        moneyLeakageItems.push({
+          id: `overrun-${b.category}`,
+          type: "BUDGET_OVERRUN",
+          severity: "CRITICAL",
+          category: b.name,
+          title: `${b.name} exceeded budget by ₹${Math.round(b.overrunAmount).toLocaleString("en-IN")}`,
+          amount: Math.round(b.overrunAmount),
+          reason: `Actual spending of ₹${Math.round(b.spent).toLocaleString("en-IN")} has crossed the allocated budget of ₹${Math.round(b.allocated).toLocaleString("en-IN")} (${b.utilization}% spent).`,
+          action: `Freeze further non-urgent ${b.name.toLowerCase()} expenses and verify site muster/invoices with the site supervisor.`,
+        });
+      }
+    }
+
+    // 2. Spending Pace vs Schedule Progress Mismatch (Premature Drain)
+    const progressPct = project.progress_percentage || overallScheduleProgress || 0;
+    for (const b of budgetBreakdown) {
+      if (b.allocated > 0 && !b.isOverrun) {
+        if (b.utilization >= 75 && progressPct <= 40) {
+          const excessPaceAmount = Math.round(b.spent - (b.allocated * (progressPct / 100)));
+          if (excessPaceAmount > 10000) {
+            moneyLeakageItems.push({
+              id: `pace-${b.category}`,
+              type: "PREMATURE_SPENDING",
+              severity: "WARNING",
+              category: b.name,
+              title: `${b.name} spending is running ahead of physical progress`,
+              amount: excessPaceAmount,
+              reason: `${b.utilization}% of the budget is spent, but project progress is only ${progressPct}%. Risk of severe budget shortfall before milestone completion.`,
+              action: `Conduct a site physical audit to confirm materials and work done match billing claims.`,
+            });
+          }
+        }
+      }
+    }
+
+    // 3. Unbudgeted Spending Leakage
+    const budgetedCategories = new Set(budgets.map(b => {
+      let c = b.category.toString().toUpperCase();
+      if (c === "MATERIAL") c = "MATERIALS";
+      if (c === "SUBCONTRACTS") c = "SUBCONTRACT";
+      if (c === "GENERAL" || c === "OFFICE") c = "OVERHEAD";
+      return c;
+    }));
+
+    for (const [catKey, spentAmt] of Object.entries(categorySpending)) {
+      if (spentAmt > 5000 && !budgetedCategories.has(catKey) && catKey !== "OTHER") {
+        const catName = categoryLabels[catKey] || catKey;
+        moneyLeakageItems.push({
+          id: `unbudgeted-${catKey}`,
+          type: "UNBUDGETED_SPEND",
+          severity: "WARNING",
+          category: catName,
+          title: `Unbudgeted spending of ₹${Math.round(spentAmt).toLocaleString("en-IN")} in ${catName}`,
+          amount: Math.round(spentAmt),
+          reason: `Money was spent on ${catName.toLowerCase()}, but no budget was allocated for this category in project planning.`,
+          action: `Set an approved budget head for this category in Finance Budgets to prevent unmonitored cash drain.`,
+        });
+      }
+    }
+
+    // 4. Physical Material Wastage Leakage (from BOQ excess)
+    for (const v of qomVariances.filter((v) => v.percentUsed > 100)) {
+      const wastageCost = Math.round(Math.abs(v.variance) * (v.rate || 0));
+      if (wastageCost > 0) {
+        moneyLeakageItems.push({
+          id: `wastage-${v.id}`,
+          type: "MATERIAL_WASTAGE",
+          severity: "CRITICAL",
+          category: "Materials",
+          title: `Material leakage: ${v.materialName} consumption exceeded BOQ estimate`,
+          amount: wastageCost,
+          reason: `${v.used} ${v.unit} used vs ${v.planned} ${v.unit} planned (+${Math.abs(v.variance).toFixed(1)} ${v.unit} excess). Estimated loss: ₹${wastageCost.toLocaleString("en-IN")}.`,
+          action: `Check concrete/mortar mixing ratios on site and inspect storage area for theft or weather damage.`,
+        });
+      }
+    }
+
+    const totalMoneyLeakage = moneyLeakageItems.reduce((sum, item) => sum + (item.amount || 0), 0);
+    const moneyLeakageData = {
+      totalLeakageAmount: totalMoneyLeakage,
+      leakageCount: moneyLeakageItems.length,
+      riskLevel: totalMoneyLeakage > 100000 ? "CRITICAL" : totalMoneyLeakage > 25000 ? "HIGH" : totalMoneyLeakage > 0 ? "WATCH" : "OPTIMAL",
+      items: moneyLeakageItems,
+      categoryBreakdown: budgetBreakdown,
+    };
+
+    // ═══════════════════════════════════════════════════════════
+    // 9. INSIGHTS & RECOMMENDED ACTIONS
     // ═══════════════════════════════════════════════════════════
     const insights: any[] = [];
+
+    // Add money leakage insights first for visibility
+    for (const leak of moneyLeakageItems) {
+      insights.push({
+        type: "MONEY_LEAKAGE",
+        severity: leak.severity === "CRITICAL" ? "critical" : "warning",
+        title: leak.title,
+        detail: `${leak.reason} Estimated impact: ₹${leak.amount.toLocaleString("en-IN")}`,
+        action: leak.action,
+      });
+    }
 
     // Material insights
     for (const v of qomVariances.filter((v) => v.percentUsed > 100)) {
@@ -550,7 +691,7 @@ export const GET = withAuth(async (req: NextRequest, user) => {
     }
 
     // ═══════════════════════════════════════════════════════════
-    // 9. EXISTING SUGGESTIONS
+    // 10. EXISTING SUGGESTIONS
     // ═══════════════════════════════════════════════════════════
     let suggestions = [];
     try {
@@ -590,6 +731,7 @@ export const GET = withAuth(async (req: NextRequest, user) => {
         pendingPaymentExposure,
         pendingPaymentCount: unpaidInvoices.length,
       },
+      moneyLeakage: moneyLeakageData,
       qomVariances,
       workTables,
       workTableStats,
@@ -632,3 +774,4 @@ export const GET = withAuth(async (req: NextRequest, user) => {
     return Response.json({ error: error.message }, { status: 500 });
   }
 });
+

@@ -97,19 +97,106 @@ async function callGeminiApi(prompt: string, apiKey: string): Promise<any> {
   throw lastError || new Error("All Gemini models temporarily unavailable");
 }
 
+function normalizeSpokenNumbers(raw: string): string {
+  let text = raw;
+
+  // Convert Indian and English spoken number words
+  const numberWords: Record<string, string> = {
+    zero: "0",
+    one: "1",
+    two: "2",
+    three: "3",
+    four: "4",
+    five: "5",
+    six: "6",
+    seven: "7",
+    eight: "8",
+    nine: "9",
+    ten: "10",
+    twenty: "20",
+    thirty: "30",
+    forty: "40",
+    fifty: "50",
+    sixty: "60",
+    seventy: "70",
+    eighty: "80",
+    ninety: "90",
+    hundred: "100",
+    thousand: "1000",
+    // Hindi
+    ek: "1",
+    do: "2",
+    teen: "3",
+    chaar: "4",
+    char: "4",
+    paanch: "5",
+    panch: "5",
+    chhah: "6",
+    che: "6",
+    saat: "7",
+    aath: "8",
+    ath: "8",
+    nau: "9",
+    das: "10",
+    gyarah: "11",
+    barah: "12",
+    pandrah: "15",
+    bees: "20",
+    pachas: "50",
+    sau: "100",
+    hazaar: "1000",
+    hazar: "1000",
+  };
+
+  for (const [word, digit] of Object.entries(numberWords)) {
+    text = text.replace(new RegExp(`\\b${word}\\b`, "gi"), digit);
+  }
+
+  // Handle "for" being misheard instead of "4"
+  // e.g. "for sofa set", "for sofa", "for cement" -> "4 sofa set"
+  text = text.replace(/\bfor\s+(?=[a-zA-Z])/gi, "4 ");
+
+  // Clean repeated duplicate adjacent words (e.g. "sofa set sofa set" -> "sofa set")
+  text = text.replace(/\b([a-zA-Z0-9]+(?:\s+[a-zA-Z0-9]+)?)\s+\1\b/gi, "$1");
+
+  return text;
+}
+
 /**
  * Intelligent local regex fallback when Gemini is unavailable.
+ */
+const KNOWN_UNITS_SET = new Set([
+  'bags', 'bag', 'tons', 'ton', 'pcs', 'pc', 'nos', 'no', 'kg', 'kgs',
+  'cans', 'can', 'trucks', 'truck', 'boxes', 'box', 'brass',
+  'litres', 'liters', 'ltr', 'cft', 'sqft', 'sqm', 'meters', 'meter', 'm'
+]);
+
+const MATERIAL_SYNONYMS: Record<string, string[]> = {
+  steel: ['rebar', 'tmt', 'sariya', 'rod'],
+  sariya: ['rebar', 'tmt', 'steel'],
+  rebar: ['steel', 'tmt', 'sariya'],
+  eent: ['brick', 'bricks', 'red bricks'],
+  int: ['brick', 'bricks', 'red bricks'],
+  bricks: ['brick', 'eent', 'red bricks'],
+  brick: ['bricks', 'eent', 'red bricks'],
+  cement: ['opc', 'ppc', 'cement'],
+  sofa: ['sofa set'],
+};
+
+/**
+ * Intelligent multi-item extraction fallback when Gemini is unavailable.
  */
 function localRuleBasedFallback(
   text: string,
   siteInventory: Array<{ id: string; material_id: string; name: string; unit: string; availableStock: number }>,
   milestones: Array<{ id: string; name: string; progress_percentage: number | null }>
 ): SmartDprAnalysisResult {
-  const lower = text.toLowerCase();
+  const normalizedText = normalizeSpokenNumbers(text);
+  const lower = normalizedText.toLowerCase();
 
   // Summary
-  const summary = text.length > 120 ? text.slice(0, 117) + "..." : text;
-  const work_completed = text;
+  const summary = normalizedText.length > 120 ? normalizedText.slice(0, 117) + "..." : normalizedText;
+  const work_completed = normalizedText;
 
   // Weather extraction
   let weather = "Sunny";
@@ -118,7 +205,7 @@ function localRuleBasedFallback(
   else if (lower.includes("hot") || lower.includes("dhoop")) weather = "Sunny";
 
   // Temperature extraction
-  const tempMatch = text.match(/(\d{1,2})\s*(?:°\s*C|degrees|degree|celsius)/i);
+  const tempMatch = normalizedText.match(/(\d{1,2})\s*(?:°\s*C|degrees|degree|celsius)/i);
   const temperature = tempMatch ? parseFloat(tempMatch[1]) : null;
 
   // Milestone matching
@@ -140,32 +227,109 @@ function localRuleBasedFallback(
     }
   }
 
-  // Material extraction from inventory items
+  // --- MULTI-ITEM EXTRACTION ---
+  // Insert delimiter before any number that follows a word (e.g. "sofa set 10 cement 5 doors" -> "sofa set , 10 cement , 5 doors")
+  const delimited = normalizedText.replace(/([a-zA-Z])\s+([0-9]+(?:\.[0-9]+)?)\s+([a-zA-Z])/g, '$1 , $2 $3');
+  const rawParts = delimited.split(/[,;&|\n]|\b(?:and|aur|plus|along with|as well as|or|ya)\b/gi);
+
+  const parsedClauses: Array<{ qty: number; unit: string; name: string }> = [];
+  for (const part of rawParts) {
+    const trimmed = part.trim();
+    if (!trimmed) continue;
+
+    // Pattern 1: [qty] [unit]? [name]
+    let m = trimmed.match(/^([0-9]+(?:\.[0-9]+)?)\s*(?:of\s+)?([a-zA-Z].*)$/i);
+    if (m) {
+      const qty = parseFloat(m[1]);
+      let rest = m[2].trim();
+      const words = rest.split(/\s+/);
+      let unit = 'units';
+
+      if (words.length > 1 && KNOWN_UNITS_SET.has(words[0].toLowerCase())) {
+        unit = words[0].toLowerCase();
+        rest = words.slice(1).join(' ').replace(/^of\s+/i, '');
+      } else if (words.length > 1 && KNOWN_UNITS_SET.has(words[words.length - 1].toLowerCase())) {
+        unit = words[words.length - 1].toLowerCase();
+        rest = words.slice(0, -1).join(' ');
+      }
+
+      rest = rest.replace(/\b(?:consumed|used|lagaya|lagaye|dala|hai|h|done|work|today|aaj)\b/gi, '').trim();
+      if (rest) parsedClauses.push({ qty, unit, name: rest });
+      continue;
+    }
+
+    // Pattern 2: [name] [qty] [unit]?
+    m = trimmed.match(/^([a-zA-Z].*?)\s+([0-9]+(?:\.[0-9]+)?)(?:\s+([a-zA-Z]+))?$/i);
+    if (m) {
+      const qty = parseFloat(m[2]);
+      let rest = m[1].trim();
+      let unit = m[3] && KNOWN_UNITS_SET.has(m[3].toLowerCase()) ? m[3].toLowerCase() : 'units';
+      rest = rest.replace(/\b(?:consumed|used|lagaya|lagaye|dala|hai|h|done|work|today|aaj)\b/gi, '').trim();
+      if (rest) parsedClauses.push({ qty, unit, name: rest });
+      continue;
+    }
+  }
+
   const material_suggestions: SmartDprMaterialSuggestion[] = [];
   const unmatched_materials: SmartDprAnalysisResult["unmatched_materials"] = [];
+  const matchedInventoryIds = new Set<string>();
 
-  for (const item of siteInventory) {
+  for (const item of parsedClauses) {
     const itemNameLower = item.name.toLowerCase();
-    const mainWord = itemNameLower.split(/\s+/)[0]; // e.g. "cement", "sand", "brick"
-    if (lower.includes(itemNameLower) || lower.includes(mainWord)) {
-      // Look for quantities near the word: e.g. "80 cement" or "cement 80" or "80 bags"
-      const qtyRegex = new RegExp(`(?:(\\d+(?:\\.\\d+)?)\\s*(?:bags?|tons?|pcs?|kg|units?)?\\s*(?:of\\s*)?${mainWord}|${mainWord}\\s*[^0-9\\n]{0,20}(\\d+(?:\\.\\d+)?))`, "i");
-      const match = text.match(qtyRegex);
-      const qty = match ? parseFloat(match[1] || match[2] || "0") : 0;
+    const itemWords = itemNameLower.split(/\s+/).filter((w) => w.length >= 3);
 
-      if (qty > 0) {
-        material_suggestions.push({
-          inventory_item_id: item.id,
-          material_id: item.material_id,
-          material_name: item.name,
-          suggested_quantity: qty,
-          unit: item.unit,
-          available_quantity: item.availableStock,
-          source: "explicit",
-          confidence: 0.9,
-          notes: `Explicit quantity of ${qty} ${item.unit} detected in text.`,
-        });
+    let bestMatch: (typeof siteInventory)[0] | null = null;
+    let bestScore = 0;
+
+    for (const inv of siteInventory) {
+      if (matchedInventoryIds.has(inv.material_id)) continue;
+      const invLower = inv.name.toLowerCase();
+      let score = 0;
+
+      if (invLower === itemNameLower) {
+        score = 100;
+      } else if (invLower.includes(itemNameLower) || itemNameLower.includes(invLower)) {
+        score = 80;
+      } else {
+        const invWords = invLower.split(/[\s\-_]+/).filter((w) => w.length >= 3 && !['main', 'wall', 'beams', 'beam'].includes(w));
+        for (const iw of itemWords) {
+          if (invWords.includes(iw)) score = Math.max(score, 60);
+          if (iw.endsWith('s') && invWords.includes(iw.slice(0, -1))) score = Math.max(score, 60);
+          if (invWords.some((w) => w + 's' === iw)) score = Math.max(score, 60);
+          if (MATERIAL_SYNONYMS[iw]) {
+            for (const syn of MATERIAL_SYNONYMS[iw]) {
+              if (invWords.includes(syn) || invLower.includes(syn)) score = Math.max(score, 50);
+            }
+          }
+        }
       }
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestMatch = inv;
+      }
+    }
+
+    if (bestMatch && bestScore >= 50) {
+      matchedInventoryIds.add(bestMatch.material_id);
+      material_suggestions.push({
+        inventory_item_id: bestMatch.id,
+        material_id: bestMatch.material_id,
+        material_name: bestMatch.name,
+        suggested_quantity: item.qty,
+        unit: item.unit !== 'units' ? item.unit : bestMatch.unit,
+        available_quantity: bestMatch.availableStock,
+        source: "explicit",
+        confidence: 0.95,
+        notes: `Detected ${item.qty} from "${item.name}"`,
+      });
+    } else {
+      unmatched_materials.push({
+        material_name: item.name,
+        quantity: item.qty,
+        unit: item.unit,
+        reason: "Material not available in this site's inventory.",
+      });
     }
   }
 
@@ -313,13 +477,14 @@ INSTRUCTIONS & RULES:
 8. MILESTONES:
    - If the update relates to any milestone listed above, suggest the match with status ("IN_PROGRESS" or "COMPLETED") and completion_percentage.
    - If brickwork or activity is stated as "completed", mark milestone as COMPLETED with 100%.
-9. MATERIAL CONSUMPTION (CRITICAL):
-   - Check if materials were explicitly reported (e.g. "80 cement bags", "2 tons sand", "5000 bricks").
-   - MATCH ONLY to an item from the "AVAILABLE SITE INVENTORY" above.
-   - If matched: source="explicit", confidence=0.95, suggested_quantity=number.
-   - If activity implies material usage but quantity is unstated, you may suggest a likely material ONLY if in the site inventory, with source="inferred", confidence=0.6, and clear notes asking supervisor to verify.
-   - NEVER invent a material.
-   - If a material mentioned in text is NOT in the site inventory: DO NOT add to material_suggestions! Instead, add it to unmatched_materials with reason: "Material not available in this site's inventory."
+9. MATERIAL CONSUMPTION (CRITICAL - MULTIPLE ITEMS SUPPORT):
+   - The supervisor may report ONE or MULTIPLE items (e.g. "4 sofa set and 10 cement bags and 5 wooden planks", "4 sofa set 10 cement 5 doors", "500 bricks, 100 kg rebar and 4 sofa set").
+   - You MUST extract EVERY SINGLE item mentioned in the text.
+   - For EACH mentioned item:
+     - Check if it matches any item in "AVAILABLE SITE INVENTORY" (match intelligent synonyms: e.g. "bricks" matches "150mm Main Wall - Red Bricks", "rebar" or "steel" matches "8mm TMT Rebar", "sofa" matches "sofa set", "cement" matches "OPC Cement").
+     - If matched in inventory: add to material_suggestions with proper inventory_item_id, material_id, material_name, suggested_quantity, unit.
+     - If mentioned but NOT in "AVAILABLE SITE INVENTORY": DO NOT omit it! Add it to unmatched_materials with material_name, quantity, unit, and reason: "Material not available in this site's inventory."
+   - DO NOT combine separate items into one. Extract each item as a separate entry!
 10. Return strictly a JSON object matching this schema:
 {
   "summary": "string",
