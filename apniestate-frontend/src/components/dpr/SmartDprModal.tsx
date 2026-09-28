@@ -120,13 +120,33 @@ function normalizeSpokenNumbers(raw: string): string {
     text = text.replace(new RegExp(`\\b${word}\\b`, 'gi'), digit);
   }
 
-  // Handle "for" being misheard instead of "4" (e.g. "for sofa set" -> "4 sofa set")
-  text = text.replace(/\bfor\s+(?=[a-zA-Z])/gi, '4 ');
+  // Handle common speech recognition phonetic mishearings in site dictation
+  // "force" misheard instead of "4" (e.g. "force sofa set" -> "4 sofa set", "force cement bags")
+  text = text.replace(/\b(?:force|forth|fourth)\s+(?=(?:sofa|cement|bag|brick|door|window|box|ton|truck|worker|labour|labor|tile|pipe|steel|rebar|sariya|set|pcs|nos|kg|units?|item)\b)/gi, '4 ');
+  text = text.replace(/\bforce\s+sofa\b/gi, '4 sofa');
 
-  // Clean repeated duplicate adjacent words (e.g. "sofa set sofa set" -> "sofa set")
-  text = text.replace(/\b([a-zA-Z0-9]+(?:\s+[a-zA-Z0-9]+)?)\s+\1\b/gi, '$1');
+  // "for" misheard instead of "4"
+  text = text.replace(/\bfor\s+(?!(?:today|tomorrow|delay|work|inspection|approval)\b)(?=[a-zA-Z])/gi, '4 ');
 
-  return text;
+  // "to" / "too" misheard instead of "2"
+  text = text.replace(/\b(?:to|too)\s+(?=(?:sofa|cement|bag|brick|door|window|box|ton|truck|worker|labour|labor|tile|pipe|steel|rebar|sariya)\b)/gi, '2 ');
+
+  // "please don't" / "pleased on" / "please on" misheard instead of "placed on"
+  text = text.replace(/\b(?:please don't|please on|pleased on|pleased)\s+(?=(?:second|first|third|fourth|ground|\d+(?:st|nd|rd|th)?|2nd|1st|3rd|4th|site|floor|room|hall|wall|roof|slab|terrace|tower)\b)/gi, 'placed on ');
+
+  // "second force" / "first force" -> "... floor"
+  text = text.replace(/\b(second|first|third|fourth|ground)\s+force\b/gi, '$1 floor');
+
+  // Iteratively clean repeated duplicate adjacent words and short phrases (e.g. "sofa set sofa set", "force force")
+  let prev = '';
+  let iters = 0;
+  while (prev !== text && iters < 6) {
+    prev = text;
+    text = text.replace(/\b([a-zA-Z0-9]+(?:\s+[a-zA-Z0-9]+){0,3})\s+\1\b/gi, '$1');
+    iters++;
+  }
+
+  return text.trim();
 }
 
 const KNOWN_UNITS_SET = new Set([
@@ -590,6 +610,21 @@ export default function SmartDprModal({
       if (res.data) {
         const data = res.data;
 
+        // If AI restored or corrected the spoken voice input, update the input box to the clean version
+        if (data.corrected_text) {
+          setSmartInputText(data.corrected_text);
+          currentTextRef.current = data.corrected_text;
+          baseTextRef.current = data.corrected_text;
+        }
+
+        if (data.corrected_text && data.corrected_text.toLowerCase() !== smartInputText.trim().toLowerCase()) {
+          setAiNotice(`✨ AI auto-corrected spoken update: "${data.corrected_text}"`);
+        } else if (data.is_fallback) {
+          setAiNotice('AI service is temporarily busy. Applied intelligent local keyword matching.');
+        } else {
+          setAiNotice('AI successfully understood your update and matched site inventory!');
+        }
+
         // Populate summary & work completed
         if (data.summary) {
           setFormSummary(data.summary);
@@ -1049,6 +1084,22 @@ export default function SmartDprModal({
                     type="button"
                     onClick={() => setSpeechError(null)}
                     className="text-amber-600 hover:text-amber-900 text-[10px] font-bold shrink-0 cursor-pointer"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              )}
+
+              {aiNotice && (
+                <div className="mt-2 p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 flex items-center justify-between gap-2 shadow-2xs animate-in fade-in">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <Sparkles size={14} className="text-emerald-600 shrink-0" />
+                    <span className="font-semibold text-[11px] truncate">{aiNotice}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setAiNotice(null)}
+                    className="text-emerald-700 hover:text-emerald-950 text-[10px] font-bold shrink-0 cursor-pointer"
                   >
                     Dismiss
                   </button>

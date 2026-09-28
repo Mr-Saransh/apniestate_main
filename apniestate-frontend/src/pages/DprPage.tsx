@@ -63,6 +63,90 @@ interface SelectedMaterialConsumption {
   notes?: string;
 }
 
+function cleanSpokenText(raw: string): string {
+  let text = raw;
+
+  // Convert Indian and English spoken number words
+  const numberWords: Record<string, string> = {
+    zero: '0',
+    one: '1',
+    two: '2',
+    three: '3',
+    four: '4',
+    five: '5',
+    six: '6',
+    seven: '7',
+    eight: '8',
+    nine: '9',
+    ten: '10',
+    twenty: '20',
+    thirty: '30',
+    forty: '40',
+    fifty: '50',
+    sixty: '60',
+    seventy: '70',
+    eighty: '80',
+    ninety: '90',
+    hundred: '100',
+    thousand: '1000',
+    // Hindi
+    ek: '1',
+    do: '2',
+    teen: '3',
+    chaar: '4',
+    char: '4',
+    paanch: '5',
+    panch: '5',
+    chhah: '6',
+    che: '6',
+    saat: '7',
+    aath: '8',
+    ath: '8',
+    nau: '9',
+    das: '10',
+    gyarah: '11',
+    barah: '12',
+    pandrah: '15',
+    bees: '20',
+    pachas: '50',
+    sau: '100',
+    hazaar: '1000',
+    hazar: '1000',
+  };
+
+  for (const [word, digit] of Object.entries(numberWords)) {
+    text = text.replace(new RegExp(`\\b${word}\\b`, 'gi'), digit);
+  }
+
+  // Handle common speech recognition phonetic mishearings in site dictation
+  // "force" misheard instead of "4" (e.g. "force sofa set" -> "4 sofa set", "force cement bags")
+  text = text.replace(/\b(?:force|forth|fourth)\s+(?=(?:sofa|cement|bag|brick|door|window|box|ton|truck|worker|labour|labor|tile|pipe|steel|rebar|sariya|set|pcs|nos|kg|units?|item)\b)/gi, '4 ');
+  text = text.replace(/\bforce\s+sofa\b/gi, '4 sofa');
+
+  // "for" misheard instead of "4"
+  text = text.replace(/\bfor\s+(?!(?:today|tomorrow|delay|work|inspection|approval)\b)(?=[a-zA-Z])/gi, '4 ');
+
+  // "to" / "too" misheard instead of "2"
+  text = text.replace(/\b(?:to|too)\s+(?=(?:sofa|cement|bag|brick|door|window|box|ton|truck|worker|labour|labor|tile|pipe|steel|rebar|sariya)\b)/gi, '2 ');
+
+  // "please don't" / "pleased on" / "please on" misheard instead of "placed on"
+  text = text.replace(/\b(?:please don't|please on|pleased on|pleased)\s+(?=(?:second|first|third|fourth|ground|\d+(?:st|nd|rd|th)?|2nd|1st|3rd|4th|site|floor|room|hall|wall|roof|slab|terrace|tower)\b)/gi, 'placed on ');
+
+  // "second force" / "first force" -> "... floor"
+  text = text.replace(/\b(second|first|third|fourth|ground)\s+force\b/gi, '$1 floor');
+
+  // Iteratively clean repeated duplicate adjacent words and short phrases (e.g. "sofa set sofa set", "force force")
+  let prev = '';
+  let iters = 0;
+  while (prev !== text && iters < 6) {
+    prev = text;
+    text = text.replace(/\b([a-zA-Z0-9]+(?:\s+[a-zA-Z0-9]+){0,3})\s+\1\b/gi, '$1');
+    iters++;
+  }
+
+  return text.trim();
+}
+
 export default function DprPage() {
   const [dprs, setDprs] = useState<DPR[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -108,6 +192,13 @@ export default function DprPage() {
   const recognitionRef = useRef<any>(null);
   const userWantsListeningRef = useRef(false);
   const restartTimeoutRef = useRef<any>(null);
+  const baseTextRef = useRef<string>('');
+  const currentTextRef = useRef<string>('');
+
+  // Keep currentTextRef in sync when user edits manually
+  useEffect(() => {
+    currentTextRef.current = smartInputText;
+  }, [smartInputText]);
 
   // Site inventory & Consumptions
   const [siteInventory, setSiteInventory] = useState<SiteInventoryItem[]>([]);
@@ -210,17 +301,23 @@ export default function DprPage() {
       recognition.lang = speechLang;
 
       recognition.onresult = (event: any) => {
-        let transcript = '';
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          transcript += event.results[i][0].transcript;
+        let finalChunk = '';
+        let interimChunk = '';
+
+        for (let i = 0; i < event.results.length; i++) {
+          const res = event.results[i];
+          if (res.isFinal) {
+            finalChunk += res[0].transcript + ' ';
+          } else {
+            interimChunk += res[0].transcript;
+          }
         }
-        if (transcript.trim()) {
-          setSmartInputText((prev) => {
-            const trimmedPrev = prev.trim();
-            if (!trimmedPrev) return transcript.trim();
-            return `${trimmedPrev} ${transcript.trim()}`;
-          });
-        }
+
+        const base = baseTextRef.current;
+        const rawCombined = [base, finalChunk.trim(), interimChunk.trim()].filter(Boolean).join(' ');
+        const cleaned = cleanSpokenText(rawCombined);
+        setSmartInputText(cleaned);
+        currentTextRef.current = cleaned;
       };
 
       recognition.onerror = (event: any) => {
@@ -251,6 +348,7 @@ export default function DprPage() {
 
       recognition.onend = () => {
         if (userWantsListeningRef.current) {
+          baseTextRef.current = currentTextRef.current.trim();
           if (restartTimeoutRef.current) clearTimeout(restartTimeoutRef.current);
           restartTimeoutRef.current = setTimeout(() => {
             if (userWantsListeningRef.current && recognitionRef.current) {
@@ -295,6 +393,9 @@ export default function DprPage() {
       } catch (_) {}
     } else {
       setSpeechError(null);
+      baseTextRef.current = smartInputText.trim();
+      currentTextRef.current = smartInputText.trim();
+
       if (typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
         try {
           const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -351,13 +452,21 @@ export default function DprPage() {
       if (res.data) {
         setAiSuggestions(res.data);
 
-        if (res.data.is_fallback) {
+        // Pre-fill form fields with AI suggestions
+        if (res.data.corrected_text) {
+          setSmartInputText(res.data.corrected_text);
+          currentTextRef.current = res.data.corrected_text;
+          baseTextRef.current = res.data.corrected_text;
+        }
+
+        if (res.data.corrected_text && res.data.corrected_text.toLowerCase() !== smartInputText.trim().toLowerCase()) {
+          setAiNotice(`✨ AI restored & corrected voice input: "${res.data.corrected_text}"`);
+        } else if (res.data.is_fallback) {
           setAiNotice('AI service is temporarily busy. Applied intelligent local keyword matching.');
         } else {
           setAiNotice('AI successfully understood your update and matched site inventory!');
         }
 
-        // Pre-fill form fields with AI suggestions
         if (res.data.summary) setFormSummary(res.data.summary);
         if (res.data.work_completed) setFormWorkCompleted(res.data.work_completed);
         if (res.data.work_in_progress) setFormWorkInProgress(res.data.work_in_progress);
@@ -946,6 +1055,38 @@ export default function DprPage() {
                     )}
                   </button>
                 </div>
+
+                {speechError && (
+                  <div className="mt-2 p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800 flex items-center justify-between gap-2 shadow-2xs">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <AlertTriangle size={14} className="text-amber-600 shrink-0" />
+                      <span className="truncate">{speechError}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSpeechError(null)}
+                      className="text-amber-600 hover:text-amber-900 text-[10px] font-bold shrink-0 cursor-pointer"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                )}
+
+                {aiNotice && (
+                  <div className="mt-2 p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 flex items-center justify-between gap-2 shadow-2xs animate-in fade-in">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <Sparkles size={14} className="text-emerald-600 shrink-0" />
+                      <span className="font-semibold text-xs truncate">{aiNotice}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setAiNotice(null)}
+                      className="text-emerald-700 hover:text-emerald-950 text-[10px] font-bold shrink-0 cursor-pointer"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* 3. AI SUGGESTED UPDATES SECTION */}

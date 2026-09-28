@@ -105,6 +105,7 @@ export interface SmartDprMilestoneSuggestion {
 export interface SmartDprAnalysisResult {
   summary: string;
   work_completed: string;
+  corrected_text?: string;
   work_in_progress?: string | null;
   tomorrow_plan?: string | null;
   reasons_for_delay?: string | null;

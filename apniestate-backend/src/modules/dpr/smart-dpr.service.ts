@@ -23,6 +23,7 @@ export interface SmartDprMilestoneSuggestion {
 export interface SmartDprAnalysisResult {
   summary: string;
   work_completed: string;
+  corrected_text?: string;
   work_in_progress?: string | null;
   tomorrow_plan?: string | null;
   reasons_for_delay?: string | null;
@@ -152,14 +153,33 @@ function normalizeSpokenNumbers(raw: string): string {
     text = text.replace(new RegExp(`\\b${word}\\b`, "gi"), digit);
   }
 
-  // Handle "for" being misheard instead of "4"
-  // e.g. "for sofa set", "for sofa", "for cement" -> "4 sofa set"
-  text = text.replace(/\bfor\s+(?=[a-zA-Z])/gi, "4 ");
+  // Handle common speech recognition phonetic mishearings in site dictation
+  // "force" misheard instead of "4" (e.g. "force sofa set" -> "4 sofa set", "force cement bags")
+  text = text.replace(/\b(?:force|forth|fourth)\s+(?=(?:sofa|cement|bag|brick|door|window|box|ton|truck|worker|labour|labor|tile|pipe|steel|rebar|sariya|set|pcs|nos|kg|units?|item)\b)/gi, "4 ");
+  text = text.replace(/\bforce\s+sofa\b/gi, "4 sofa");
 
-  // Clean repeated duplicate adjacent words (e.g. "sofa set sofa set" -> "sofa set")
-  text = text.replace(/\b([a-zA-Z0-9]+(?:\s+[a-zA-Z0-9]+)?)\s+\1\b/gi, "$1");
+  // "for" misheard instead of "4" (when not followed by time/preposition words)
+  text = text.replace(/\bfor\s+(?!(?:today|tomorrow|delay|work|inspection|approval)\b)(?=[a-zA-Z])/gi, "4 ");
 
-  return text;
+  // "to" / "too" misheard instead of "2"
+  text = text.replace(/\b(?:to|too)\s+(?=(?:sofa|cement|bag|brick|door|window|box|ton|truck|worker|labour|labor|tile|pipe|steel|rebar|sariya)\b)/gi, "2 ");
+
+  // "please don't" / "pleased on" / "please on" misheard instead of "placed on"
+  text = text.replace(/\b(?:please don't|please on|pleased on|pleased)\s+(?=(?:second|first|third|fourth|ground|\d+(?:st|nd|rd|th)?|2nd|1st|3rd|4th|site|floor|room|hall|wall|roof|slab|terrace|tower)\b)/gi, "placed on ");
+
+  // "second force" / "first force" -> "... floor"
+  text = text.replace(/\b(second|first|third|fourth|ground)\s+force\b/gi, "$1 floor");
+
+  // Iteratively clean repeated duplicate adjacent words and short phrases (e.g. "sofa set sofa set", "force force")
+  let prev = "";
+  let iters = 0;
+  while (prev !== text && iters < 6) {
+    prev = text;
+    text = text.replace(/\b([a-zA-Z0-9]+(?:\s+[a-zA-Z0-9]+){0,3})\s+\1\b/gi, "$1");
+    iters++;
+  }
+
+  return text.trim();
 }
 
 /**
@@ -336,6 +356,7 @@ function localRuleBasedFallback(
   return {
     summary,
     work_completed,
+    corrected_text: normalizedText,
     work_in_progress: null,
     tomorrow_plan: null,
     reasons_for_delay: null,
@@ -467,17 +488,27 @@ BOQ REFERENCE:
 ${JSON.stringify(boqItems.map((b) => ({ description: b.description, unit: b.unit })), null, 2)}
 
 INSTRUCTIONS & RULES:
-1. SUMMARY: Write a concise, professional 1-2 sentence executive summary of today's progress.
-2. WORK COMPLETED: Detail the specific construction activities completed today.
-3. WORK IN PROGRESS: Activities ongoing or partially done, or null if none mentioned.
-4. TOMORROW PLAN: Planned work or pending tasks for tomorrow, or null if not stated.
-5. DELAY REASONS: Any delays, blockers, weather issues, or bottlenecks, or null.
-6. SAFETY & QUALITY: Any safety observations or quality remarks, or null.
-7. WEATHER & TEMPERATURE: Weather condition (Sunny, Cloudy, Rainy, Hot, Clear, etc.) and temperature in Celsius if stated.
-8. MILESTONES:
+1. SPEECH RECONSTRUCTION & AUTOCORRECT (MANDATORY):
+   - The supervisor spoke or typed this update, often via microphone voice recognition (Web Speech API) on an active construction site.
+   - Microphone voice recognition frequently contains acoustic confusion, phonetic mishearings, and repeated stutter loops.
+   - Common examples:
+     - "force sofa set" / "for sofa set" -> "4 sofa sets" (numbers misheard as "force", "for", "to", "won")
+     - "please don't second floor" / "pleased on" -> "placed on second floor"
+     - "second force" -> "second floor"
+     - repeated duplicate words/phrases like "force force sofa set force sofa set please don't..." -> "4 sofa sets placed on second floor"
+     - Hindi words (e.g. "eent" -> "bricks", "sariya" -> "rebar/steel", "chaar" -> "4")
+   - In "corrected_text", reconstruct the supervisor's true intended statement into a clean, clear, grammatically correct professional English sentence (e.g. "Placed 4 sofa sets on the second floor").
+2. SUMMARY: Write a concise, professional 1-2 sentence executive summary of today's progress based on the reconstructed speech.
+3. WORK COMPLETED: Detail the specific construction activities completed today using the clean, corrected speech.
+4. WORK IN PROGRESS: Activities ongoing or partially done, or null if none mentioned.
+5. TOMORROW PLAN: Planned work or pending tasks for tomorrow, or null if not stated.
+6. DELAY REASONS: Any delays, blockers, weather issues, or bottlenecks, or null.
+7. SAFETY & QUALITY: Any safety observations or quality remarks, or null.
+8. WEATHER & TEMPERATURE: Weather condition (Sunny, Cloudy, Rainy, Hot, Clear, etc.) and temperature in Celsius if stated.
+9. MILESTONES:
    - If the update relates to any milestone listed above, suggest the match with status ("IN_PROGRESS" or "COMPLETED") and completion_percentage.
    - If brickwork or activity is stated as "completed", mark milestone as COMPLETED with 100%.
-9. MATERIAL CONSUMPTION (CRITICAL - MULTIPLE ITEMS SUPPORT):
+10. MATERIAL CONSUMPTION (CRITICAL - MULTIPLE ITEMS SUPPORT):
    - The supervisor may report ONE or MULTIPLE items (e.g. "4 sofa set and 10 cement bags and 5 wooden planks", "4 sofa set 10 cement 5 doors", "500 bricks, 100 kg rebar and 4 sofa set").
    - You MUST extract EVERY SINGLE item mentioned in the text.
    - For EACH mentioned item:
@@ -485,8 +516,9 @@ INSTRUCTIONS & RULES:
      - If matched in inventory: add to material_suggestions with proper inventory_item_id, material_id, material_name, suggested_quantity, unit.
      - If mentioned but NOT in "AVAILABLE SITE INVENTORY": DO NOT omit it! Add it to unmatched_materials with material_name, quantity, unit, and reason: "Material not available in this site's inventory."
    - DO NOT combine separate items into one. Extract each item as a separate entry!
-10. Return strictly a JSON object matching this schema:
+11. Return strictly a JSON object matching this schema:
 {
+  "corrected_text": "string (Clean, reconstructed speech free of phonetic stutters)",
   "summary": "string",
   "work_completed": "string",
   "work_in_progress": "string or null",
@@ -583,9 +615,12 @@ INSTRUCTIONS & RULES:
       }
     }
 
+    const cleanTranscript = rawAiResult.corrected_text || normalizeSpokenNumbers(text);
+
     return {
-      summary: rawAiResult.summary || text.slice(0, 100),
-      work_completed: rawAiResult.work_completed || text,
+      corrected_text: cleanTranscript,
+      summary: rawAiResult.summary || cleanTranscript.slice(0, 100),
+      work_completed: rawAiResult.work_completed || cleanTranscript,
       work_in_progress: rawAiResult.work_in_progress || null,
       tomorrow_plan: rawAiResult.tomorrow_plan || null,
       reasons_for_delay: rawAiResult.reasons_for_delay || null,
