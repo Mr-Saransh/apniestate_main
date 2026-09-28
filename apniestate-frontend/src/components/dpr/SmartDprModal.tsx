@@ -65,6 +65,51 @@ interface SmartDprModalProps {
   onSuccess: () => void;
 }
 
+/**
+ * Aggressively deduplicate stuttered/repeated words and phrases in speech text.
+ * Handles patterns like "sofa set sofa set sofa set" -> "sofa set",
+ * "force force sofa" -> "force sofa", "today we we we used" -> "today we used", etc.
+ */
+function deduplicateStutteredText(raw: string): string {
+  let text = raw;
+
+  // 1. Remove immediately repeated single words ("we we we" -> "we", "the the" -> "the")
+  text = text.replace(/\b(\w+)(?:\s+\1)+\b/gi, '$1');
+
+  // 2. Remove repeated 2-word phrases ("sofa set sofa set" -> "sofa set")
+  let prev = '';
+  let iters = 0;
+  while (prev !== text && iters < 8) {
+    prev = text;
+    // Match 1-4 word phrases repeated adjacently
+    text = text.replace(/\b([a-zA-Z0-9]+(?:\s+[a-zA-Z0-9]+){0,3})\s+\1\b/gi, '$1');
+    iters++;
+  }
+
+  // 3. Remove partial stutter restarts: "today we used 4 so today we used 4 sofa" -> "today we used 4 sofa"
+  // Look for sentences that re-start from the beginning
+  const words = text.split(/\s+/);
+  if (words.length > 6) {
+    // Check if the first 3+ words repeat later in the text (user restarted their sentence)
+    for (let windowSize = Math.min(5, Math.floor(words.length / 2)); windowSize >= 3; windowSize--) {
+      const prefix = words.slice(0, windowSize).join(' ').toLowerCase();
+      const restText = words.slice(windowSize).join(' ').toLowerCase();
+      const restartIdx = restText.indexOf(prefix);
+      if (restartIdx !== -1) {
+        // Found a restart - keep only from the restart point onward (the more complete version)
+        const wordsBeforeRestart = restText.slice(0, restartIdx).split(/\s+/).filter(Boolean).length;
+        text = words.slice(windowSize + wordsBeforeRestart).join(' ');
+        break;
+      }
+    }
+  }
+
+  // 4. Collapse multiple spaces
+  text = text.replace(/\s{2,}/g, ' ');
+
+  return text.trim();
+}
+
 function normalizeSpokenNumbers(raw: string): string {
   let text = raw;
 
@@ -137,14 +182,8 @@ function normalizeSpokenNumbers(raw: string): string {
   // "second force" / "first force" -> "... floor"
   text = text.replace(/\b(second|first|third|fourth|ground)\s+force\b/gi, '$1 floor');
 
-  // Iteratively clean repeated duplicate adjacent words and short phrases (e.g. "sofa set sofa set", "force force")
-  let prev = '';
-  let iters = 0;
-  while (prev !== text && iters < 6) {
-    prev = text;
-    text = text.replace(/\b([a-zA-Z0-9]+(?:\s+[a-zA-Z0-9]+){0,3})\s+\1\b/gi, '$1');
-    iters++;
-  }
+  // Deduplicate stuttered speech
+  text = deduplicateStutteredText(text);
 
   return text.trim();
 }
@@ -361,11 +400,18 @@ export default function SmartDprModal({
   }, [smartInputText, siteInventory]);
 
   const recognitionRef = useRef<any>(null);
-  const baseTextRef = useRef('');
   const userWantsListeningRef = useRef(false);
   const currentTextRef = useRef('');
   const restartTimeoutRef = useRef<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ─── STUTTER-FREE SPEECH: Track finalized chunks separately ───
+  // Instead of re-reading all event.results (which causes Chrome to re-emit old results
+  // and create duplicates), we track which result indices have been finalized and only
+  // accumulate each final result ONCE.
+  const finalizedChunksRef = useRef<string[]>([]);
+  const lastProcessedFinalIdxRef = useRef(-1);
+  const interimDisplayRef = useRef('');
 
   useEffect(() => {
     currentTextRef.current = smartInputText;
@@ -415,6 +461,7 @@ export default function SmartDprModal({
   }, [formSiteId]);
 
   // Speech Recognition setup (English India / Hindi)
+  // ─── COMPLETELY REWRITTEN to eliminate stuttering ───
   useEffect(() => {
     const SpeechRecognition =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -429,25 +476,49 @@ export default function SmartDprModal({
       recognition.continuous = true;
       recognition.interimResults = true;
       recognition.lang = speechLang;
+      // Increase max alternatives for better accuracy
+      recognition.maxAlternatives = 1;
 
       recognition.onresult = (event: any) => {
-        let finalChunk = '';
-        let interimChunk = '';
+        // ─── KEY FIX: Only process NEW final results, never re-read old ones ───
+        // Chrome's SpeechRecognition re-emits ALL results in event.results on every
+        // onresult callback. The old approach of iterating all results caused duplicates.
+        // Instead, we track which indices have been processed and only handle new ones.
+
+        let newFinalText = '';
+        let currentInterim = '';
 
         for (let i = 0; i < event.results.length; i++) {
-          const res = event.results[i];
-          if (res.isFinal) {
-            finalChunk += res[0].transcript + ' ';
+          const result = event.results[i];
+          if (result.isFinal) {
+            // Only process this final result if we haven't seen it before
+            if (i > lastProcessedFinalIdxRef.current) {
+              const transcript = result[0].transcript.trim();
+              if (transcript) {
+                // Apply normalization and deduplication to each chunk immediately
+                const cleaned = normalizeSpokenNumbers(transcript);
+                finalizedChunksRef.current.push(cleaned);
+                newFinalText += cleaned + ' ';
+              }
+              lastProcessedFinalIdxRef.current = i;
+            }
           } else {
-            interimChunk += res[0].transcript;
+            // Only take the LATEST interim result (not accumulated old ones)
+            currentInterim = result[0].transcript;
           }
         }
 
-        const base = baseTextRef.current;
-        const rawCombined = [base, finalChunk.trim(), interimChunk.trim()].filter(Boolean).join(' ');
-        const normalized = normalizeSpokenNumbers(rawCombined);
-        setSmartInputText(normalized);
-        currentTextRef.current = normalized;
+        // Build the display text: all finalized chunks + current interim
+        const allFinals = finalizedChunksRef.current.join(' ').trim();
+        const interimNormalized = currentInterim ? normalizeSpokenNumbers(currentInterim) : '';
+        interimDisplayRef.current = interimNormalized;
+
+        const displayText = [allFinals, interimNormalized].filter(Boolean).join(' ');
+        // Apply one final deduplication pass on the combined text
+        const deduped = deduplicateStutteredText(displayText);
+
+        setSmartInputText(deduped);
+        currentTextRef.current = deduped;
       };
 
       recognition.onerror = (event: any) => {
@@ -484,8 +555,11 @@ export default function SmartDprModal({
       recognition.onend = () => {
         // If user still wants to be in listening mode (Chrome ended due to pause or no-speech)
         if (userWantsListeningRef.current) {
-          // Save what has been recorded so far as the base for the next recognition chunk
-          baseTextRef.current = currentTextRef.current.trim();
+          // Chrome auto-stops after ~60s of continuous recognition or on silence.
+          // We restart, but DO NOT reset the finalized chunks — just reset the result index
+          // tracker since Chrome will start new result indices from 0.
+          lastProcessedFinalIdxRef.current = -1;
+
           if (restartTimeoutRef.current) clearTimeout(restartTimeoutRef.current);
           restartTimeoutRef.current = setTimeout(() => {
             if (userWantsListeningRef.current && recognitionRef.current) {
@@ -534,12 +608,21 @@ export default function SmartDprModal({
         recognitionRef.current.stop();
       } catch (_) {}
 
-      // Instantly auto-understand update when supervisor finishes speaking
-      setTimeout(() => {
-        if (currentTextRef.current.trim()) {
-          handleUnderstandUpdate();
-        }
-      }, 350);
+      // ─── Auto-clean with AI when user stops speaking ───
+      // Apply final client-side deduplication immediately, then trigger AI cleanup
+      const rawText = currentTextRef.current.trim();
+      if (rawText) {
+        const clientCleaned = deduplicateStutteredText(normalizeSpokenNumbers(rawText));
+        setSmartInputText(clientCleaned);
+        currentTextRef.current = clientCleaned;
+
+        // Auto-trigger AI understand to get corrected_text and update the field
+        setTimeout(() => {
+          if (currentTextRef.current.trim()) {
+            handleUnderstandUpdate();
+          }
+        }, 250);
+      }
     } else {
       setSpeechError(null);
 
@@ -558,7 +641,16 @@ export default function SmartDprModal({
       }
 
       try {
-        baseTextRef.current = smartInputText.trim();
+        // Reset speech tracking state for a fresh recording session
+        finalizedChunksRef.current = [];
+        lastProcessedFinalIdxRef.current = -1;
+        interimDisplayRef.current = '';
+
+        // If user already typed something, seed the finalized chunks with it
+        if (smartInputText.trim()) {
+          finalizedChunksRef.current = [smartInputText.trim()];
+        }
+
         userWantsListeningRef.current = true;
         setIsListening(true);
         recognitionRef.current.lang = speechLang;
@@ -614,7 +706,9 @@ export default function SmartDprModal({
         if (data.corrected_text) {
           setSmartInputText(data.corrected_text);
           currentTextRef.current = data.corrected_text;
-          baseTextRef.current = data.corrected_text;
+          // Reset finalized chunks to the corrected text so future speech sessions build on it
+          finalizedChunksRef.current = [data.corrected_text];
+          lastProcessedFinalIdxRef.current = -1;
         }
 
         if (data.corrected_text && data.corrected_text.toLowerCase() !== smartInputText.trim().toLowerCase()) {

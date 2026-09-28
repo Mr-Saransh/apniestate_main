@@ -98,6 +98,47 @@ async function callGeminiApi(prompt: string, apiKey: string): Promise<any> {
   throw lastError || new Error("All Gemini models temporarily unavailable");
 }
 
+/**
+ * Aggressively deduplicate stuttered/repeated words and phrases in speech text.
+ * Handles patterns like "sofa set sofa set sofa set" -> "sofa set",
+ * "force force sofa" -> "force sofa", "today we we we used" -> "today we used", etc.
+ */
+function deduplicateStutteredText(raw: string): string {
+  let text = raw;
+
+  // 1. Remove immediately repeated single words ("we we we" -> "we", "the the" -> "the")
+  text = text.replace(/\b(\w+)(?:\s+\1)+\b/gi, '$1');
+
+  // 2. Remove repeated 2-word phrases ("sofa set sofa set" -> "sofa set")
+  let prev = '';
+  let iters = 0;
+  while (prev !== text && iters < 8) {
+    prev = text;
+    text = text.replace(/\b([a-zA-Z0-9]+(?:\s+[a-zA-Z0-9]+){0,3})\s+\1\b/gi, '$1');
+    iters++;
+  }
+
+  // 3. Remove partial stutter restarts: "today we used 4 so today we used 4 sofa" -> "today we used 4 sofa"
+  const words = text.split(/\s+/);
+  if (words.length > 6) {
+    for (let windowSize = Math.min(5, Math.floor(words.length / 2)); windowSize >= 3; windowSize--) {
+      const prefix = words.slice(0, windowSize).join(' ').toLowerCase();
+      const restText = words.slice(windowSize).join(' ').toLowerCase();
+      const restartIdx = restText.indexOf(prefix);
+      if (restartIdx !== -1) {
+        const wordsBeforeRestart = restText.slice(0, restartIdx).split(/\s+/).filter(Boolean).length;
+        text = words.slice(windowSize + wordsBeforeRestart).join(' ');
+        break;
+      }
+    }
+  }
+
+  // 4. Collapse multiple spaces
+  text = text.replace(/\s{2,}/g, ' ');
+
+  return text.trim();
+}
+
 function normalizeSpokenNumbers(raw: string): string {
   let text = raw;
 
@@ -170,14 +211,8 @@ function normalizeSpokenNumbers(raw: string): string {
   // "second force" / "first force" -> "... floor"
   text = text.replace(/\b(second|first|third|fourth|ground)\s+force\b/gi, "$1 floor");
 
-  // Iteratively clean repeated duplicate adjacent words and short phrases (e.g. "sofa set sofa set", "force force")
-  let prev = "";
-  let iters = 0;
-  while (prev !== text && iters < 6) {
-    prev = text;
-    text = text.replace(/\b([a-zA-Z0-9]+(?:\s+[a-zA-Z0-9]+){0,3})\s+\1\b/gi, "$1");
-    iters++;
-  }
+  // Deduplicate stuttered speech
+  text = deduplicateStutteredText(text);
 
   return text.trim();
 }
@@ -445,13 +480,22 @@ export async function analyzeSmartDpr(
 
   const apiKey = process.env.GEMINI_API_KEY || "AIzaSyAVswtsus_sdSKEyEfl3ugc1rCITuR_dEo";
 
-  // 5. Construct the Structured Prompt
+  // 5. Pre-clean the speech text to remove stutters before sending to AI
+  const preCleanedText = normalizeSpokenNumbers(text);
+
+  // 6. Construct the Structured Prompt
   const prompt = `
 You are the AI engine for Apni Estate Smart DPR (Daily Progress Report) for Indian construction projects.
-A supervisor has entered or spoken the following daily update (may be in English, Hindi, or Hinglish):
+A supervisor has entered or spoken the following daily update (may be in English, Hindi, or Hinglish).
 
+RAW SPEECH TRANSCRIPT (may contain stuttering, repeated words, and speech recognition errors):
 """
 ${text}
+"""
+
+PRE-CLEANED VERSION (basic normalization applied, but may still need correction):
+"""
+${preCleanedText}
 """
 
 PROJECT CONTEXT:

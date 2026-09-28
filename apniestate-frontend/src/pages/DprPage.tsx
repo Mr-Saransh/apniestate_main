@@ -63,6 +63,43 @@ interface SelectedMaterialConsumption {
   notes?: string;
 }
 
+/**
+ * Aggressively deduplicate stuttered/repeated words and phrases in speech text.
+ */
+function deduplicateStutteredText(raw: string): string {
+  let text = raw;
+
+  // 1. Remove immediately repeated single words ("we we we" -> "we")
+  text = text.replace(/\b(\w+)(?:\s+\1)+\b/gi, '$1');
+
+  // 2. Remove repeated multi-word phrases ("sofa set sofa set" -> "sofa set")
+  let prev = '';
+  let iters = 0;
+  while (prev !== text && iters < 8) {
+    prev = text;
+    text = text.replace(/\b([a-zA-Z0-9]+(?:\s+[a-zA-Z0-9]+){0,3})\s+\1\b/gi, '$1');
+    iters++;
+  }
+
+  // 3. Remove partial stutter restarts
+  const words = text.split(/\s+/);
+  if (words.length > 6) {
+    for (let windowSize = Math.min(5, Math.floor(words.length / 2)); windowSize >= 3; windowSize--) {
+      const prefix = words.slice(0, windowSize).join(' ').toLowerCase();
+      const restText = words.slice(windowSize).join(' ').toLowerCase();
+      const restartIdx = restText.indexOf(prefix);
+      if (restartIdx !== -1) {
+        const wordsBeforeRestart = restText.slice(0, restartIdx).split(/\s+/).filter(Boolean).length;
+        text = words.slice(windowSize + wordsBeforeRestart).join(' ');
+        break;
+      }
+    }
+  }
+
+  text = text.replace(/\s{2,}/g, ' ');
+  return text.trim();
+}
+
 function cleanSpokenText(raw: string): string {
   let text = raw;
 
@@ -119,30 +156,15 @@ function cleanSpokenText(raw: string): string {
   }
 
   // Handle common speech recognition phonetic mishearings in site dictation
-  // "force" misheard instead of "4" (e.g. "force sofa set" -> "4 sofa set", "force cement bags")
   text = text.replace(/\b(?:force|forth|fourth)\s+(?=(?:sofa|cement|bag|brick|door|window|box|ton|truck|worker|labour|labor|tile|pipe|steel|rebar|sariya|set|pcs|nos|kg|units?|item)\b)/gi, '4 ');
   text = text.replace(/\bforce\s+sofa\b/gi, '4 sofa');
-
-  // "for" misheard instead of "4"
   text = text.replace(/\bfor\s+(?!(?:today|tomorrow|delay|work|inspection|approval)\b)(?=[a-zA-Z])/gi, '4 ');
-
-  // "to" / "too" misheard instead of "2"
   text = text.replace(/\b(?:to|too)\s+(?=(?:sofa|cement|bag|brick|door|window|box|ton|truck|worker|labour|labor|tile|pipe|steel|rebar|sariya)\b)/gi, '2 ');
-
-  // "please don't" / "pleased on" / "please on" misheard instead of "placed on"
   text = text.replace(/\b(?:please don't|please on|pleased on|pleased)\s+(?=(?:second|first|third|fourth|ground|\d+(?:st|nd|rd|th)?|2nd|1st|3rd|4th|site|floor|room|hall|wall|roof|slab|terrace|tower)\b)/gi, 'placed on ');
-
-  // "second force" / "first force" -> "... floor"
   text = text.replace(/\b(second|first|third|fourth|ground)\s+force\b/gi, '$1 floor');
 
-  // Iteratively clean repeated duplicate adjacent words and short phrases (e.g. "sofa set sofa set", "force force")
-  let prev = '';
-  let iters = 0;
-  while (prev !== text && iters < 6) {
-    prev = text;
-    text = text.replace(/\b([a-zA-Z0-9]+(?:\s+[a-zA-Z0-9]+){0,3})\s+\1\b/gi, '$1');
-    iters++;
-  }
+  // Deduplicate stuttered speech
+  text = deduplicateStutteredText(text);
 
   return text.trim();
 }
@@ -192,8 +214,11 @@ export default function DprPage() {
   const recognitionRef = useRef<any>(null);
   const userWantsListeningRef = useRef(false);
   const restartTimeoutRef = useRef<any>(null);
-  const baseTextRef = useRef<string>('');
   const currentTextRef = useRef<string>('');
+  // ─── STUTTER-FREE SPEECH: Track finalized chunks separately ───
+  const finalizedChunksRef = useRef<string[]>([]);
+  const lastProcessedFinalIdxRef = useRef(-1);
+  const interimDisplayRef = useRef('');
 
   // Keep currentTextRef in sync when user edits manually
   useEffect(() => {
@@ -301,23 +326,34 @@ export default function DprPage() {
       recognition.lang = speechLang;
 
       recognition.onresult = (event: any) => {
-        let finalChunk = '';
-        let interimChunk = '';
+        // ─── KEY FIX: Only process NEW final results, never re-read old ones ───
+        let currentInterim = '';
 
         for (let i = 0; i < event.results.length; i++) {
-          const res = event.results[i];
-          if (res.isFinal) {
-            finalChunk += res[0].transcript + ' ';
+          const result = event.results[i];
+          if (result.isFinal) {
+            if (i > lastProcessedFinalIdxRef.current) {
+              const transcript = result[0].transcript.trim();
+              if (transcript) {
+                const cleaned = cleanSpokenText(transcript);
+                finalizedChunksRef.current.push(cleaned);
+              }
+              lastProcessedFinalIdxRef.current = i;
+            }
           } else {
-            interimChunk += res[0].transcript;
+            currentInterim = result[0].transcript;
           }
         }
 
-        const base = baseTextRef.current;
-        const rawCombined = [base, finalChunk.trim(), interimChunk.trim()].filter(Boolean).join(' ');
-        const cleaned = cleanSpokenText(rawCombined);
-        setSmartInputText(cleaned);
-        currentTextRef.current = cleaned;
+        const allFinals = finalizedChunksRef.current.join(' ').trim();
+        const interimNormalized = currentInterim ? cleanSpokenText(currentInterim) : '';
+        interimDisplayRef.current = interimNormalized;
+
+        const displayText = [allFinals, interimNormalized].filter(Boolean).join(' ');
+        const deduped = deduplicateStutteredText(displayText);
+
+        setSmartInputText(deduped);
+        currentTextRef.current = deduped;
       };
 
       recognition.onerror = (event: any) => {
@@ -348,7 +384,8 @@ export default function DprPage() {
 
       recognition.onend = () => {
         if (userWantsListeningRef.current) {
-          baseTextRef.current = currentTextRef.current.trim();
+          // Reset result index tracker (Chrome starts new indices from 0 on restart)
+          lastProcessedFinalIdxRef.current = -1;
           if (restartTimeoutRef.current) clearTimeout(restartTimeoutRef.current);
           restartTimeoutRef.current = setTimeout(() => {
             if (userWantsListeningRef.current && recognitionRef.current) {
@@ -391,10 +428,34 @@ export default function DprPage() {
       try {
         recognitionRef.current.stop();
       } catch (_) {}
+
+      // ─── Auto-clean with AI when user stops speaking ───
+      const rawText = currentTextRef.current.trim();
+      if (rawText) {
+        const clientCleaned = deduplicateStutteredText(cleanSpokenText(rawText));
+        setSmartInputText(clientCleaned);
+        currentTextRef.current = clientCleaned;
+
+        // Auto-trigger AI understand to get corrected_text and update the field
+        setTimeout(() => {
+          if (currentTextRef.current.trim()) {
+            handleUnderstandUpdate();
+          }
+        }, 250);
+      }
     } else {
       setSpeechError(null);
-      baseTextRef.current = smartInputText.trim();
       currentTextRef.current = smartInputText.trim();
+
+      // Reset speech tracking state for a fresh recording session
+      finalizedChunksRef.current = [];
+      lastProcessedFinalIdxRef.current = -1;
+      interimDisplayRef.current = '';
+
+      // If user already typed something, seed the finalized chunks with it
+      if (smartInputText.trim()) {
+        finalizedChunksRef.current = [smartInputText.trim()];
+      }
 
       if (typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
         try {
@@ -456,7 +517,9 @@ export default function DprPage() {
         if (res.data.corrected_text) {
           setSmartInputText(res.data.corrected_text);
           currentTextRef.current = res.data.corrected_text;
-          baseTextRef.current = res.data.corrected_text;
+          // Reset finalized chunks to the corrected text so future speech sessions build on it
+          finalizedChunksRef.current = [res.data.corrected_text];
+          lastProcessedFinalIdxRef.current = -1;
         }
 
         if (res.data.corrected_text && res.data.corrected_text.toLowerCase() !== smartInputText.trim().toLowerCase()) {
