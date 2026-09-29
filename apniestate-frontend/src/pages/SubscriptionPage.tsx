@@ -113,7 +113,7 @@ const DURATION_PACKAGES: Record<DurationOption, { discountRate: number; label: s
 
 export default function SubscriptionPage() {
   const navigate = useNavigate();
-  const { user, setAuthSession, logout } = useAuth();
+  const { user, setAuthSession, updateUser, logout } = useAuth();
 
   const [selectedPlan, setSelectedPlan] = useState<PlanTier>('ENTERPRISE');
   const [selectedDuration, setSelectedDuration] = useState<DurationOption>(4);
@@ -261,12 +261,18 @@ export default function SubscriptionPage() {
     try {
       const res = await subscriptionApi.requestTrial();
       if (res.success) {
-        alert('Free trial requested successfully! Please wait for admin approval.');
-        await logout();
-        navigate('/login', { replace: true });
+        if (res.data?.accessToken) {
+          localStorage.setItem('access_token', res.data.accessToken);
+        }
+        if (res.data?.user) {
+          updateUser(res.data.user);
+        } else {
+          updateUser({ ...user!, subscription_status: 'TRIAL_ACTIVE', onboarded: true });
+        }
+        navigate('/projects?create=true', { replace: true });
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to request trial');
+      setError(err.message || 'Failed to activate trial');
     } finally {
       setRequestingTrial(false);
     }
@@ -509,15 +515,16 @@ export default function SubscriptionPage() {
             <span>Need to test Apni Estate first?</span>
           </div>
           <p className="text-xs text-slate-400 mb-4">
-            Request a 15-day free trial. Approval is reviewed by the Apni Estate onboarding team.
+            Start a 15-day free trial of our Enterprise Package with unlimited project management and full CRM access included!
           </p>
           <button
             type="button"
             disabled={requestingTrial}
             onClick={handleRequestTrial}
-            className="px-5 py-2.5 rounded-xl text-xs font-bold text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 transition-colors"
+            className="px-6 py-3 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#2648E7] to-[#4F6DFF] hover:from-[#1e3bbd] hover:to-[#2648E7] border border-blue-500/30 shadow-lg shadow-blue-500/20 hover:scale-[1.02] transition-all flex items-center gap-2 mx-auto disabled:opacity-50"
           >
-            {requestingTrial ? 'Requesting Trial...' : 'Request 15-Day Free Trial →'}
+            <Sparkles size={14} className="text-[#FCC300]" />
+            <span>{requestingTrial ? 'Activating Enterprise Trial...' : 'Start 15-Day Enterprise Trial Free →'}</span>
           </button>
         </div>
       </div>

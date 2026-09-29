@@ -23,18 +23,44 @@ export function withAuth(handler: RouteHandler) {
     try {
       dbUser = await prisma.user.findUnique({
         where: { id: payload.sub },
-        select: { company_id: true },
+        select: { company_id: true, name: true, role: true, subscription_status: true },
       });
     } catch (e) {
       console.warn("Transient DB error in auth middleware", e);
-      // Fallback to payload's company_id if DB is unreachable to avoid 500s
-      dbUser = { company_id: payload.company_id || null };
+      dbUser = { company_id: payload.company_id || null, name: "User", role: payload.role, subscription_status: "NONE" };
     }
 
     if (!dbUser && !payload.company_id) return unauthorized();
 
-    if (!payload.company_id) {
-      payload.company_id = dbUser?.company_id || null;
+    // Keep payload.company_id synced with DB record
+    if (dbUser?.company_id) {
+      payload.company_id = dbUser.company_id;
+    } else {
+      // Check active membership
+      const membership = await prisma.companyMembership.findFirst({
+        where: { user_id: payload.sub, status: "ACTIVE" },
+        select: { company_id: true },
+      });
+      if (membership?.company_id) {
+        payload.company_id = membership.company_id;
+        await prisma.user.update({
+          where: { id: payload.sub },
+          data: { company_id: membership.company_id },
+        }).catch(() => {});
+      } else if (dbUser && (dbUser.subscription_status === "TRIAL_ACTIVE" || dbUser.subscription_status === "ACTIVE")) {
+        // Auto-provision workspace for active trial/paid builder
+        const company = await prisma.company.create({
+          data: { name: `${dbUser.name || "User"}'s Workspace` },
+        });
+        payload.company_id = company.id;
+        await prisma.companyMembership.create({
+          data: { user_id: payload.sub, company_id: company.id, roles: ["BUILDER"], status: "ACTIVE" },
+        });
+        await prisma.user.update({
+          where: { id: payload.sub },
+          data: { company_id: company.id },
+        });
+      }
     }
 
     return handler(req, payload, context);
@@ -59,14 +85,14 @@ export function withPermission(requiredPermission: string, handler: RouteHandler
 }
 
 /**
- * Middleware wrapper enforcing CRM entitlement check (₹1,00,000 Plan required).
+ * Middleware wrapper enforcing CRM entitlement check (Enterprise Plan / Active Trial required).
  */
 export function withCrmAuth(handler: RouteHandler) {
   return withAuth(async (req, user, context) => {
-    const crmAccess = await canAccessCRM(user.company_id);
+    const crmAccess = await canAccessCRM(user.company_id, user.sub);
     if (!crmAccess.allowed) {
       return forbidden(
-        crmAccess.reason || "CRM is available exclusively on the ₹1,00,000 Premium Plan. Upgrade your subscription to access CRM features."
+        crmAccess.reason || "CRM is available exclusively on the Enterprise Plan. Upgrade your subscription to access CRM features."
       );
     }
 

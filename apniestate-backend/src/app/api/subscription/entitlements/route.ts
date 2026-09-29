@@ -4,6 +4,6 @@ import { getCompanyEntitlements } from "@/modules/subscription/entitlement.servi
 import { ok } from "@/lib/response";
 
 export const GET = withAuth(async (_req: NextRequest, user) => {
-  const entitlements = await getCompanyEntitlements(user.company_id);
+  const entitlements = await getCompanyEntitlements(user.company_id, user.sub);
   return ok(entitlements, "Company entitlements retrieved");
 });

@@ -19,7 +19,12 @@ function calculateProjectProgress(project: {
 }
 
 export const getProjects = async (userId: string, role: string, companyId?: string | null) => {
-  if (!companyId) return [];
+  let effectiveCompanyId = companyId;
+  if (!effectiveCompanyId) {
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { company_id: true } });
+    effectiveCompanyId = user?.company_id || null;
+  }
+  if (!effectiveCompanyId) return [];
 
   // Self-repair: Assign current companyId to any projects created by this builder that lack it
   if (role === "BUILDER") {
@@ -29,12 +34,12 @@ export const getProjects = async (userId: string, role: string, companyId?: stri
         company_id: null
       },
       data: {
-        company_id: companyId
+        company_id: effectiveCompanyId
       }
     });
   }
 
-  const where: any = { company_id: companyId };
+  const where: any = { company_id: effectiveCompanyId };
 
   if (role === "BUILDER" || role === "ADMIN") {
     // Builders and Admins see all projects under the company
@@ -128,11 +133,35 @@ export const createProject = async (data: CreateProjectInput, builderId: string,
   const { start_date, end_date, ...rest } = data;
   
   return prisma.$transaction(async (tx) => {
+    let effectiveCompanyId = companyId;
+
+    if (!effectiveCompanyId) {
+      const user = await tx.user.findUnique({
+        where: { id: builderId },
+        select: { company_id: true, name: true },
+      });
+      if (user?.company_id) {
+        effectiveCompanyId = user.company_id;
+      } else if (user) {
+        const company = await tx.company.create({
+          data: { name: `${user.name}'s Workspace` },
+        });
+        effectiveCompanyId = company.id;
+        await tx.companyMembership.create({
+          data: { user_id: builderId, company_id: company.id, roles: ["BUILDER"], status: "ACTIVE" },
+        });
+        await tx.user.update({
+          where: { id: builderId },
+          data: { company_id: company.id },
+        });
+      }
+    }
+
     const project = await tx.project.create({
       data: {
         ...rest,
         builder_id: builderId,
-        company_id: companyId || null,
+        company_id: effectiveCompanyId || null,
         start_date: new Date(start_date),
         end_date: end_date ? new Date(end_date) : null,
       }
@@ -144,7 +173,7 @@ export const createProject = async (data: CreateProjectInput, builderId: string,
         name: "Main Site",
         location: (data as any).address || (data as any).city || "Project Location",
         project_id: project.id,
-        company_id: companyId || null,
+        company_id: effectiveCompanyId || null,
         status: "NOT_STARTED",
       }
     });

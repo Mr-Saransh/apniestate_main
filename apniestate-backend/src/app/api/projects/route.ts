@@ -16,7 +16,7 @@ export const POST = withAuth(async (req, user) => {
   if ("error" in parsed) return parsed.error;
 
   // Backend Entitlement Enforcement: Active project limit check
-  const entitlement = await canCreateProject(user.company_id);
+  const entitlement = await canCreateProject(user.company_id, user.sub);
   if (!entitlement.allowed) {
     return forbidden(
       entitlement.reason || "Your current subscription plan limit does not allow creating new projects."

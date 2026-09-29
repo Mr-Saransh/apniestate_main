@@ -323,7 +323,7 @@ export async function getSubscriptionStatus(
   if (!user) throw new Error("User not found");
 
   const effectiveCompanyId = companyId || user.company_id;
-  const entitlements = await getCompanyEntitlements(effectiveCompanyId);
+  const entitlements = await getCompanyEntitlements(effectiveCompanyId, userId);
 
   // Retrieve active subscription
   let sub = null;
@@ -475,51 +475,107 @@ export async function requestTrial(userId: string) {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) throw new Error("User not found");
 
-  if (user.subscription_status === "TRIAL_ACTIVE") {
-    throw new Error("You already have an active trial");
-  }
   if (user.subscription_status === "ACTIVE") {
     throw new Error("You already have an active subscription");
   }
 
+  // Ensure workspace exists
   let companyId = user.company_id;
   if (!companyId) {
-    const company = await prisma.company.create({
-      data: { name: `${user.name}'s Workspace` },
+    const existingMembership = await prisma.companyMembership.findFirst({
+      where: { user_id: userId, status: "ACTIVE" },
+      select: { company_id: true },
     });
-    companyId = company.id;
-    await prisma.companyMembership.create({
-      data: { user_id: userId, company_id: company.id, roles: ["BUILDER"], status: "ACTIVE" },
-    });
+    if (existingMembership) {
+      companyId = existingMembership.company_id;
+    } else {
+      const company = await prisma.company.create({
+        data: { name: `${user.name}'s Workspace` },
+      });
+      companyId = company.id;
+      await prisma.companyMembership.create({
+        data: { user_id: userId, company_id: company.id, roles: ["BUILDER"], status: "ACTIVE" },
+      });
+    }
   }
 
-  const existing = await prisma.subscription.findFirst({
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000); // 15 days
+
+  // Check existing trial
+  const existingTrial = await prisma.subscription.findFirst({
     where: { user_id: userId, type: "TRIAL" },
+    orderBy: { created_at: "desc" },
   });
 
-  if (existing) {
-    throw new Error("Trial already requested or used previously");
+  let subscription;
+  if (existingTrial) {
+    subscription = await prisma.subscription.update({
+      where: { id: existingTrial.id },
+      data: {
+        company_id: companyId,
+        plan: "ENTERPRISE",
+        status: "TRIAL_ACTIVE",
+        start_date: now,
+        end_date: expiresAt,
+        starts_at: now,
+        expires_at: expiresAt,
+        duration_months: 1,
+        price: 0,
+        currency: "INR",
+        type: "TRIAL",
+      },
+    });
+  } else {
+    subscription = await prisma.subscription.create({
+      data: {
+        company_id: companyId,
+        user_id: userId,
+        type: "TRIAL",
+        plan: "ENTERPRISE",
+        duration_months: 1,
+        status: "TRIAL_ACTIVE",
+        start_date: now,
+        end_date: expiresAt,
+        starts_at: now,
+        expires_at: expiresAt,
+        price: 0,
+        currency: "INR",
+      },
+    });
   }
 
-  const subscription = await prisma.subscription.create({
+  const updatedUser = await prisma.user.update({
+    where: { id: userId },
     data: {
+      subscription_status: "TRIAL_ACTIVE",
       company_id: companyId,
-      user_id: userId,
-      type: "TRIAL",
-      plan: "BASIC",
-      duration_months: 1,
-      status: "PENDING_TRIAL",
-      price: 0,
-      currency: "INR",
+      onboarded: true,
     },
   });
 
-  await prisma.user.update({
-    where: { id: userId },
-    data: { subscription_status: "PENDING_TRIAL", company_id: companyId },
+  // Issue refreshed access token with company_id
+  const accessToken = signAccessToken({
+    sub: updatedUser.id,
+    email: updatedUser.email || updatedUser.username || "",
+    role: updatedUser.role as any,
+    company_id: companyId,
   });
 
-  return subscription;
+  return {
+    subscription,
+    user: {
+      id: updatedUser.id,
+      name: updatedUser.name,
+      email: updatedUser.email || updatedUser.username || "",
+      role: updatedUser.role,
+      company_id: companyId,
+      subscription_status: "TRIAL_ACTIVE",
+      onboarded: true,
+      profile_completed: updatedUser.profile_completed,
+    },
+    accessToken,
+  };
 }
 
 // ─── Admin Approval: Trial ────────────────────────────────
@@ -531,26 +587,83 @@ export async function approveTrial(userId: string, _adminUsername?: string) {
   const now = new Date();
   const expiresAt = new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000); // 15 days
 
-  await prisma.subscription.updateMany({
-    where: { user_id: userId, status: "PENDING_TRIAL" },
-    data: {
-      status: "TRIAL_ACTIVE",
-      start_date: now,
-      end_date: expiresAt,
-      starts_at: now,
-      expires_at: expiresAt,
-    },
+  let companyId = user.company_id;
+  if (!companyId) {
+    const existingMembership = await prisma.companyMembership.findFirst({
+      where: { user_id: userId, status: "ACTIVE" },
+      select: { company_id: true },
+    });
+    if (existingMembership) {
+      companyId = existingMembership.company_id;
+    } else {
+      const company = await prisma.company.create({
+        data: { name: `${user.name}'s Workspace` },
+      });
+      companyId = company.id;
+      await prisma.companyMembership.create({
+        data: { user_id: userId, company_id: company.id, roles: ["BUILDER"], status: "ACTIVE" },
+      });
+    }
+  }
+
+  // Update or create trial subscription with ENTERPRISE plan
+  const existingTrial = await prisma.subscription.findFirst({
+    where: { user_id: userId, type: "TRIAL" },
+    orderBy: { created_at: "desc" },
   });
+
+  let subscription;
+  if (existingTrial) {
+    subscription = await prisma.subscription.update({
+      where: { id: existingTrial.id },
+      data: {
+        company_id: companyId,
+        plan: "ENTERPRISE",
+        status: "TRIAL_ACTIVE",
+        start_date: now,
+        end_date: expiresAt,
+        starts_at: now,
+        expires_at: expiresAt,
+        duration_months: 1,
+        price: 0,
+        currency: "INR",
+        type: "TRIAL",
+      },
+    });
+  } else {
+    subscription = await prisma.subscription.create({
+      data: {
+        company_id: companyId,
+        user_id: userId,
+        type: "TRIAL",
+        plan: "ENTERPRISE",
+        status: "TRIAL_ACTIVE",
+        start_date: now,
+        end_date: expiresAt,
+        starts_at: now,
+        expires_at: expiresAt,
+        duration_months: 1,
+        price: 0,
+        currency: "INR",
+      },
+    });
+  }
 
   await prisma.user.update({
     where: { id: userId },
-    data: { subscription_status: "TRIAL_ACTIVE" },
+    data: {
+      subscription_status: "TRIAL_ACTIVE",
+      company_id: companyId,
+      onboarded: true,
+    },
   });
+
+  return subscription;
 }
 
 export async function rejectTrial(userId: string) {
   await prisma.subscription.updateMany({
-    where: { user_id: userId, status: "PENDING_TRIAL" },
+    where: { user_id: userId, type: "TRIAL" },
     data: { status: "EXPIRED" },
   });
 

@@ -24,7 +24,7 @@ export const PATCH = withAuth(async (req, user, ctx?: Ctx) => {
   if (parsed.data.status && ["PLANNING", "ACTIVE", "ON_HOLD"].includes(parsed.data.status)) {
     const existing = await getProjectById(id, user.company_id);
     if (existing && ["COMPLETED", "CANCELLED"].includes(existing.status)) {
-      const entitlement = await canCreateProject(user.company_id);
+      const entitlement = await canCreateProject(user.company_id, user.sub);
       if (!entitlement.allowed) {
         return forbidden(
           entitlement.reason || "Reactivating this project exceeds your current plan limit."

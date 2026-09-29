@@ -16,7 +16,7 @@ export const POST = withAdminAuth(async (req: NextRequest, admin) => {
 
   try {
     const result = await approveTrial(user_id, admin.username);
-    return ok(result, "Trial approved — user workspace created");
+    return ok(result, "Trial approved with 15-Day Enterprise package (Unlimited Projects & CRM)");
   } catch (err: any) {
     if (err.message?.includes("No pending trial")) {
       return badRequest(err.message);

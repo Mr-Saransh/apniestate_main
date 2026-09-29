@@ -186,11 +186,13 @@ export function calculateSubscriptionPrice(
 
 /**
  * Retrieves the latest active or demo subscription for a company.
+ * Prioritizes ACTIVE and TRIAL_ACTIVE subscriptions over EXPIRED ones.
  */
 export async function getCompanySubscription(companyId: string) {
   if (!companyId) return null;
 
-  const subscription = await prisma.subscription.findFirst({
+  // 1. Look for ACTIVE, TRIAL_ACTIVE, or EXPIRING_SOON first
+  let subscription = await prisma.subscription.findFirst({
     where: {
       company_id: companyId,
       status: {
@@ -198,29 +200,55 @@ export async function getCompanySubscription(companyId: string) {
           SubscriptionStatus.ACTIVE,
           SubscriptionStatus.TRIAL_ACTIVE,
           SubscriptionStatus.EXPIRING_SOON,
-          SubscriptionStatus.EXPIRED,
-          SubscriptionStatus.PENDING_TRIAL,
         ],
       },
     },
     orderBy: { created_at: "desc" },
   });
 
+  // 2. Fallback to PENDING_TRIAL, EXPIRED, or TRIAL_EXPIRED
+  if (!subscription) {
+    subscription = await prisma.subscription.findFirst({
+      where: {
+        company_id: companyId,
+        status: {
+          in: [
+            SubscriptionStatus.PENDING_TRIAL,
+            SubscriptionStatus.EXPIRED,
+            SubscriptionStatus.TRIAL_EXPIRED,
+          ],
+        },
+      },
+      orderBy: { created_at: "desc" },
+    });
+  }
+
   if (!subscription) return null;
 
   // Check if expired (demo accounts never expire naturally)
   const now = new Date();
-  const endDate = subscription.end_date || subscription.expires_at || now;
-  const isExpired = !subscription.is_demo && endDate < now;
+  const endDate = subscription.end_date || subscription.expires_at;
+  // If endDate is not specified yet (e.g. pending trial), it is NOT expired!
+  const isExpired = !subscription.is_demo && endDate ? (new Date(endDate).getTime() < now.getTime()) : false;
 
   if (isExpired && subscription.status !== SubscriptionStatus.EXPIRED && subscription.status !== SubscriptionStatus.TRIAL_EXPIRED) {
-    // Graceful auto-update in DB
+    const expiredStatus = subscription.type === "TRIAL" || subscription.status === SubscriptionStatus.TRIAL_ACTIVE
+      ? SubscriptionStatus.TRIAL_EXPIRED
+      : SubscriptionStatus.EXPIRED;
+
     await prisma.subscription.update({
       where: { id: subscription.id },
-      data: { status: SubscriptionStatus.EXPIRED },
+      data: { status: expiredStatus },
     }).catch((err) => console.warn("Failed to auto-update expired subscription status:", err));
 
-    subscription.status = SubscriptionStatus.EXPIRED;
+    if (subscription.user_id) {
+      await prisma.user.update({
+        where: { id: subscription.user_id },
+        data: { subscription_status: expiredStatus },
+      }).catch(() => {});
+    }
+
+    subscription.status = expiredStatus;
   }
 
   return {
@@ -231,9 +259,48 @@ export async function getCompanySubscription(companyId: string) {
 
 /**
  * Returns comprehensive entitlement summary for a company context.
+ * For any TRIAL users, delivers the best package: ENTERPRISE (unlimited projects + CRM).
  */
-export async function getCompanyEntitlements(companyId: string | null | undefined) {
-  if (!companyId) {
+export async function getCompanyEntitlements(companyId: string | null | undefined, fallbackUserId?: string) {
+  let effectiveCompanyId = companyId;
+
+  // Self-heal: If no companyId was supplied, resolve from user or active membership
+  if (!effectiveCompanyId && fallbackUserId) {
+    const user = await prisma.user.findUnique({
+      where: { id: fallbackUserId },
+      select: { company_id: true, name: true, subscription_status: true },
+    });
+    if (user?.company_id) {
+      effectiveCompanyId = user.company_id;
+    } else if (user) {
+      const membership = await prisma.companyMembership.findFirst({
+        where: { user_id: fallbackUserId, status: "ACTIVE" },
+        select: { company_id: true },
+      });
+      if (membership?.company_id) {
+        effectiveCompanyId = membership.company_id;
+        await prisma.user.update({
+          where: { id: fallbackUserId },
+          data: { company_id: membership.company_id },
+        }).catch(() => {});
+      } else if (user.subscription_status === "TRIAL_ACTIVE" || user.subscription_status === "ACTIVE") {
+        // Auto-provision workspace for active trial or paid builder
+        const company = await prisma.company.create({
+          data: { name: `${user.name}'s Workspace` },
+        });
+        effectiveCompanyId = company.id;
+        await prisma.companyMembership.create({
+          data: { user_id: fallbackUserId, company_id: company.id, roles: ["BUILDER"], status: "ACTIVE" },
+        });
+        await prisma.user.update({
+          where: { id: fallbackUserId },
+          data: { company_id: company.id },
+        });
+      }
+    }
+  }
+
+  if (!effectiveCompanyId) {
     return {
       company_id: null,
       plan_id: null,
@@ -256,21 +323,42 @@ export async function getCompanyEntitlements(companyId: string | null | undefine
     };
   }
 
-  const sub = await getCompanySubscription(companyId);
+  let sub = await getCompanySubscription(effectiveCompanyId);
+
+  // Fallback: If company has no subscription record, check user-level subscription
+  if (!sub && fallbackUserId) {
+    const userSub = await prisma.subscription.findFirst({
+      where: {
+        user_id: fallbackUserId,
+        status: { in: [SubscriptionStatus.ACTIVE, SubscriptionStatus.TRIAL_ACTIVE, SubscriptionStatus.EXPIRING_SOON, SubscriptionStatus.PENDING_TRIAL] },
+      },
+      orderBy: { created_at: "desc" },
+    });
+    if (userSub) {
+      await prisma.subscription.update({
+        where: { id: userSub.id },
+        data: { company_id: effectiveCompanyId },
+      }).catch(() => {});
+      sub = { ...userSub, is_expired: false };
+    }
+  }
 
   // Count active projects (status not COMPLETED or CANCELLED)
   const activeProjectsCount = await prisma.project.count({
     where: {
-      company_id: companyId,
+      company_id: effectiveCompanyId,
       status: { in: ["PLANNING", "ACTIVE", "ON_HOLD"] },
     },
   });
 
-  const rawPlanId = sub?.plan || "BASIC";
+  const isDemo = !!sub?.is_demo;
+  const isTrial = sub?.type === "TRIAL" || sub?.status === SubscriptionStatus.TRIAL_ACTIVE;
+
+  // ALL TRIAL USERS RECEIVE THE BEST PACKAGE: ENTERPRISE (Unlimited projects + full CRM)
+  const rawPlanId = isTrial ? "ENTERPRISE" : (sub?.plan || "BASIC");
   const planKey = resolvePlanKey(rawPlanId);
   const plan = COMMERCIAL_PLANS[planKey];
 
-  const isDemo = !!sub?.is_demo;
   const isActive = !!sub && !sub.is_expired && (sub.status === SubscriptionStatus.ACTIVE || sub.status === SubscriptionStatus.TRIAL_ACTIVE || isDemo);
   const isExpired = !!sub && sub.is_expired;
 
@@ -288,10 +376,15 @@ export async function getCompanyEntitlements(companyId: string | null | undefine
 
   if (!sub) {
     canCreateProject = false;
-    canCreateProjectReason = "No active subscription. Please select a plan to start creating projects.";
+    canCreateProjectReason = "No active subscription. Please select a plan or start a 15-day free trial.";
   } else if (isExpired) {
     canCreateProject = false;
-    canCreateProjectReason = "Your subscription has expired. Please renew your plan to create projects.";
+    canCreateProjectReason = isTrial
+      ? "Your 15-day free trial has expired. Upgrade your subscription to continue creating projects."
+      : "Your subscription has expired. Please renew your plan to create projects.";
+  } else if (!isActive) {
+    canCreateProject = false;
+    canCreateProjectReason = "Your subscription or trial is pending approval or inactive.";
   } else if (plan.maxActiveProjects !== Infinity && activeProjectsCount >= plan.maxActiveProjects) {
     canCreateProject = false;
     canCreateProjectReason = `Your current ${plan.name} allows ${plan.maxActiveProjects} active project${plan.maxActiveProjects === 1 ? "" : "s"}. Archive an existing project or upgrade your plan.`;
@@ -300,10 +393,10 @@ export async function getCompanyEntitlements(companyId: string | null | undefine
   }
 
   return {
-    company_id: companyId,
+    company_id: effectiveCompanyId,
     plan_id: plan.id,
-    plan_name: plan.name,
-    badge: plan.badge,
+    plan_name: isTrial ? "Enterprise (Trial)" : plan.name,
+    badge: isTrial ? "Trial" : plan.badge,
     setup_cost: plan.setupCost,
     monthly_price: plan.monthlyPrice,
     base_price: plan.basePrice,
@@ -325,23 +418,15 @@ export async function getCompanyEntitlements(companyId: string | null | undefine
 
 /**
  * Checks whether a company is allowed to create a new active project.
+ * Supports fallback userId for self-healing workspace context.
  */
-export async function canCreateProject(companyId: string | null | undefined): Promise<{
+export async function canCreateProject(companyId: string | null | undefined, userId?: string): Promise<{
   allowed: boolean;
   reason?: string;
   currentActiveCount: number;
   maxProjects: number | "unlimited";
 }> {
-  if (!companyId) {
-    return {
-      allowed: false,
-      reason: "No company context provided.",
-      currentActiveCount: 0,
-      maxProjects: 0,
-    };
-  }
-
-  const entitlements = await getCompanyEntitlements(companyId);
+  const entitlements = await getCompanyEntitlements(companyId, userId);
 
   return {
     allowed: entitlements.can_create_project,
@@ -353,25 +438,20 @@ export async function canCreateProject(companyId: string | null | undefined): Pr
 
 /**
  * Checks whether a company is allowed to access CRM features.
- * CRM is included in the Enterprise Plan.
+ * CRM is included in the Enterprise Plan and free trial.
  */
-export async function canAccessCRM(companyId: string | null | undefined): Promise<{
+export async function canAccessCRM(companyId: string | null | undefined, userId?: string): Promise<{
   allowed: boolean;
   reason?: string;
 }> {
-  if (!companyId) {
-    return {
-      allowed: false,
-      reason: "No company context provided.",
-    };
-  }
-
-  const entitlements = await getCompanyEntitlements(companyId);
+  const entitlements = await getCompanyEntitlements(companyId, userId);
 
   if (!entitlements.is_active) {
     return {
       allowed: false,
-      reason: "Your subscription is not active or has expired. Please subscribe or renew to access CRM.",
+      reason: entitlements.is_expired
+        ? "Your trial or subscription has expired. Please upgrade or renew to access CRM."
+        : "Your subscription is not active. Please subscribe to access CRM.",
     };
   }
 
@@ -388,9 +468,9 @@ export async function canAccessCRM(companyId: string | null | undefined): Promis
 /**
  * Returns project usage metrics for a company.
  */
-export async function getProjectUsage(companyId: string | null | undefined) {
-  if (!companyId) return { activeCount: 0, limit: 0, canCreate: false };
-  const entitlements = await getCompanyEntitlements(companyId);
+export async function getProjectUsage(companyId: string | null | undefined, userId?: string) {
+  if (!companyId && !userId) return { activeCount: 0, limit: 0, canCreate: false };
+  const entitlements = await getCompanyEntitlements(companyId, userId);
   return {
     activeCount: entitlements.active_projects_count,
     limit: entitlements.max_projects === -1 ? "Unlimited" : entitlements.max_projects,
@@ -398,3 +478,4 @@ export async function getProjectUsage(companyId: string | null | undefined) {
     plan: entitlements.plan_name,
   };
 }
+
