@@ -59,7 +59,8 @@ export const POST = withAuth(async (req, user) => {
     // Let's do it manually for each item to stay in the same transaction.
 
     for (const item of grn.items) {
-      if (item.received_qty > 0) {
+      const quantityToAdd = Math.max(0, (item.received_qty || 0) - (item.rejected_qty || 0));
+      if (quantityToAdd > 0) {
         let invItem = await tx.inventoryItem.findUnique({
           where: { material_id_site_id: { material_id: item.material_id, site_id } }
         });
@@ -69,8 +70,6 @@ export const POST = withAuth(async (req, user) => {
             data: { material_id: item.material_id, site_id, quantity: 0, min_quantity: 5 }
           });
         }
-
-        const quantityToAdd = item.received_qty;
 
         await tx.inventoryItem.update({
           where: { id: invItem.id },
@@ -82,7 +81,7 @@ export const POST = withAuth(async (req, user) => {
             item_id: invItem.id,
             type: "GRN_RECEIPT",
             quantity: quantityToAdd,
-            notes: `GRN ${grn.id} against PO`,
+            notes: `GRN ${grn.id} against PO (Accepted: ${quantityToAdd}, Rejected: ${item.rejected_qty})`,
             user_id: user.sub
           }
         });

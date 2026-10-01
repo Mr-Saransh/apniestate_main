@@ -45,107 +45,198 @@ export const GET = withAuth(async (request: Request, user: any) => {
       orderBy: { created_at: 'desc' },
     });
 
-    // Calculate project-wide cumulative ordered and received quantities per material
-    const materialOrderedMap = new Map<string, number>();
-    const materialReceivedMap = new Map<string, number>();
+    // Received (GRN)
+    const grns = await prisma.goodsReceiptNote.findMany({
+      where: { site_id: { in: siteIds } },
+      include: {
+        purchase_order: { include: { vendor: true, items: true } },
+        items: { include: { material: true } }
+      },
+      orderBy: { created_at: 'desc' }
+    });
 
+    // Consumption History (Real DPR / Site Usage)
+    const dbConsumption = await prisma.materialConsumption.findMany({
+      where: { site_id: { in: siteIds } },
+      include: { material: true },
+      orderBy: { date: 'desc' }
+    });
+
+    // Centralized Calculation Maps (Points 3, 5, 6)
+    const materialOrderedMap = new Map<string, number>();
+    const materialWeightedRateMap = new Map<string, { totalCost: number; totalQty: number }>();
+    const materialAcceptedMap = new Map<string, number>();
+    const materialRejectedMap = new Map<string, number>();
+    const materialConsumedMap = new Map<string, number>();
+
+    // 1. Process active Purchase Orders
     orders.forEach(o => {
-      if (o.status === 'CANCELLED') return;
+      if (['CANCELLED', 'REJECTED'].includes(o.status)) return;
       o.items.forEach(i => {
         const matName = (i.material?.name || '').trim().toLowerCase();
         const matId = i.material_id;
         const qty = Number(i.quantity) || 0;
-        const recQty = Number(i.received_quantity) || 0;
+        const unitPrice = Number(i.unit_price) || 0;
 
         if (matName) {
           materialOrderedMap.set(matName, (materialOrderedMap.get(matName) || 0) + qty);
-          materialReceivedMap.set(matName, (materialReceivedMap.get(matName) || 0) + recQty);
+          const existingRate = materialWeightedRateMap.get(matName) || { totalCost: 0, totalQty: 0 };
+          materialWeightedRateMap.set(matName, {
+            totalCost: existingRate.totalCost + (qty * unitPrice),
+            totalQty: existingRate.totalQty + qty
+          });
         }
         if (matId) {
           materialOrderedMap.set(matId, (materialOrderedMap.get(matId) || 0) + qty);
-          materialReceivedMap.set(matId, (materialReceivedMap.get(matId) || 0) + recQty);
+          const existingRate = materialWeightedRateMap.get(matId) || { totalCost: 0, totalQty: 0 };
+          materialWeightedRateMap.set(matId, {
+            totalCost: existingRate.totalCost + (qty * unitPrice),
+            totalQty: existingRate.totalQty + qty
+          });
         }
       });
     });
+
+    // 2. Process GRNs (Accepted vs Rejected receipts)
+    grns.forEach(g => {
+      g.items.forEach(gi => {
+        const matName = (gi.material?.name || '').trim().toLowerCase();
+        const matId = gi.material_id;
+        const parsedReceived = Number(gi.received_qty) || 0;
+        let accepted = 0;
+        let rejected = 0;
+
+        if (g.quality_status === 'REJECTED') {
+          accepted = 0;
+          rejected = parsedReceived;
+        } else if (g.quality_status === 'PARTIAL') {
+          rejected = (Number(gi.rejected_qty) || 0) + (Number(gi.damaged_qty) || 0);
+          accepted = Math.max(0, parsedReceived - rejected);
+        } else {
+          accepted = parsedReceived;
+          rejected = 0;
+        }
+
+        if (matName) {
+          materialAcceptedMap.set(matName, (materialAcceptedMap.get(matName) || 0) + accepted);
+          materialRejectedMap.set(matName, (materialRejectedMap.get(matName) || 0) + rejected);
+        }
+        if (matId) {
+          materialAcceptedMap.set(matId, (materialAcceptedMap.get(matId) || 0) + accepted);
+          materialRejectedMap.set(matId, (materialRejectedMap.get(matId) || 0) + rejected);
+        }
+      });
+    });
+
+    // 3. Process site material consumptions
+    dbConsumption.forEach(c => {
+      const matName = (c.material?.name || '').trim().toLowerCase();
+      const matId = c.material_id;
+      const qty = Number(c.quantity) || 0;
+      if (matName) {
+        materialConsumedMap.set(matName, (materialConsumedMap.get(matName) || 0) + qty);
+      }
+      if (matId) {
+        materialConsumedMap.set(matId, (materialConsumedMap.get(matId) || 0) + qty);
+      }
+    });
+
+    const formatBOQItem = (i: any, categoryName: string) => {
+      const matName = (i.material?.name || i.description || '').trim().toLowerCase();
+      const plannedQty = Number(i.quantity) || 0;
+      const plannedRate = Number(i.total_rate) || Number(i.material_rate) || 0;
+
+      const ordQty = materialOrderedMap.get(matName) || (i.material_id ? materialOrderedMap.get(i.material_id) : 0) || 0;
+      const accRecQty = materialAcceptedMap.get(matName) || (i.material_id ? materialAcceptedMap.get(i.material_id) : 0) || 0;
+      const rejQty = materialRejectedMap.get(matName) || (i.material_id ? materialRejectedMap.get(i.material_id) : 0) || 0;
+      const consumedLogQty = materialConsumedMap.get(matName) || (i.material_id ? materialConsumedMap.get(i.material_id) : 0) || 0;
+      const realConsumed = Math.max(Number(i.used_quantity) || 0, consumedLogQty);
+
+      // Remaining to Procure = max(planned - (ordered - rejected), 0)
+      const remainingToProcure = Math.max(0, plannedQty - Math.max(0, ordQty - rejQty));
+      // Remaining available for consumption = planned - consumed
+      const remainingToConsume = Math.max(0, plannedQty - realConsumed);
+
+      // Actual Purchase Rate (Weighted Average) vs Baseline Planned Rate (Point 5)
+      const rateInfo = materialWeightedRateMap.get(matName) || (i.material_id ? materialWeightedRateMap.get(i.material_id) : null);
+      let actualPurchaseRate = 0;
+      let rateVariance = 0;
+      let rateVariancePercent = 0;
+
+      if (rateInfo && rateInfo.totalQty > 0) {
+        actualPurchaseRate = Math.round((rateInfo.totalCost / rateInfo.totalQty) * 100) / 100;
+        rateVariance = Math.round((actualPurchaseRate - plannedRate) * 100) / 100;
+        rateVariancePercent = plannedRate > 0 ? Math.round(((actualPurchaseRate - plannedRate) / plannedRate) * 1000) / 10 : 0;
+      }
+
+      return {
+        id: i.id,
+        name: i.material?.name || i.description,
+        unit: i.unit,
+        planned: plannedQty,
+        used: realConsumed,
+        consumed: realConsumed,
+        ordered: ordQty,
+        received: accRecQty,
+        acceptedReceived: accRecQty,
+        rejected: rejQty,
+        remaining: remainingToProcure,
+        remainingToProcure,
+        remainingToConsume,
+        rate: plannedRate, // Baseline Planned / BOQ Rate (preserved!)
+        actualPurchaseRate,
+        rateVariance,
+        rateVariancePercent,
+        amount: i.total_amount || (plannedQty * plannedRate),
+        remarks: i.remarks || null,
+        code: i.code || null,
+        category: categoryName
+      };
+    };
 
     const boqCategories = boqs.length > 0
       ? boqs[0].categories.map(c => ({
           id: c.id,
           name: c.name,
-          items: c.items.map(i => {
-            const matName = (i.material?.name || i.description || '').trim().toLowerCase();
-            const ordQty = materialOrderedMap.get(matName) || (i.material_id ? materialOrderedMap.get(i.material_id) : 0) || 0;
-            const recQty = materialReceivedMap.get(matName) || (i.material_id ? materialReceivedMap.get(i.material_id) : 0) || 0;
-            const effectiveUsed = Math.max(Number(i.used_quantity) || 0, ordQty);
-            const remaining = Math.max(0, (i.quantity || 0) - effectiveUsed);
-
-            return {
-              id: i.id,
-              name: i.material?.name || i.description,
-              unit: i.unit,
-              planned: i.quantity,
-              used: effectiveUsed,
-              ordered: ordQty,
-              received: recQty,
-              remaining: remaining,
-              rate: i.total_rate || i.material_rate || 0,
-              amount: i.total_amount || ((i.quantity || 0) * (i.total_rate || i.material_rate || 0)),
-              remarks: i.remarks || null,
-              code: i.code || null,
-              category: c.name
-            };
-          })
+          items: c.items.map(i => formatBOQItem(i, c.name))
         }))
       : [];
 
     const boqItems = boqs.length > 0 
-      ? boqs[0].categories.flatMap(c => 
-          c.items.map(i => {
-            const matName = (i.material?.name || i.description || '').trim().toLowerCase();
-            const ordQty = materialOrderedMap.get(matName) || (i.material_id ? materialOrderedMap.get(i.material_id) : 0) || 0;
-            const recQty = materialReceivedMap.get(matName) || (i.material_id ? materialReceivedMap.get(i.material_id) : 0) || 0;
-            const effectiveUsed = Math.max(Number(i.used_quantity) || 0, ordQty);
-            const remaining = Math.max(0, (i.quantity || 0) - effectiveUsed);
-
-            return {
-              id: i.id,
-              name: i.material?.name || i.description,
-              unit: i.unit,
-              planned: i.quantity,
-              used: effectiveUsed,
-              ordered: ordQty,
-              received: recQty,
-              remaining: remaining,
-              rate: i.total_rate || i.material_rate || 0,
-              amount: i.total_amount || ((i.quantity || 0) * (i.total_rate || i.material_rate || 0)),
-              remarks: i.remarks || null,
-              code: i.code || null,
-              category: c.name
-            };
-          })
-        )
+      ? boqs[0].categories.flatMap(c => c.items.map(i => formatBOQItem(i, c.name)))
       : [];
 
     console.log(`[API /purchase/summary] Found ${boqs.length} BOQs. boqItems:`, boqItems.length, 'categories:', boqCategories.length);
 
-    // Material Requests
+    // Material Requests (Point 8: Requested, Approved, Ordered)
     const requests = await prisma.materialRequest.findMany({
       where: { site_id: { in: siteIds } },
       include: { material: true },
       orderBy: { created_at: 'desc' },
     });
 
-    const formattedRequests = requests.map(r => ({
-      id: r.id,
-      name: r.material.name,
-      stage: r.status, // "DRAFT", "PENDING_APPROVAL", "QUOTATION", "ORDERED", "APPROVED"
-      qty: `${r.quantity} ${r.material.unit}`,
-      quantity: r.quantity,
-      unit: r.material.unit,
-      date: new Date(r.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
-      priority: r.priority,
-      notes: r.notes
-    }));
+    const formattedRequests = requests.map(r => {
+      const requestedQty = Number(r.quantity) || 0;
+      const approvedQty = r.approved_quantity !== null && r.approved_quantity !== undefined ? Number(r.approved_quantity) : requestedQty;
+      const orderedQty = r.ordered_quantity !== null && r.ordered_quantity !== undefined ? Number(r.ordered_quantity) : (r.status === 'ORDERED' ? approvedQty : 0);
+      const isLocked = r.status === 'ORDERED' || r.status === 'COMPLETED';
+
+      return {
+        id: r.id,
+        name: r.material.name,
+        stage: r.status, // "DRAFT", "PENDING_APPROVAL", "QUOTATION", "ORDERED", "APPROVED"
+        qty: `${requestedQty} ${r.material.unit}`,
+        quantity: requestedQty, // Historical site requested quantity (immutable)
+        requestedQuantity: requestedQty,
+        approvedQuantity: approvedQty,
+        orderedQuantity: orderedQty,
+        isLocked,
+        unit: r.material.unit,
+        date: new Date(r.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
+        priority: r.priority,
+        notes: r.notes
+      };
+    });
 
     const formattedOrders = orders.map(o => {
       let meta: any = null;
@@ -231,15 +322,7 @@ export const GET = withAuth(async (request: Request, user: any) => {
       };
     });
 
-    // Received (GRN)
-    const grns = await prisma.goodsReceiptNote.findMany({
-      where: { site_id: { in: siteIds } },
-      include: {
-        purchase_order: { include: { vendor: true, items: true } },
-        items: { include: { material: true } }
-      },
-      orderBy: { created_at: 'desc' }
-    });
+
 
     const attachments = await prisma.attachment.findMany({
       where: { entity_type: 'GRN', entity_id: { in: grns.map(g => g.id) }, category: 'Bill' }
@@ -333,12 +416,7 @@ export const GET = withAuth(async (request: Request, user: any) => {
       reorderLevel: `${i.min_quantity || 0} ${i.material.unit}`
     }));
 
-    // Consumption History
-    const dbConsumption = await prisma.materialConsumption.findMany({
-      where: { site_id: { in: siteIds } },
-      include: { material: true },
-      orderBy: { date: 'desc' }
-    });
+
     const formattedConsumption = dbConsumption.map(c => ({
       id: c.id,
       material: c.material.name,

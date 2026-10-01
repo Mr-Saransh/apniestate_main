@@ -7,6 +7,14 @@ export interface Milestone {
   description: string | null;
   target_date: string;
   actual_date: string | null;
+  planned_start_date?: string | null;
+  planned_end_date?: string | null;
+  actual_start_date?: string | null;
+  actual_end_date?: string | null;
+  schedule_status?: 'AHEAD' | 'ON_TIME' | 'DELAYED' | 'ON_TRACK' | 'AT_RISK' | 'PENDING';
+  scheduleStatus?: 'AHEAD' | 'ON_TIME' | 'DELAYED' | 'ON_TRACK' | 'AT_RISK' | 'PENDING';
+  days_variance?: number;
+  daysVariance?: number;
   weight: number | null;
   progress_percentage?: number;
   status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'DELAYED';
@@ -18,7 +26,11 @@ export interface CreateMilestoneData {
   project_id: string;
   name: string;
   description?: string | null;
-  target_date: string;
+  target_date?: string;
+  planned_start_date?: string | null;
+  planned_end_date?: string | null;
+  actual_start_date?: string | null;
+  actual_end_date?: string | null;
   weight?: number | null;
   progress_percentage?: number;
   status?: Milestone['status'];
@@ -28,7 +40,12 @@ export interface UpdateMilestoneData {
   name?: string;
   description?: string | null;
   target_date?: string;
+  planned_start_date?: string | null;
+  planned_end_date?: string | null;
+  actual_start_date?: string | null;
+  actual_end_date?: string | null;
   weight?: number | null;
+  progress_percentage?: number;
   status?: Milestone['status'];
   actual_date?: string | null;
 }

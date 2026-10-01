@@ -4,6 +4,7 @@ import { withAuth } from "@/middleware/auth.middleware";
 import { prisma } from "@/lib/prisma";
 import { ok } from "@/lib/response";
 import { calculateProjectCategorySpending } from "@/modules/budgets/budgets.service";
+import { calculateScheduleStatus } from "@/lib/schedule";
 
 /**
  * GET /api/project-intelligence?project_id=xxx
@@ -330,17 +331,32 @@ export const GET = withAuth(async (req: NextRequest, user) => {
       const plannedProgress = 100; // Each milestone should reach 100%
       const actualProgress = m.progress_percentage || (m.status === "COMPLETED" ? 100 : 0);
       const variance = actualProgress - plannedProgress;
-      const isOverdue = m.status !== "COMPLETED" && new Date(m.target_date) < today;
-      const daysOverdue = isOverdue
-        ? Math.ceil((today.getTime() - new Date(m.target_date).getTime()) / (1000 * 60 * 60 * 24))
-        : 0;
+      
+      const schedule = calculateScheduleStatus({
+        status: m.status,
+        planned_start_date: m.planned_start_date,
+        planned_end_date: m.planned_end_date || m.target_date,
+        target_date: m.target_date,
+        actual_start_date: m.actual_start_date,
+        actual_end_date: m.actual_end_date || m.actual_date,
+        actual_date: m.actual_date,
+        progress_percentage: m.progress_percentage
+      });
+
+      const isOverdue = schedule.scheduleStatus === "DELAYED";
+      const daysOverdue = schedule.daysVariance > 0 ? schedule.daysVariance : 0;
 
       return {
         id: m.id,
         name: m.name,
         targetDate: m.target_date,
+        plannedStartDate: m.planned_start_date,
+        plannedEndDate: m.planned_end_date || m.target_date,
+        actualStartDate: m.actual_start_date,
+        actualEndDate: m.actual_end_date || m.actual_date,
         actualDate: m.actual_date,
         status: m.status,
+        scheduleStatus: schedule.scheduleStatus,
         plannedProgress,
         actualProgress,
         variance,

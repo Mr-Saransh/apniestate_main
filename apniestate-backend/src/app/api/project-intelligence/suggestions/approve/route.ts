@@ -43,13 +43,15 @@ export const POST = withAuth(async (req: NextRequest, user) => {
         );
       }
 
-      // Create official milestone using the same pattern as existing milestones
+      const targetDate = suggestion.suggested_end || suggestion.suggested_start || new Date();
       const milestone = await prisma.milestone.create({
         data: {
           project_id: suggestion.project_id,
           name: suggestion.name,
           description: suggestion.description,
-          target_date: suggestion.suggested_end || suggestion.suggested_start || new Date(),
+          target_date: targetDate,
+          planned_start_date: suggestion.suggested_start,
+          planned_end_date: targetDate,
           weight: 1,
           status: "PENDING",
           progress_percentage: 0,
@@ -100,12 +102,15 @@ export const POST = withAuth(async (req: NextRequest, user) => {
           continue;
         }
 
+        const targetDate = suggestion.suggested_end || suggestion.suggested_start || new Date();
         const milestone = await prisma.milestone.create({
           data: {
             project_id: suggestion.project_id,
             name: suggestion.name,
             description: suggestion.description,
-            target_date: suggestion.suggested_end || suggestion.suggested_start || new Date(),
+            target_date: targetDate,
+            planned_start_date: suggestion.suggested_start,
+            planned_end_date: targetDate,
             weight: 1,
             status: "PENDING",
             progress_percentage: 0,

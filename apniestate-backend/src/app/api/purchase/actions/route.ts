@@ -47,6 +47,14 @@ export const POST = withAuth(async (request: Request, user: any) => {
 
     if (action === 'UPDATE_REQUEST_STATUS') {
       const { requestId, status, approvedQuantity, notes } = payload;
+      const existingReq = await prisma.materialRequest.findUnique({ where: { id: requestId } });
+      if (!existingReq) return NextResponse.json({ error: 'Request not found' }, { status: 404 });
+      if (['ORDERED', 'COMPLETED'].includes(existingReq.status)) {
+        return NextResponse.json({
+          error: `Requirement has already been converted into an order (Status: ${existingReq.status}) and is locked against modifications.`
+        }, { status: 400 });
+      }
+
       const dataToUpdate: any = { status };
       if (status === 'APPROVED') {
         dataToUpdate.approved_by = user.sub;
@@ -63,6 +71,14 @@ export const POST = withAuth(async (request: Request, user: any) => {
 
     if (action === 'MODIFY_REQUEST') {
       const { requestId, quantity, approvedQuantity, status, notes } = payload;
+      const existingReq = await prisma.materialRequest.findUnique({ where: { id: requestId } });
+      if (!existingReq) return NextResponse.json({ error: 'Request not found' }, { status: 404 });
+      if (['ORDERED', 'COMPLETED'].includes(existingReq.status)) {
+        return NextResponse.json({
+          error: `Requirement has already been converted into an order (Status: ${existingReq.status}) and is locked against modifications.`
+        }, { status: 400 });
+      }
+
       const dataToUpdate: any = {};
       if (quantity !== undefined) dataToUpdate.quantity = Number(quantity);
       if (approvedQuantity !== undefined) dataToUpdate.approved_quantity = Number(approvedQuantity);
@@ -93,7 +109,15 @@ export const POST = withAuth(async (request: Request, user: any) => {
       for (const item of items) {
         const parsedRate = Number(item.rate) || 0;
         const parsedQty = Number(item.planned) || 0;
-        if (parsedQty < 0 || !item.name) continue;
+        if (parsedQty <= 0 || !item.name) continue;
+
+        // Skip non-material noise rows (headers, totals, notes)
+        const desc = String(item.name).trim().toLowerCase();
+        if (/^(sub[\s-]?total|grand[\s-]?total|total[\s:]|net[\s-]?total|summary|total\b)/i.test(desc)) continue;
+        if (/^(page\s+\d+|printed\s+on|date\s*:|tender\s+no)/i.test(desc)) continue;
+        if (/^(note[s]?\s*:|important\s*:|general\s+notes?|specifications?\s*:|terms\s*(&|and)\s*conditions)/i.test(desc)) continue;
+        if (/^([0-9]+(\.[0-9]+)*[.:)]?|[a-z]\.|\([a-z0-9]\)|[ivx]+\.|\s*[-*•#]\s*)$/i.test(desc) || /^\d+$/.test(desc)) continue;
+
         const catName = item.category || categoryName || 'General';
         
         let category = await prisma.bOQCategory.findFirst({
@@ -107,7 +131,7 @@ export const POST = withAuth(async (request: Request, user: any) => {
 
         boqItemsData.push({
           category_id: category.id,
-          description: item.name,
+          description: item.name.trim(),
           unit: item.unit || 'nos',
           quantity: parsedQty,
           material_rate: parsedRate,
@@ -162,7 +186,14 @@ export const POST = withAuth(async (request: Request, user: any) => {
         for (const item of (cat.items || [])) {
           const parsedRate = Number(item.rate) || 0;
           const parsedQty = Number(item.planned || item.quantity) || 0;
-          if (!item.name && parsedQty <= 0) continue;
+          if (!item.name || parsedQty <= 0) continue;
+
+          // Reject non-material summary/header rows
+          const desc = String(item.name).trim().toLowerCase();
+          if (/^(sub[\s-]?total|grand[\s-]?total|total[\s:]|net[\s-]?total|summary|total\b)/i.test(desc)) continue;
+          if (/^(page\s+\d+|printed\s+on|date\s*:|tender\s+no)/i.test(desc)) continue;
+          if (/^(note[s]?\s*:|important\s*:|general\s+notes?|specifications?\s*:|terms\s*(&|and)\s*conditions)/i.test(desc)) continue;
+          if (/^([0-9]+(\.[0-9]+)*[.:)]?|[a-z]\.|\([a-z0-9]\)|[ivx]+\.|\s*[-*•#]\s*)$/i.test(desc) || /^\d+$/.test(desc)) continue;
 
           const itemTotal = (item.amount !== undefined && item.amount !== null && !isNaN(Number(item.amount)))
             ? Number(item.amount)
@@ -173,7 +204,7 @@ export const POST = withAuth(async (request: Request, user: any) => {
           await prisma.bOQItem.create({
             data: {
               category_id: category.id,
-              description: item.name || 'Unnamed Material',
+              description: item.name.trim() || 'Unnamed Material',
               unit: item.unit || 'nos',
               quantity: parsedQty,
               material_rate: parsedRate,
@@ -361,117 +392,187 @@ export const POST = withAuth(async (request: Request, user: any) => {
           data: { project_id: projectId, company_id: user.company_id, name: "Main Site", location: "Main Location", status: "IN_PROGRESS" }
         });
       }
-      
-      let totalAmount = 0;
-      const poItemsData = [];
-      const priceVariances = [];
+
+      // Check Quotation if provided to enforce finalPurchaseRate <= quotedRate (Point 7)
+      let dbQuotation: any = null;
+      if (quotationId) {
+        dbQuotation = await prisma.quotation.findUnique({
+          where: { id: quotationId },
+          include: { items: { include: { material: true } } }
+        });
+      }
 
       for (const item of items) {
         if (!item.materialName) continue;
-        let material = await prisma.material.findFirst({ where: { name: item.materialName } });
-        if (!material) {
-          material = await prisma.material.create({
-            data: { name: item.materialName, unit: item.unit || 'pcs', company_id: user.company_id }
-          });
-        }
-        const parsedQty = Number(item.quantity) || 1;
         const parsedRate = Number(item.rate) || 0;
-        const quotedRate = Number(item.quotedRate) !== undefined && !isNaN(Number(item.quotedRate)) ? Number(item.quotedRate) : parsedRate;
-        const total = parsedQty * parsedRate;
-        totalAmount += total;
+        let quotedRate = Number(item.quotedRate);
 
-        poItemsData.push({
-          material_id: material.id,
-          quantity: parsedQty,
-          unit_price: parsedRate,
-          total: total
-        });
-
-        priceVariances.push({
-          materialName: item.materialName,
-          materialId: material.id,
-          quotedRate: quotedRate,
-          boughtRate: parsedRate,
-          quantity: parsedQty,
-          varianceAmount: (parsedRate - quotedRate) * parsedQty
-        });
-      }
-
-      if (poItemsData.length === 0) {
-        return NextResponse.json({ error: 'No valid items provided' }, { status: 400 });
-      }
-
-      const poNumber = `PO-${Math.floor(Math.random() * 100000)}`;
-
-      // Serialized metadata to store quotation and price variance tracking
-      const poMeta = JSON.stringify({
-        userNotes: notes || '',
-        quotationId: quotationId || null,
-        requestId: requestId || null,
-        priceVariances
-      });
-
-      const po = await prisma.purchaseOrder.create({
-        data: {
-          po_number: poNumber,
-          vendor_id: vendorId,
-          project_id: projectId,
-          site_id: site.id,
-          created_by: user.sub,
-          status: 'APPROVED',
-          total_amount: totalAmount,
-          company_id: user.company_id,
-          delivery_date: eta ? new Date(eta) : null,
-          notes: poMeta,
-          items: {
-            create: poItemsData
+        if (dbQuotation && dbQuotation.items) {
+          const qItem = dbQuotation.items.find((qi: any) =>
+            qi.material_id === item.materialId ||
+            (qi.material?.name && qi.material.name.trim().toLowerCase() === String(item.materialName).trim().toLowerCase())
+          );
+          if (qItem && qItem.rate !== undefined) {
+            quotedRate = qItem.rate;
           }
         }
-      });
 
-      // 1. Update QoM (Quantity of Materials) used_quantity baseline for each ordered item
-      try {
+        if (!isNaN(quotedRate) && quotedRate > 0 && parsedRate > quotedRate) {
+          return NextResponse.json({
+            error: `Final purchase rate (₹${parsedRate}) cannot exceed the selected quotation rate of ₹${quotedRate} for "${item.materialName}".`
+          }, { status: 400 });
+        }
+      }
+
+      const poResult = await prisma.$transaction(async (tx) => {
+        let totalAmount = 0;
+        const poItemsData = [];
+        const priceVariances = [];
+
         for (const item of items) {
           if (!item.materialName) continue;
-          const parsedQty = Number(item.quantity) || 0;
-          if (parsedQty <= 0) continue;
+          let material = await tx.material.findFirst({
+            where: { name: { equals: item.materialName.trim(), mode: 'insensitive' } }
+          });
+          if (!material) {
+            material = await tx.material.create({
+              data: { name: item.materialName.trim(), unit: item.unit || 'pcs', company_id: user.company_id }
+            });
+          }
+          const parsedQty = Number(item.quantity) || 1;
+          const parsedRate = Number(item.rate) || 0;
+          const quotedRate = Number(item.quotedRate) !== undefined && !isNaN(Number(item.quotedRate)) ? Number(item.quotedRate) : parsedRate;
+          const total = parsedQty * parsedRate;
+          totalAmount += total;
 
-          const boqItems = await prisma.bOQItem.findMany({
+          // ─── Cumulative Over-procurement Validation (Point 4) ───
+          const boqItems = await tx.bOQItem.findMany({
             where: {
+              category: { boq: { project_id: projectId } },
               OR: [
+                { material_id: material.id },
                 { description: { equals: item.materialName.trim(), mode: 'insensitive' } },
                 { code: item.materialName.trim() }
-              ],
-              category: { boq: { project_id: projectId } }
+              ]
             }
           });
 
           if (boqItems.length > 0) {
-            await prisma.bOQItem.update({
-              where: { id: boqItems[0].id },
-              data: { used_quantity: { increment: parsedQty } }
-            });
-          }
-        }
-      } catch (boqErr) {
-        console.error("Auto BOQ used_quantity increment error:", boqErr);
-      }
+            const boqItem = boqItems[0];
+            const plannedQty = Number(boqItem.quantity) || 0;
 
-      // 2. Lock Material Requirement (Indent) so it cannot be ordered again
-      try {
+            // Sum active/non-cancelled ordered quantities
+            const activePoItems = await tx.purchaseOrderItem.findMany({
+              where: {
+                purchase_order: {
+                  project_id: projectId,
+                  status: { notIn: ['CANCELLED', 'REJECTED'] }
+                },
+                OR: [
+                  { material_id: material.id },
+                  { material: { name: { equals: item.materialName.trim(), mode: 'insensitive' } } }
+                ]
+              }
+            });
+            const totalActiveOrdered = activePoItems.reduce((sum, pi) => sum + (Number(pi.quantity) || 0), 0);
+
+            // Sum rejected quantities from GRNs to reopen unfulfilled procurement
+            const grnItems = await tx.goodsReceiptNoteItem.findMany({
+              where: {
+                grn: {
+                  purchase_order: {
+                    project_id: projectId,
+                    status: { notIn: ['CANCELLED'] }
+                  }
+                },
+                material_id: material.id
+              },
+              include: { grn: true }
+            });
+
+            let totalRejected = 0;
+            for (const gi of grnItems) {
+              if (gi.grn.quality_status === 'REJECTED') {
+                totalRejected += Number(gi.received_qty) || 0;
+              } else {
+                totalRejected += (Number(gi.rejected_qty) || 0) + (Number(gi.damaged_qty) || 0);
+              }
+            }
+
+            const netCommitted = Math.max(0, totalActiveOrdered - totalRejected);
+            const remainingToOrder = Math.max(0, plannedQty - netCommitted);
+
+            if (parsedQty > remainingToOrder) {
+              throw new Error(
+                `Cannot order ${parsedQty} ${item.unit || 'units'} of "${item.materialName}". Planned quantity is ${plannedQty}, already active/ordered: ${netCommitted}. Remaining allowable quantity to order is ${remainingToOrder}.`
+              );
+            }
+          }
+
+          poItemsData.push({
+            material_id: material.id,
+            quantity: parsedQty,
+            unit_price: parsedRate,
+            total: total
+          });
+
+          priceVariances.push({
+            materialName: item.materialName,
+            materialId: material.id,
+            quotedRate: quotedRate,
+            boughtRate: parsedRate,
+            quantity: parsedQty,
+            varianceAmount: (parsedRate - quotedRate) * parsedQty
+          });
+        }
+
+        if (poItemsData.length === 0) {
+          throw new Error('No valid items provided');
+        }
+
+        const poNumber = `PO-${Math.floor(Math.random() * 100000)}`;
+
+        const poMeta = JSON.stringify({
+          userNotes: notes || '',
+          quotationId: quotationId || null,
+          requestId: requestId || null,
+          priceVariances
+        });
+
+        const po = await tx.purchaseOrder.create({
+          data: {
+            po_number: poNumber,
+            vendor_id: vendorId,
+            project_id: projectId,
+            site_id: site.id,
+            created_by: user.sub,
+            status: 'APPROVED',
+            total_amount: totalAmount,
+            company_id: user.company_id,
+            delivery_date: eta ? new Date(eta) : null,
+            notes: poMeta,
+            items: {
+              create: poItemsData
+            }
+          }
+        });
+
+        // Lock Material Requirement & set ordered_quantity (Point 8)
         if (requestId) {
-          await prisma.materialRequest.update({
+          const firstItemQty = items.length > 0 ? (Number(items[0].quantity) || 0) : 0;
+          await tx.materialRequest.update({
             where: { id: requestId },
             data: {
               status: 'ORDERED',
+              ordered_quantity: firstItemQty,
               notes: `Order placed via PO ${poNumber}`
             }
           });
         } else {
-          // If no explicit requestId was passed, check if there are approved requirements for these materials in this project
           for (const item of items) {
             if (!item.materialName) continue;
-            const matchingReq = await prisma.materialRequest.findFirst({
+            const parsedQty = Number(item.quantity) || 0;
+            const matchingReq = await tx.materialRequest.findFirst({
               where: {
                 site_id: site.id,
                 status: 'APPROVED',
@@ -479,37 +580,28 @@ export const POST = withAuth(async (request: Request, user: any) => {
               }
             });
             if (matchingReq) {
-              await prisma.materialRequest.update({
+              await tx.materialRequest.update({
                 where: { id: matchingReq.id },
                 data: {
                   status: 'ORDERED',
+                  ordered_quantity: parsedQty,
                   notes: `Auto-linked and locked via PO ${poNumber}`
                 }
               });
             }
           }
         }
-      } catch (reqErr) {
-        console.error("Auto requirement status update error:", reqErr);
-      }
 
-      // 3. If ordered from a Quotation, mark that Quotation as ACCEPTED
-      try {
         if (quotationId) {
-          await prisma.quotation.update({
+          await tx.quotation.update({
             where: { id: quotationId },
             data: { status: 'ACCEPTED' }
           });
         }
-      } catch (qErr) {
-        console.error("Auto quotation accept error:", qErr);
-      }
 
-      // Automatically add as Due in Finance
-      try {
-        const vendor = await prisma.vendor.findUnique({ where: { id: vendorId }, select: { name: true, phone: true } });
+        const vendor = await tx.vendor.findUnique({ where: { id: vendorId }, select: { name: true, phone: true } });
         const itemsSummary = items.map((i: any) => i.materialName).filter(Boolean).join(', ');
-        await prisma.financeDue.create({
+        await tx.financeDue.create({
           data: {
             company_id: user.company_id,
             project_id: projectId,
@@ -529,11 +621,11 @@ export const POST = withAuth(async (request: Request, user: any) => {
             created_by: user.sub,
           }
         });
-      } catch (dueErr) {
-        console.error("Auto FinanceDue generation error:", dueErr);
-      }
 
-      return NextResponse.json({ success: true, po });
+        return po;
+      });
+
+      return NextResponse.json({ success: true, po: poResult });
     }
 
     if (action === 'UPDATE_PO_STATUS') {
@@ -583,6 +675,8 @@ export const POST = withAuth(async (request: Request, user: any) => {
 
       const result = await prisma.$transaction(async (tx) => {
         const grnItemsData = [];
+        const itemAcceptedMap: Array<{ material_id: string; acceptedQty: number; poItemId?: string }> = [];
+
         for (const item of (items || [])) {
           const parsedQty = Number(item.receivedQty) || 0;
           if (parsedQty <= 0) continue;
@@ -602,6 +696,9 @@ export const POST = withAuth(async (request: Request, user: any) => {
             poItem = po.items[0];
           }
           
+          let materialId = poItem?.material_id;
+          let orderedQty = poItem ? poItem.quantity : parsedQty;
+
           if (!poItem) {
             const rawName = item.materialName || item.poItemId;
             if (rawName) {
@@ -620,21 +717,40 @@ export const POST = withAuth(async (request: Request, user: any) => {
                   }
                 });
               }
-              if (material) {
-                grnItemsData.push({
-                  material_id: material.id,
-                  ordered_qty: parsedQty,
-                  received_qty: parsedQty
-                });
-              }
+              materialId = material.id;
             }
-            continue;
+          }
+
+          if (!materialId) continue;
+
+          // ─── Determine Accepted vs Rejected Quantities (Point 6) ───
+          let rejectedQty = 0;
+          let acceptedQty = 0;
+
+          if (quality === 'REJECTED') {
+            acceptedQty = 0;
+            rejectedQty = parsedQty;
+          } else if (quality === 'PARTIAL') {
+            rejectedQty = Math.max(0, Math.min(parsedQty, Number(item.rejectedQty) || 0));
+            acceptedQty = Math.max(0, parsedQty - rejectedQty);
+          } else {
+            acceptedQty = parsedQty;
+            rejectedQty = 0;
           }
 
           grnItemsData.push({
-            material_id: poItem.material_id,
-            ordered_qty: poItem.quantity,
-            received_qty: parsedQty
+            material_id: materialId,
+            ordered_qty: orderedQty,
+            received_qty: parsedQty,
+            rejected_qty: rejectedQty,
+            damaged_qty: quality === 'REJECTED' ? parsedQty : (Number(item.damagedQty) || rejectedQty),
+            short_supply: 0
+          });
+
+          itemAcceptedMap.push({
+            material_id: materialId,
+            acceptedQty,
+            poItemId: poItem?.id
           });
         }
         
@@ -687,39 +803,50 @@ export const POST = withAuth(async (request: Request, user: any) => {
           });
         }
 
-        for (const item of grnItemsData) {
-          // Update PO received quantity
-          await tx.purchaseOrderItem.updateMany({
-            where: { purchase_order_id: poId, material_id: item.material_id },
-            data: { received_quantity: { increment: item.received_qty } }
-          });
-          
-          let invItem = await tx.inventoryItem.findFirst({
-            where: { site_id: siteId, material_id: item.material_id }
-          });
-          if (invItem) {
-            await tx.inventoryItem.update({
-              where: { id: invItem.id },
-              data: { quantity: { increment: item.received_qty } }
+        // ─── Inventory & PO Increment: ONLY for Accepted Quantities (Point 6) ───
+        for (const record of itemAcceptedMap) {
+          const { material_id, acceptedQty } = record;
+          if (acceptedQty > 0) {
+            // Update PO received quantity
+            await tx.purchaseOrderItem.updateMany({
+              where: { purchase_order_id: poId, material_id },
+              data: { received_quantity: { increment: acceptedQty } }
             });
-          } else {
-            invItem = await tx.inventoryItem.create({
-              data: { site_id: siteId, material_id: item.material_id, quantity: item.received_qty, company_id: user.company_id }
+            
+            let invItem = await tx.inventoryItem.findFirst({
+              where: { site_id: siteId, material_id }
+            });
+            if (invItem) {
+              await tx.inventoryItem.update({
+                where: { id: invItem.id },
+                data: { quantity: { increment: acceptedQty } }
+              });
+            } else {
+              invItem = await tx.inventoryItem.create({
+                data: { site_id: siteId, material_id, quantity: acceptedQty, company_id: user.company_id }
+              });
+            }
+            await tx.inventoryTransaction.create({
+              data: {
+                item_id: invItem.id,
+                type: 'GRN_RECEIPT',
+                quantity: acceptedQty,
+                user_id: user.sub,
+                notes: `GRN ${newGrn.id} accepted receipt`
+              }
             });
           }
-          await tx.inventoryTransaction.create({
-            data: { item_id: invItem.id, type: 'GRN_RECEIPT', quantity: item.received_qty, user_id: user.sub }
-          });
         }
 
-        // Check if all items in the PO have been fully received
+        // Update PO status based on accepted received quantities
         const updatedPoItems = await tx.purchaseOrderItem.findMany({
           where: { purchase_order_id: poId }
         });
         const allReceived = updatedPoItems.length > 0 && updatedPoItems.every(pi => (pi.received_quantity || 0) >= pi.quantity);
+        const anyReceived = updatedPoItems.some(pi => (pi.received_quantity || 0) > 0);
         await tx.purchaseOrder.update({
           where: { id: poId },
-          data: { status: allReceived ? 'DELIVERED' : 'PARTIAL' }
+          data: { status: allReceived ? 'DELIVERED' : (anyReceived ? 'PARTIAL' : po.status) }
         });
 
         return newGrn;

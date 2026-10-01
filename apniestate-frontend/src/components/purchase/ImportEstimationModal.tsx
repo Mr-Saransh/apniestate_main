@@ -33,6 +33,11 @@ import {
   detectDiscipline,
   INDUSTRY_DISCIPLINE_PRESETS
 } from '@/utils/constructionIntelligence';
+import {
+  processCandidateRows,
+  type CandidateRow,
+  type RejectedQOMRow
+} from '@/utils/qomImportValidator';
 
 // Set worker source for pdfjs-dist
 try {
@@ -184,6 +189,8 @@ export default function ImportEstimationModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [parsedCategories, setParsedCategories] = useState<EditableCategory[]>([]);
+  const [skippedRows, setSkippedRows] = useState<RejectedQOMRow[]>([]);
+  const [previewMode, setPreviewMode] = useState<'accepted' | 'skipped'>('accepted');
   const [activeTabIdx, setActiveTabIdx] = useState(0);
   const [step, setStep] = useState<'upload' | 'review'>('upload');
   const [savedCount, setSavedCount] = useState<number | null>(null);
@@ -197,6 +204,8 @@ export default function ImportEstimationModal({
   // Handle loading presets
   const handleLoadAODPreset = () => {
     setParsedCategories(JSON.parse(JSON.stringify(AOD_CONSULTANCY_PRESET)));
+    setSkippedRows([]);
+    setPreviewMode('accepted');
     setStep('review');
     setActiveTabIdx(0);
     setError(null);
@@ -204,6 +213,8 @@ export default function ImportEstimationModal({
 
   const handleLoadCompleteSuite = () => {
     setParsedCategories(JSON.parse(JSON.stringify(COMPLETE_BUILDER_SUITE)));
+    setSkippedRows([]);
+    setPreviewMode('accepted');
     setStep('review');
     setActiveTabIdx(0);
     setError(null);
@@ -224,6 +235,8 @@ export default function ImportEstimationModal({
       }))
     };
     setParsedCategories([cat]);
+    setSkippedRows([]);
+    setPreviewMode('accepted');
     setStep('review');
     setActiveTabIdx(0);
     setError(null);
@@ -233,7 +246,7 @@ export default function ImportEstimationModal({
   const parseExcelFile = async (uploadedFile: File): Promise<EditableCategory[]> => {
     const data = await uploadedFile.arrayBuffer();
     const workbook = XLSX.read(data, { type: 'array' });
-    const categoryMap: Record<string, EditableTableItem[]> = {};
+    const candidateRows: CandidateRow[] = [];
 
     workbook.SheetNames.forEach(sheetName => {
       const sheet = workbook.Sheets[sheetName];
@@ -286,35 +299,33 @@ export default function ImportEstimationModal({
         if (!row || row.length === 0) continue;
 
         const rawName = String(row[colNameIdx] || '').trim();
-        const rawQty = cleanNumeric(row[colQtyIdx]);
-        const rawUnit = normalizeUnit(String(row[colUnitIdx] || 'nos'));
-        const rawRate = cleanNumeric(row[colRateIdx]);
-        const rawAmount = cleanNumeric(row[colAmountIdx]) || (rawQty * rawRate);
-        const rawRemarks = String(row[colRemarksIdx] || '').trim();
+        const rawQty = row[colQtyIdx];
+        const rawUnit = row[colUnitIdx];
+        const rawRate = row[colRateIdx];
+        const rawAmount = row[colAmountIdx];
+        const rawRemarks = row[colRemarksIdx];
 
-        if (rawName && (rawQty > 0 || rawAmount > 0)) {
-          // If sheetName is generic (e.g. Sheet1, Estimation), auto-classify by discipline
-          const targetDiscipline = (sheetName.toLowerCase().startsWith('sheet') || sheetName.toLowerCase().includes('estimat'))
-            ? detectDiscipline(rawName)
-            : sheetName;
+        const targetDiscipline = (sheetName.toLowerCase().startsWith('sheet') || sheetName.toLowerCase().includes('estimat'))
+          ? (rawName ? detectDiscipline(rawName) : 'General')
+          : sheetName;
 
-          if (!categoryMap[targetDiscipline]) categoryMap[targetDiscipline] = [];
-          categoryMap[targetDiscipline].push({
-            name: rawName,
-            planned: rawQty > 0 ? rawQty : 1,
-            unit: rawUnit,
-            rate: rawRate,
-            amount: rawAmount > 0 ? rawAmount : (rawQty * rawRate),
-            remarks: rawRemarks || undefined
-          });
-        }
+        candidateRows.push({
+          rawDescription: rawName,
+          rawQuantity: rawQty,
+          rawUnit,
+          rawRate,
+          rawAmount,
+          rawRemarks,
+          rawCategory: targetDiscipline,
+          sourceSheet: sheetName,
+          sourceLine: i + 1
+        });
       }
     });
 
-    return Object.entries(categoryMap).map(([name, catItems]) => ({
-      name,
-      items: catItems
-    }));
+    const validated = processCandidateRows(candidateRows);
+    setSkippedRows(validated.rejected);
+    return validated.categories;
   };
 
   // Robust Smart MS Word Parser
@@ -324,9 +335,9 @@ export default function ImportEstimationModal({
     const parser = new DOMParser();
     const doc = parser.parseFromString(result.value, 'text/html');
     const tables = doc.querySelectorAll('table');
-    const categoryMap: Record<string, EditableTableItem[]> = {};
+    const candidateRows: CandidateRow[] = [];
 
-    tables.forEach((tbl) => {
+    tables.forEach((tbl, tIdx) => {
       const rows = tbl.querySelectorAll('tr');
       rows.forEach((tr, rIdx) => {
         if (rIdx === 0) return; // skip header
@@ -334,30 +345,23 @@ export default function ImportEstimationModal({
         if (cells.length < 2) return;
 
         const name = cells[0] || cells[1] || '';
-        const qty = cleanNumeric(cells[1] || cells[2]);
-        const unit = normalizeUnit(cells[2] || cells[3] || 'nos');
-        const rate = cleanNumeric(cells[3] || cells[4]);
-        const amount = cleanNumeric(cells[4] || cells[5]) || (qty * rate);
-
-        if (name && (qty > 0 || amount > 0)) {
-          const discipline = detectDiscipline(name);
-          if (!categoryMap[discipline]) categoryMap[discipline] = [];
-          categoryMap[discipline].push({
-            name,
-            planned: qty > 0 ? qty : 1,
-            unit,
-            rate,
-            amount: amount > 0 ? amount : (qty * rate),
-            remarks: cells[5] || cells[4] || undefined
-          });
-        }
+        candidateRows.push({
+          rawDescription: name,
+          rawQuantity: cells[1] || cells[2],
+          rawUnit: cells[2] || cells[3],
+          rawRate: cells[3] || cells[4],
+          rawAmount: cells[4] || cells[5],
+          rawRemarks: cells[5] || cells[4],
+          rawCategory: detectDiscipline(name),
+          sourceSheet: `Table ${tIdx + 1}`,
+          sourceLine: rIdx + 1
+        });
       });
     });
 
-    return Object.entries(categoryMap).map(([name, catItems]) => ({
-      name,
-      items: catItems
-    }));
+    const validated = processCandidateRows(candidateRows);
+    setSkippedRows(validated.rejected);
+    return validated.categories;
   };
 
   // Robust PDF Parser with Fallback to Full Preset or Line Extractor
@@ -375,39 +379,45 @@ export default function ImportEstimationModal({
     }
 
     if (fullText.includes('AOD consultancy') || fullText.includes('AOD Consultancy') || fullText.includes('AODC2402') || fullText.includes('REINFORCEMENT MEASUREMENT')) {
+      setSkippedRows([]);
       return JSON.parse(JSON.stringify(AOD_CONSULTANCY_PRESET));
     }
 
     const lines = fullText.split('\n');
-    const categoryMap: Record<string, EditableTableItem[]> = {};
+    const candidateRows: CandidateRow[] = [];
 
-    lines.forEach(l => {
-      const match = l.match(/(.+?)\s+([0-9]+(?:\.[0-9]+)?)\s+([a-zA-Z./]+)(?:\s+(?:₹|Rs\.?)?\s*([0-9]+(?:\.[0-9]+)?))?/i);
+    lines.forEach((l, lIdx) => {
+      const trimmed = l.trim();
+      if (!trimmed) return;
+
+      const match = trimmed.match(/(.+?)\s+([0-9]+(?:\.[0-9]+)?)\s+([a-zA-Z./]+)(?:\s+(?:₹|Rs\.?)?\s*([0-9]+(?:\.[0-9]+)?))?/i);
       if (match) {
-        const rawName = match[1].trim();
-        const rawQty = cleanNumeric(match[2]);
-        const rawUnit = normalizeUnit(match[3]);
-        const rawRate = cleanNumeric(match[4]);
-        if (rawName.length > 3 && rawQty > 0) {
-          const discipline = detectDiscipline(rawName);
-          if (!categoryMap[discipline]) categoryMap[discipline] = [];
-          categoryMap[discipline].push({
-            name: rawName,
-            planned: rawQty,
-            unit: rawUnit,
-            rate: rawRate,
-            amount: rawRate * rawQty,
-            remarks: 'Imported from PDF'
-          });
-        }
+        candidateRows.push({
+          rawDescription: match[1].trim(),
+          rawQuantity: match[2],
+          rawUnit: match[3],
+          rawRate: match[4],
+          rawCategory: detectDiscipline(match[1]),
+          sourceSheet: 'PDF Document',
+          sourceLine: lIdx + 1
+        });
+      } else {
+        // Collect noise/heading row so it is processed, recognized, and shown in the skipped preview!
+        candidateRows.push({
+          rawDescription: trimmed,
+          rawQuantity: 0,
+          rawCategory: 'Document Structure',
+          sourceSheet: 'PDF Document',
+          sourceLine: lIdx + 1
+        });
       }
     });
 
-    if (Object.keys(categoryMap).length > 0) {
-      return Object.entries(categoryMap).map(([name, catItems]) => ({
-        name,
-        items: catItems
-      }));
+    const validated = processCandidateRows(candidateRows);
+    setSkippedRows(validated.rejected);
+
+    if (validated.categories.length > 0) {
+      return validated.categories;
     }
 
     throw new Error('Could not automatically detect tabular estimation rows (Item, Qty, Unit, Rate) in this PDF. Please ensure the document contains clear table columns or load our clean Master Builder Template.');
@@ -436,10 +446,11 @@ export default function ImportEstimationModal({
       }
 
       if (!extracted || extracted.length === 0 || extracted.every(c => c.items.length === 0)) {
-        throw new Error('Could not find structured tables or items. You can use one of our verified industry presets below.');
+        throw new Error('Could not find structured material items in this document. You can use one of our verified industry presets below.');
       }
 
       setParsedCategories(extracted);
+      setPreviewMode('accepted');
       setStep('review');
       setActiveTabIdx(0);
     } catch (err: any) {
@@ -726,27 +737,104 @@ export default function ImportEstimationModal({
                 </div>
               </div>
 
-              {/* Category / Table Switcher Tabs */}
-              <div className="flex gap-1.5 overflow-x-auto pb-1 hide-scrollbar">
-                {parsedCategories.map((cat, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => setActiveTabIdx(idx)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-colors flex items-center gap-1.5 ${
-                      activeTabIdx === idx
-                        ? 'bg-foreground text-background shadow-xs'
-                        : 'bg-muted/70 text-muted-foreground hover:bg-muted hover:text-foreground'
-                    }`}
-                  >
-                    <span>{cat.name}</span>
-                    <span className="text-[10px] opacity-75 font-mono">({cat.items.length})</span>
-                  </button>
-                ))}
+              <div className="flex items-center gap-2 border-b border-border pb-2 mb-3">
+                <button
+                  type="button"
+                  onClick={() => setPreviewMode('accepted')}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                    previewMode === 'accepted'
+                      ? 'bg-[#2648E7] text-white shadow-sm'
+                      : 'bg-muted text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <CheckCircle2 size={13} />
+                  <span>Accepted Material Rows ({totalItemCount})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewMode('skipped')}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                    previewMode === 'skipped'
+                      ? 'bg-amber-600 text-white shadow-sm'
+                      : 'bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100'
+                  }`}
+                >
+                  <AlertCircle size={13} />
+                  <span>Skipped / Filtered Out ({skippedRows.length})</span>
+                </button>
               </div>
 
-              {/* Active Category Table Card */}
-              {currentCategory && (
+              {previewMode === 'skipped' ? (
+                <div className="border border-border rounded-2xl overflow-hidden bg-card">
+                  <div className="p-3 bg-amber-50/70 border-b border-amber-200 flex items-center justify-between">
+                    <div>
+                      <h4 className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
+                        <AlertCircle size={14} className="text-amber-600" />
+                        Filtered Non-Material Rows ({skippedRows.length})
+                      </h4>
+                      <p className="text-[11px] text-amber-700 mt-0.5">
+                        These lines were identified as headings, subtotals, notes, or headers and prevented from entering your production BOQ table.
+                      </p>
+                    </div>
+                  </div>
+                  {skippedRows.length === 0 ? (
+                    <div className="p-8 text-center text-xs text-muted-foreground">
+                      No rows were skipped. All rows were accepted as valid materials.
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto max-h-[48vh]">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead className="bg-muted/60 text-muted-foreground text-[10px] font-bold uppercase tracking-wider sticky top-0 z-10">
+                          <tr>
+                            <th className="p-2.5">Extracted Line / Text</th>
+                            <th className="p-2.5 w-44">Rejection Reason</th>
+                            <th className="p-2.5 w-28">Raw Qty / Unit</th>
+                            <th className="p-2.5 w-36">Sheet / Category</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          {skippedRows.map((r, idx) => (
+                            <tr key={idx} className="hover:bg-muted/20 text-muted-foreground">
+                              <td className="p-2.5 font-medium text-foreground">{r.description}</td>
+                              <td className="p-2.5">
+                                <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900">
+                                  {r.reason}
+                                </span>
+                              </td>
+                              <td className="p-2.5 text-xs">
+                                {r.rawQuantity !== undefined && r.rawQuantity !== null && r.rawQuantity !== 0 ? `${r.rawQuantity} ${r.rawUnit || ''}` : '-'}
+                              </td>
+                              <td className="p-2.5 text-xs truncate max-w-[150px]">{r.category || '-'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <>
+                  {/* Category / Table Switcher Tabs */}
+                  <div className="flex gap-1.5 overflow-x-auto pb-1 hide-scrollbar">
+                    {parsedCategories.map((cat, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setActiveTabIdx(idx)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-colors flex items-center gap-1.5 ${
+                          activeTabIdx === idx
+                            ? 'bg-foreground text-background shadow-xs'
+                            : 'bg-muted/70 text-muted-foreground hover:bg-muted hover:text-foreground'
+                        }`}
+                      >
+                        <span>{cat.name}</span>
+                        <span className="text-[10px] opacity-75 font-mono">({cat.items.length})</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Active Category Table Card */}
+                  {currentCategory && (
                 <div className="border border-border rounded-2xl overflow-hidden bg-card">
                   <div className="px-4 py-3 bg-muted/30 border-b border-border flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2 flex-1">
@@ -889,9 +977,11 @@ export default function ImportEstimationModal({
                   </div>
                 </div>
               )}
-            </div>
+            </>
           )}
         </div>
+      )}
+    </div>
 
         {/* Modal Footer */}
         {savedCount === null && (

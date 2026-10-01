@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { apiClient } from '@/api/client';
 import { milestonesApi, type Milestone } from '@/api/milestones';
+import { getScheduleStatus } from '@/utils/schedule';
 import SmartDprModal from '@/components/dpr/SmartDprModal';
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -59,7 +60,9 @@ export default function ProgressWorkspace() {
 
   // Add Milestone Form
   const [mName, setMName] = useState('');
-  const [mTargetDate, setMTargetDate] = useState('');
+  const [mPlannedStartDate, setMPlannedStartDate] = useState('');
+  const [mPlannedEndDate, setMPlannedEndDate] = useState('');
+  const [mWeight, setMWeight] = useState(1);
   const [isCreatingMilestone, setIsCreatingMilestone] = useState(false);
 
   const fetchData = async () => {
@@ -93,22 +96,41 @@ export default function ProgressWorkspace() {
 
   const handleAddMilestone = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activeProjectId || !mName || !mTargetDate) return;
+    const plannedEnd = mPlannedEndDate;
+    if (!activeProjectId || !mName || !plannedEnd) return;
     try {
       setIsCreatingMilestone(true);
       await milestonesApi.create({
         project_id: activeProjectId,
         name: mName,
-        target_date: mTargetDate
+        planned_start_date: mPlannedStartDate || null,
+        planned_end_date: plannedEnd,
+        target_date: plannedEnd,
+        weight: mWeight || 1
       });
       setShowAddMilestone(false);
       setMName('');
-      setMTargetDate('');
+      setMPlannedStartDate('');
+      setMPlannedEndDate('');
+      setMWeight(1);
       fetchData();
     } catch (err) {
       alert("Failed to create milestone");
     } finally {
       setIsCreatingMilestone(false);
+    }
+  };
+
+  const handleStatusChange = async (milestone: Milestone, newStatus: Milestone['status']) => {
+    try {
+      await milestonesApi.update(milestone.id, {
+        status: newStatus,
+        progress_percentage: newStatus === 'COMPLETED' ? 100 : milestone.progress_percentage
+      });
+      fetchData();
+    } catch (err) {
+      console.error("Failed to update milestone status:", err);
+      alert("Failed to update status");
     }
   };
 
@@ -242,7 +264,7 @@ export default function ProgressWorkspace() {
                     <Sparkles size={14} /> Submit DPR
                   </button>
                   <button 
-                    onClick={() => { setMTargetDate(''); setShowAddMilestone(true); }}
+                    onClick={() => { setMPlannedStartDate(''); setMPlannedEndDate(''); setShowAddMilestone(true); }}
                     className="text-xs font-bold bg-[#2648E7]/10 text-[#2648E7] px-3 py-1.5 rounded-lg flex items-center gap-1 hover:bg-[#2648E7]/20 transition-colors cursor-pointer"
                   >
                     <Plus size={14} /> Add Milestone
@@ -255,7 +277,9 @@ export default function ProgressWorkspace() {
                   <div className="text-center p-6 bg-white rounded-xl border border-border text-sm text-muted-foreground">
                     No milestones defined yet.
                   </div>
-                ) : milestones.map((m, i) => (
+                ) : milestones.map((m, i) => {
+                  const schedule = getScheduleStatus(m);
+                  return (
                   <div key={m.id} className="flex gap-4">
                     <div className="flex flex-col items-center">
                       <div className={`size-5 rounded-full border-2 mt-1 shrink-0 ${
@@ -270,17 +294,31 @@ export default function ProgressWorkspace() {
                     <div className="flex-1 pb-4">
                       <div className={`rounded-xl px-4 py-3 border ${
                         m.status === 'IN_PROGRESS' ? "bg-[#2648E7]/5 border-[#2648E7]/20" :
-                        m.status === 'COMPLETED' ? "bg-white border-border opacity-60" :
+                        m.status === 'COMPLETED' ? "bg-white border-border opacity-75" :
                         "bg-white border-border"
                       }`}>
-                        <div className="flex items-center justify-between">
-                          <p className={`font-semibold text-sm ${m.status === 'IN_PROGRESS' ? "text-[#2648E7]" : "text-foreground"}`}>{m.name}</p>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded-md">
-                              {new Date(m.target_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className={`font-semibold text-sm ${m.status === 'IN_PROGRESS' ? "text-[#2648E7]" : "text-foreground"}`}>{m.name}</p>
+                              {m.status === 'COMPLETED' && <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs">
+                              <span className="text-muted-foreground">
+                                <strong className="text-foreground">Planned:</strong> {schedule.plannedStart} &rarr; {schedule.plannedEnd}
+                              </span>
+                              <span className="text-muted-foreground hidden sm:inline">·</span>
+                              <span className="text-muted-foreground">
+                                <strong className="text-foreground">Actual:</strong> {schedule.actualStart} &rarr; {schedule.actualEnd}
+                              </span>
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
+                            <span className={`text-xs px-2.5 py-0.5 rounded-full border ${schedule.badgeClass}`}>
+                              {schedule.label}
                             </span>
-                            {m.status === 'COMPLETED' && <CheckCircle2 size={16} className="text-emerald-500" />}
-                            <button onClick={() => handleDeleteMilestone(m.id)} className="p-1 hover:bg-muted text-muted-foreground hover:text-red-500 rounded-lg transition-colors">
+                            <button onClick={() => handleDeleteMilestone(m.id)} className="p-1 hover:bg-muted text-muted-foreground hover:text-red-500 rounded-lg transition-colors" title="Delete milestone">
                               <Trash2 size={14} />
                             </button>
                           </div>
@@ -293,20 +331,49 @@ export default function ProgressWorkspace() {
                           <span className="text-xs font-bold text-muted-foreground">{m.progress_percentage || 0}%</span>
                         </div>
 
-                        {m.status !== 'COMPLETED' && (
-                          <div className="mt-3 pt-3 border-t border-border border-dashed flex justify-end">
+                        <div className="mt-3 pt-3 border-t border-border border-dashed flex items-center justify-between flex-wrap gap-2">
+                          <div className="flex items-center gap-2">
+                            {m.status === 'PENDING' && (
+                              <button
+                                onClick={() => handleStatusChange(m, 'IN_PROGRESS')}
+                                className="text-xs font-bold text-[#2648E7] hover:bg-[#2648E7]/10 px-2.5 py-1 rounded-lg border border-[#2648E7]/30 transition-colors"
+                              >
+                                Start Work
+                              </button>
+                            )}
+                            {m.status === 'IN_PROGRESS' && (
+                              <button
+                                onClick={() => handleStatusChange(m, 'COMPLETED')}
+                                className="text-xs font-bold text-emerald-700 hover:bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-300 transition-colors"
+                              >
+                                Mark Complete
+                              </button>
+                            )}
+                            {m.status === 'COMPLETED' && (
+                              <button
+                                onClick={() => handleStatusChange(m, 'IN_PROGRESS')}
+                                className="text-xs font-medium text-muted-foreground hover:bg-slate-100 px-2.5 py-1 rounded-lg border border-border transition-colors"
+                                title="Reopen activity (preserves actual history)"
+                              >
+                                Reopen Work
+                              </button>
+                            )}
+                          </div>
+
+                          {m.status !== 'COMPLETED' && (
                             <button 
                               onClick={() => { setSelectedMilestone(m); setShowDprModal(true); }}
                               className="text-xs font-bold text-white bg-[#2648E7] px-3 py-1.5 rounded-lg flex items-center gap-1 hover:bg-[#1a35b3]"
                             >
                               <Plus size={14} /> Submit DPR
                             </button>
-                          </div>
-                        )}
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
-                ))}
+                );
+              })}
               </div>
             </>
           ) : (
@@ -464,7 +531,7 @@ export default function ProgressWorkspace() {
                     <button
                       onClick={() => {
                         const offsetDate = new Date(selectedDate.getTime() - (selectedDate.getTimezoneOffset() * 60000));
-                        setMTargetDate(offsetDate.toISOString().split('T')[0]);
+                        setMPlannedEndDate(offsetDate.toISOString().split('T')[0]);
                         setShowAddMilestone(true);
                       }}
                       className="text-xs font-bold px-3 py-1.5 bg-[#2648E7] hover:bg-[#1a35b3] text-white rounded-lg transition-colors flex items-center gap-1 shadow-sm"
@@ -504,7 +571,7 @@ export default function ProgressWorkspace() {
                       <button 
                         onClick={() => {
                           const offsetDate = new Date(selectedDate.getTime() - (selectedDate.getTimezoneOffset() * 60000));
-                          setMTargetDate(offsetDate.toISOString().split('T')[0]);
+                          setMPlannedEndDate(offsetDate.toISOString().split('T')[0]);
                           setShowAddMilestone(true);
                         }}
                         className="w-full border-2 border-dashed border-border rounded-xl p-5 flex flex-col items-center justify-center gap-2 text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors group bg-white"
@@ -564,9 +631,15 @@ export default function ProgressWorkspace() {
                 <label className="block text-sm font-semibold mb-1.5">Milestone Name</label>
                 <input required value={mName} onChange={e => setMName(e.target.value)} className="w-full bg-muted border border-transparent rounded-xl px-4 py-2.5 text-sm outline-none focus:border-[#2648E7] focus:bg-white" placeholder="e.g. Ground Floor Slab" />
               </div>
-              <div>
-                <label className="block text-sm font-semibold mb-1.5">Target Date</label>
-                <input required type="date" value={mTargetDate} onChange={e => setMTargetDate(e.target.value)} className="w-full bg-muted border border-transparent rounded-xl px-4 py-2.5 text-sm outline-none focus:border-[#2648E7] focus:bg-white" />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-semibold mb-1.5">Planned Start Date</label>
+                  <input type="date" value={mPlannedStartDate} onChange={e => setMPlannedStartDate(e.target.value)} className="w-full bg-muted border border-transparent rounded-xl px-3 py-2 text-sm outline-none focus:border-[#2648E7] focus:bg-white" />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold mb-1.5">Planned End Date *</label>
+                  <input required type="date" value={mPlannedEndDate} onChange={e => setMPlannedEndDate(e.target.value)} className="w-full bg-muted border border-transparent rounded-xl px-3 py-2 text-sm outline-none focus:border-[#2648E7] focus:bg-white" />
+                </div>
               </div>
               <div className="pt-2 flex justify-end">
                 <button disabled={isCreatingMilestone} type="submit" className="bg-[#2648E7] text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md hover:bg-[#1a35b3] disabled:opacity-50 flex items-center gap-2">

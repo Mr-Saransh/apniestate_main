@@ -537,8 +537,13 @@ function RequestsTab({
   };
 
   const handleOpenModify = (req: MaterialRequestSummary) => {
+    if (req.stage === 'ORDERED' || req.isLocked) {
+      alert('This requirement has already been converted into a purchase order and is locked.');
+      return;
+    }
     setModifyingReq(req);
-    setNewQty(String(req.qty));
+    const initialQty = req.approvedQuantity !== undefined ? req.approvedQuantity : (req.requestedQuantity !== undefined ? req.requestedQuantity : cleanNumeric(req.qty));
+    setNewQty(String(initialQty));
     setModifyNotes('');
   };
 
@@ -546,18 +551,18 @@ function RequestsTab({
     if (!modifyingReq) return;
     setSubmitting(true);
     try {
+      const parsed = parseFloat(newQty);
       await purchaseApi.performAction('MODIFY_REQUEST', {
         requestId: modifyingReq.id,
-        quantity: parseFloat(newQty) || modifyingReq.qty,
-        approvedQuantity: parseFloat(newQty) || modifyingReq.qty,
+        approvedQuantity: !isNaN(parsed) && parsed > 0 ? parsed : (modifyingReq.approvedQuantity || modifyingReq.requestedQuantity),
         status: approveAlso ? 'APPROVED' : undefined,
         notes: modifyNotes || undefined
       });
       setModifyingReq(null);
       onRefresh();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert('Failed to update requirement');
+      alert(err?.response?.data?.error || err?.message || 'Failed to update requirement');
     } finally {
       setSubmitting(false);
     }
@@ -599,8 +604,22 @@ function RequestsTab({
                 <p className="font-bold text-sm text-foreground">{m.name}</p>
                 {stageBadge(m.stage)}
               </div>
-              <p className="text-sm text-muted-foreground">Quantity: <strong className="text-foreground">{m.qty}</strong></p>
-              <p className="text-xs text-muted-foreground mt-0.5">{m.date}</p>
+              <div className="flex items-center gap-2.5 text-xs text-muted-foreground mt-1 flex-wrap">
+                <span className="px-2 py-0.5 rounded-md bg-slate-100 font-medium text-slate-800">
+                  Requested: <strong className="font-bold">{m.requestedQuantity ?? m.quantity ?? m.qty} {m.unit || ''}</strong>
+                </span>
+                {m.approvedQuantity !== undefined && m.approvedQuantity !== null && (
+                  <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 font-medium">
+                    Approved: <strong className="font-bold">{m.approvedQuantity} {m.unit || ''}</strong>
+                  </span>
+                )}
+                {m.orderedQuantity !== undefined && m.orderedQuantity !== null && m.orderedQuantity > 0 && (
+                  <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-800 font-medium">
+                    Ordered: <strong className="font-bold">{m.orderedQuantity} {m.unit || ''}</strong>
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-1.5">{m.date}</p>
             </div>
           </div>
           
@@ -625,7 +644,7 @@ function RequestsTab({
                   <CheckCircle2 size={15} /> Approved & Ready to Order
                 </span>
                 <button
-                  onClick={() => onConvertToOrder(m.name, parseInt(m.qty, 10) || 1, m.id)}
+                  onClick={() => onConvertToOrder(m.name, m.approvedQuantity || parseInt(m.qty, 10) || 1, m.id)}
                   className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#2648E7] hover:bg-[#2648E7]/90 text-white text-xs font-bold rounded-xl transition-colors shadow-sm"
                 >
                   <ShoppingCart size={13} /> Create Order
@@ -1728,6 +1747,38 @@ function PurchaseModals({
           quotedRate: it.quotedRate ? cleanNumeric(it.quotedRate) : (cleanNumeric(it.rate) || 0),
           varianceReason: it.varianceReason || undefined
         }));
+
+        // Frontend Quoted Rate Validation (Point 7)
+        for (const it of payload.items) {
+          const boughtRate = cleanNumeric(it.rate) || 0;
+          const quotedRate = cleanNumeric(it.quotedRate);
+          if (quotedRate > 0 && boughtRate > quotedRate) {
+            setErrorMsg(`Final purchase rate cannot exceed the selected quotation rate of ₹${quotedRate}.`);
+            setLoading(false);
+            return;
+          }
+        }
+
+        // Frontend Cumulative Over-Procurement Validation (Point 4)
+        for (const it of payload.items) {
+          const qtyToOrder = cleanNumeric(it.quantity) || 0;
+          const boqMatch = (data?.boq_items || []).find(b =>
+            b.name.trim().toLowerCase() === it.materialName.trim().toLowerCase()
+          );
+          if (boqMatch) {
+            const remainingAllowed = boqMatch.remainingToProcure !== undefined 
+              ? boqMatch.remainingToProcure 
+              : Math.max(0, boqMatch.planned - (boqMatch.ordered || 0));
+            if (qtyToOrder > remainingAllowed) {
+              setErrorMsg(
+                `Cannot order ${qtyToOrder} ${it.unit || 'units'} of "${it.materialName}". Planned quantity is ${boqMatch.planned}, already active/ordered: ${boqMatch.ordered || 0}. Remaining allowable quantity to order is ${remainingAllowed}.`
+              );
+              setLoading(false);
+              return;
+            }
+          }
+        }
+
         if (formData.quotationId) payload.quotationId = formData.quotationId;
         if (formData.requestId) payload.requestId = formData.requestId;
 
@@ -1773,7 +1824,14 @@ function PurchaseModals({
           setLoading(false);
           return;
         }
-        payload.items = validItems;
+        payload.quality = formData.quality || 'GOOD';
+        payload.items = validItems.map((it: any) => ({
+          ...it,
+          receivedQty: cleanNumeric(it.receivedQty) || 0,
+          rejectedQty: formData.quality === 'REJECTED'
+            ? cleanNumeric(it.receivedQty) || 0
+            : (formData.quality === 'PARTIAL' ? (cleanNumeric(it.rejectedQty) || 0) : 0)
+        }));
         payload.deliveryDate = formData.deliveryDate || new Date().toISOString().slice(0, 10);
         payload.deliveryTime = formData.deliveryTime || new Date().toTimeString().slice(0, 5);
         payload.deliverySpeed = formData.deliverySpeed || 'ON_TIME';
@@ -2399,25 +2457,50 @@ function PurchaseModals({
                                     diff < 0
                                       ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
                                       : diff > 0
-                                      ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                      ? 'bg-rose-50 text-rose-800 border-rose-200'
                                       : 'bg-blue-50 text-blue-800 border-blue-200'
                                   }`}>
                                     <span>
                                       {diff < 0 
                                         ? `🎉 Negotiated Savings: ₹${Math.abs(diff).toLocaleString()}/${item.unit || 'unit'} below quote` 
                                         : diff > 0 
-                                        ? `⚠️ Price Increase: +₹${diff.toLocaleString()}/${item.unit || 'unit'} above quote` 
+                                        ? `⛔ Blocked: Final purchase rate cannot exceed the selected quotation rate of ₹${qRate}.` 
                                         : `⚡ Exactly matches vendor quotation`}
                                     </span>
-                                    {diff !== 0 && (
+                                    {diff < 0 && (
                                       <span className="font-bold">
-                                        Total {diff < 0 ? 'Saved' : 'Cost'}: ₹{totalSaved.toLocaleString()}
+                                        Total Saved: ₹{totalSaved.toLocaleString()}
                                       </span>
                                     )}
                                   </div>
                                 );
                               })()
                             )}
+
+                            {/* Remaining Allowable Order Quantity Display (Point 4) */}
+                            {(() => {
+                              const boqMatch = item.boqItem || (data?.boq_items || []).find(b => b.name?.trim().toLowerCase() === item.materialName?.trim().toLowerCase());
+                              if (!boqMatch) return null;
+                              const remaining = boqMatch.remainingToProcure !== undefined 
+                                ? boqMatch.remainingToProcure 
+                                : Math.max(0, boqMatch.planned - (boqMatch.ordered || 0));
+                              const currentQty = Number(item.quantity) || 0;
+                              const isOver = currentQty > remaining;
+                              return (
+                                <div className={`p-2 rounded-xl text-xs flex items-center justify-between font-semibold border ${
+                                  isOver ? 'bg-rose-50 text-rose-800 border-rose-200' : 'bg-slate-50 text-slate-700 border-slate-200'
+                                }`}>
+                                  <span>
+                                    Planned: <strong>{boqMatch.planned}</strong> · Active Ordered: <strong>{boqMatch.ordered || 0}</strong> · Allowable to Order: <strong className={isOver ? 'text-rose-700 font-extrabold' : 'text-emerald-700'}>{remaining} {item.unit || ''}</strong>
+                                  </span>
+                                  {isOver && (
+                                    <span className="text-rose-700 font-bold">
+                                      ⛔ Exceeds planned limit by {currentQty - remaining}
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })()}
                           </div>
                         ) : (
                           <div className="grid grid-cols-3 gap-3">
@@ -2686,23 +2769,58 @@ function PurchaseModals({
                               )}
                             </div>
 
-                            <div className="flex items-center gap-2 shrink-0">
-                              <label className="text-xs font-semibold text-muted-foreground whitespace-nowrap">
-                                Recv Qty:
-                              </label>
-                              <div className="relative flex items-center">
-                                <input
-                                  required
-                                  type="number"
-                                  min="0"
-                                  step="any"
-                                  className="w-24 bg-white border border-border rounded-xl px-3 py-2 text-sm font-bold text-foreground focus:outline-none focus:border-[#2648E7] text-right pr-2"
-                                  value={item.receivedQty !== undefined ? item.receivedQty : ''}
-                                  onChange={e => handleItemChange(idx, 'receivedQty', e.target.value)}
-                                />
-                                {item.unit && (
-                                  <span className="text-xs text-muted-foreground ml-1.5">
-                                    {item.unit}
+                            <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2.5 shrink-0">
+                              <div className="flex items-center gap-1.5">
+                                <label className="text-xs font-semibold text-muted-foreground whitespace-nowrap">
+                                  Recv Qty:
+                                </label>
+                                <div className="relative flex items-center">
+                                  <input
+                                    required
+                                    type="number"
+                                    min="0"
+                                    step="any"
+                                    className="w-20 bg-white border border-border rounded-xl px-2.5 py-1.5 text-xs font-bold text-foreground focus:outline-none focus:border-[#2648E7] text-right"
+                                    value={item.receivedQty !== undefined ? item.receivedQty : ''}
+                                    onChange={e => handleItemChange(idx, 'receivedQty', e.target.value)}
+                                  />
+                                  {item.unit && (
+                                    <span className="text-xs text-muted-foreground ml-1.5">
+                                      {item.unit}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              {formData.quality === 'PARTIAL' && (
+                                <div className="flex items-center gap-1.5">
+                                  <label className="text-xs font-semibold text-rose-600 whitespace-nowrap">
+                                    Rej/Damaged:
+                                  </label>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step="any"
+                                    placeholder="0"
+                                    className="w-20 bg-white border border-rose-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-rose-700 focus:outline-none focus:border-rose-500 text-right"
+                                    value={item.rejectedQty !== undefined ? item.rejectedQty : ''}
+                                    onChange={e => handleItemChange(idx, 'rejectedQty', e.target.value)}
+                                  />
+                                </div>
+                              )}
+
+                              <div className="text-xs">
+                                {formData.quality === 'REJECTED' ? (
+                                  <span className="px-2 py-1 rounded-lg bg-rose-50 text-rose-800 font-bold border border-rose-200 text-[11px]">
+                                    Accepted: 0 (Inv +0)
+                                  </span>
+                                ) : formData.quality === 'PARTIAL' ? (
+                                  <span className="px-2 py-1 rounded-lg bg-emerald-50 text-emerald-800 font-bold border border-emerald-200 text-[11px]">
+                                    Accepted: {Math.max(0, (Number(item.receivedQty) || 0) - (Number(item.rejectedQty) || 0))} (Inv +{Math.max(0, (Number(item.receivedQty) || 0) - (Number(item.rejectedQty) || 0))})
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-1 rounded-lg bg-emerald-50 text-emerald-800 font-bold border border-emerald-200 text-[11px]">
+                                    Accepted: {Number(item.receivedQty) || 0}
                                   </span>
                                 )}
                               </div>

@@ -75,6 +75,10 @@ export default function QuantityOfMaterialsTab({
   const [renamingCatId, setRenamingCatId] = useState<string | null>(null);
   const [renamedCatTitle, setRenamedCatTitle] = useState('');
 
+  // Table-level Edit Mode states
+  const [editingTableId, setEditingTableId] = useState<string | null>(null);
+  const [batchEditData, setBatchEditData] = useState<Record<string, { name: string; unit: string; planned: number | string; rate: number | string; remarks: string }>>({});
+
   // Group items into disconnected tables
   const displayTables = useMemo(() => {
     if (categories && categories.length > 0) {
@@ -242,6 +246,74 @@ export default function QuantityOfMaterialsTab({
     } catch (err) {
       console.error(err);
       alert('Failed to delete item');
+    }
+  };
+
+  // Table-level Edit Mode handlers
+  const handleToggleTableEditMode = (table: { id: string; name: string; items: BOQItemSummary[] }) => {
+    if (editingTableId === table.id) {
+      setEditingTableId(null);
+      setBatchEditData({});
+    } else {
+      const initial: Record<string, { name: string; unit: string; planned: number | string; rate: number | string; remarks: string }> = {};
+      table.items.forEach(it => {
+        initial[it.id] = {
+          name: it.name,
+          unit: it.unit,
+          planned: it.planned,
+          rate: it.rate || 0,
+          remarks: it.remarks || ''
+        };
+      });
+      setBatchEditData(initial);
+      setEditingTableId(table.id);
+      setCollapsedTables(prev => ({ ...prev, [table.name]: false }));
+    }
+  };
+
+  const handleBatchFieldChange = (itemId: string, field: string, value: any) => {
+    setBatchEditData(prev => ({
+      ...prev,
+      [itemId]: {
+        ...(prev[itemId] || { name: '', unit: '', planned: 0, rate: 0, remarks: '' }),
+        [field]: value
+      }
+    }));
+  };
+
+  const handleSaveTableEditMode = async (table: { id: string; name: string; items: BOQItemSummary[] }) => {
+    setSavingAction(true);
+    try {
+      const updatePromises = table.items.map(async (it) => {
+        const edited = batchEditData[it.id];
+        if (!edited) return;
+        const nameChanged = edited.name.trim() !== it.name;
+        const plannedChanged = cleanNumeric(edited.planned) !== it.planned;
+        const unitChanged = normalizeUnit(edited.unit) !== it.unit;
+        const rateChanged = cleanNumeric(edited.rate) !== (it.rate || 0);
+        const remarksChanged = (edited.remarks ? edited.remarks.trim() : '') !== (it.remarks || '');
+
+        if (nameChanged || plannedChanged || unitChanged || rateChanged || remarksChanged) {
+          return purchaseApi.performAction('UPDATE_BOQ_ITEM', {
+            itemId: it.id,
+            name: edited.name.trim(),
+            planned: cleanNumeric(edited.planned),
+            unit: normalizeUnit(edited.unit),
+            rate: cleanNumeric(edited.rate),
+            remarks: edited.remarks ? edited.remarks.trim() : undefined
+          });
+        }
+      });
+
+      await Promise.all(updatePromises);
+      setEditingTableId(null);
+      setBatchEditData({});
+      onRefresh();
+    } catch (err) {
+      console.error('Failed to save table changes:', err);
+      alert('Failed to save table changes');
+    } finally {
+      setSavingAction(false);
     }
   };
 
@@ -730,6 +802,41 @@ export default function QuantityOfMaterialsTab({
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0">
+                    {/* Table-level Edit Mode Toggle */}
+                    <button
+                      onClick={() => handleToggleTableEditMode(table)}
+                      className={`flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-lg border transition-colors shadow-2xs ${
+                        editingTableId === table.id
+                          ? 'bg-amber-500 text-white border-amber-600 hover:bg-amber-600'
+                          : 'bg-white border-border text-foreground hover:bg-slate-50'
+                      }`}
+                      title={editingTableId === table.id ? 'Exit Table Edit Mode' : 'Enter Table Edit Mode (Edit all rows in this table)'}
+                    >
+                      <Edit2 size={13} className={editingTableId === table.id ? 'text-white' : 'text-[#2648E7]'} />
+                      {editingTableId === table.id ? 'Exit Edit' : 'Edit Mode'}
+                    </button>
+
+                    {editingTableId === table.id && (
+                      <div className="flex items-center gap-1.5 animate-in fade-in">
+                        <button
+                          onClick={() => handleSaveTableEditMode(table)}
+                          disabled={savingAction}
+                          className="flex items-center gap-1 px-3 py-1 text-xs font-bold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs"
+                        >
+                          <Check size={13} /> {savingAction ? 'Saving...' : 'Save All'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setEditingTableId(null);
+                            setBatchEditData({});
+                          }}
+                          className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700"
+                        >
+                          <X size={13} /> Cancel
+                        </button>
+                      </div>
+                    )}
+
                     <button
                       onClick={() => setAddingToCategory(addingToCategory === table.name ? null : table.name)}
                       className="flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-lg bg-white border border-border text-foreground hover:bg-slate-50 transition-colors shadow-2xs"
@@ -880,22 +987,103 @@ export default function QuantityOfMaterialsTab({
                               <th className="py-2.5 px-3.5">Particulars of Items / Material</th>
                               <th className="py-2.5 px-3 w-20">Unit</th>
                               <th className="py-2.5 px-3 w-28 text-right">Planned Qty</th>
-                              <th className="py-2.5 px-3 w-24 text-right">Rate (₹)</th>
+                              <th className="py-2.5 px-3 w-28 text-right">Rate (₹)</th>
                               <th className="py-2.5 px-3 w-28 text-right">Amount (₹)</th>
-                              <th className="py-2.5 px-3 w-24 text-right">Used / Ord.</th>
-                              <th className="py-2.5 px-3 w-24 text-right">Remaining</th>
+                              <th className="py-2.5 px-3 w-24 text-right">Ordered</th>
+                              <th className="py-2.5 px-3 w-24 text-right">Consumed</th>
+                              <th className="py-2.5 px-3 w-28 text-right">Remaining</th>
                               <th className="py-2.5 px-3 min-w-[140px]">Notes / Location</th>
                               <th className="py-2.5 px-3 w-16 text-center">Actions</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-border">
                             {table.items.map((item) => {
+                              const isTableBatchEditing = editingTableId === table.id;
                               const isEditing = editingItemId === item.id;
-                              const remaining = Math.max(0, item.planned - item.used);
-                              const isExceeded = item.used > item.planned;
+                              const rowBatchData = batchEditData[item.id] || {
+                                name: item.name,
+                                unit: item.unit,
+                                planned: item.planned,
+                                rate: item.rate || 0,
+                                remarks: item.remarks || ''
+                              };
+                              const remaining = item.remainingToProcure !== undefined
+                                ? item.remainingToProcure
+                                : Math.max(0, item.planned - (item.ordered || 0));
                               const rowAmount = (item.amount !== undefined && item.amount > 0)
                                 ? item.amount
                                 : (item.planned * (item.rate || 0));
+
+                              if (isTableBatchEditing) {
+                                return (
+                                  <tr key={item.id} className="bg-amber-50/30 hover:bg-amber-50/50 transition-colors">
+                                    <td className="py-2 px-3">
+                                      <input
+                                        type="text"
+                                        value={rowBatchData.name}
+                                        onChange={e => handleBatchFieldChange(item.id, 'name', e.target.value)}
+                                        className="w-full text-xs font-semibold bg-white border border-border rounded-lg px-2 py-1 focus:border-[#2648E7] focus:outline-none"
+                                      />
+                                    </td>
+                                    <td className="py-2 px-3">
+                                      <input
+                                        type="text"
+                                        value={rowBatchData.unit}
+                                        onChange={e => handleBatchFieldChange(item.id, 'unit', e.target.value)}
+                                        className="w-full text-xs bg-white border border-border rounded-lg px-2 py-1 text-center focus:border-[#2648E7] focus:outline-none"
+                                      />
+                                    </td>
+                                    <td className="py-2 px-3">
+                                      <input
+                                        type="number"
+                                        step="any"
+                                        value={rowBatchData.planned}
+                                        onChange={e => handleBatchFieldChange(item.id, 'planned', e.target.value)}
+                                        className="w-full text-xs bg-white border border-border rounded-lg px-2 py-1 text-right focus:border-[#2648E7] focus:outline-none"
+                                      />
+                                    </td>
+                                    <td className="py-2 px-3">
+                                      <input
+                                        type="number"
+                                        step="any"
+                                        value={rowBatchData.rate}
+                                        onChange={e => handleBatchFieldChange(item.id, 'rate', e.target.value)}
+                                        className="w-full text-xs bg-white border border-border rounded-lg px-2 py-1 text-right focus:border-[#2648E7] focus:outline-none"
+                                      />
+                                    </td>
+                                    <td className="py-2 px-3 text-right font-bold text-foreground">
+                                      ₹{((Number(rowBatchData.planned) || 0) * (Number(rowBatchData.rate) || 0)).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                                    </td>
+                                    <td className="py-2 px-3 text-right text-muted-foreground font-medium">
+                                      {(item.ordered || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                                    </td>
+                                    <td className="py-2 px-3 text-right text-muted-foreground font-medium">
+                                      {(item.consumed ?? item.used ?? 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                                    </td>
+                                    <td className="py-2 px-3 text-right font-semibold text-emerald-700">
+                                      {Math.max(0, (Number(rowBatchData.planned) || 0) - (item.ordered || 0)).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                                    </td>
+                                    <td className="py-2 px-3">
+                                      <input
+                                        type="text"
+                                        value={rowBatchData.remarks}
+                                        onChange={e => handleBatchFieldChange(item.id, 'remarks', e.target.value)}
+                                        placeholder="Remarks..."
+                                        className="w-full text-xs bg-white border border-border rounded-lg px-2 py-1 focus:border-[#2648E7] focus:outline-none"
+                                      />
+                                    </td>
+                                    <td className="py-2 px-3 text-center">
+                                      <button
+                                        onClick={() => handleDeleteItem(item.id, item.name)}
+                                        className="p-1 text-muted-foreground hover:text-red-600 rounded hover:bg-red-50"
+                                        title="Delete row"
+                                      >
+                                        <Trash2 size={13} />
+                                      </button>
+                                    </td>
+                                  </tr>
+                                );
+                              }
 
                               if (isEditing) {
                                 return (
@@ -937,11 +1125,14 @@ export default function QuantityOfMaterialsTab({
                                     <td className="py-2 px-3 text-right font-bold text-foreground">
                                       ₹{((Number(editFormData.planned) || 0) * (Number(editFormData.rate) || 0)).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                                     </td>
-                                    <td className="py-2 px-3 text-right text-muted-foreground">
-                                      {item.used}
+                                    <td className="py-2 px-3 text-right text-muted-foreground font-medium">
+                                      {(item.ordered || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                                    </td>
+                                    <td className="py-2 px-3 text-right text-muted-foreground font-medium">
+                                      {(item.consumed ?? item.used ?? 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
                                     </td>
                                     <td className="py-2 px-3 text-right font-semibold text-emerald-600">
-                                      {Math.max(0, (Number(editFormData.planned) || 0) - item.used)}
+                                      {Math.max(0, (Number(editFormData.planned) || 0) - (item.ordered || 0)).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
                                     </td>
                                     <td className="py-2 px-3">
                                       <input
@@ -993,19 +1184,53 @@ export default function QuantityOfMaterialsTab({
                                   <td className="py-2.5 px-3 text-right font-bold text-foreground">
                                     {item.planned.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
                                   </td>
-                                  <td className="py-2.5 px-3 text-right text-muted-foreground">
-                                    {item.rate && item.rate > 0 ? `₹${item.rate.toLocaleString('en-IN')}` : '-'}
+                                  <td className="py-2.5 px-3 text-right">
+                                    <div className="font-semibold text-foreground">
+                                      {item.rate && item.rate > 0 ? `₹${item.rate.toLocaleString('en-IN')}` : '-'}
+                                    </div>
+                                    {item.actualPurchaseRate !== undefined && item.actualPurchaseRate > 0 && (
+                                      <div
+                                        className="text-[10px] flex items-center justify-end gap-1 mt-0.5"
+                                        title={`Planned Baseline: ₹${item.rate || 0} | Actual Weighted Avg: ₹${item.actualPurchaseRate.toFixed(2)} | Variance: ₹${(item.rateVariance || 0).toFixed(2)}`}
+                                      >
+                                        <span className="text-muted-foreground font-mono">PO: ₹{item.actualPurchaseRate.toLocaleString('en-IN', { maximumFractionDigits: 1 })}</span>
+                                        {item.rateVariance !== undefined && (
+                                          <span className={`px-1 py-0.2 rounded font-bold ${
+                                            item.rateVariance <= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
+                                          }`}>
+                                            {item.rateVariance <= 0 ? '' : '+'}{item.rateVariancePercent?.toFixed(0)}%
+                                          </span>
+                                        )}
+                                      </div>
+                                    )}
                                   </td>
                                   <td className="py-2.5 px-3 text-right font-extrabold text-foreground">
                                     {rowAmount > 0 ? `₹${rowAmount.toLocaleString('en-IN', { maximumFractionDigits: 0 })}` : '-'}
                                   </td>
-                                  <td className="py-2.5 px-3 text-right font-medium text-muted-foreground">
-                                    {item.used.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                                  <td className="py-2.5 px-3 text-right">
+                                    <div className="font-bold text-foreground">
+                                      {(item.ordered || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                                    </div>
+                                    {item.acceptedReceived !== undefined && item.acceptedReceived > 0 && (
+                                      <div className="text-[10px] text-emerald-700 font-medium" title="Accepted received goods">
+                                        Rcv: {item.acceptedReceived.toLocaleString('en-IN', { maximumFractionDigits: 1 })}
+                                      </div>
+                                    )}
                                   </td>
-                                  <td className="py-2.5 px-3 text-right font-bold">
-                                    <span className={isExceeded ? 'text-rose-600' : 'text-emerald-700'}>
-                                      {remaining.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
-                                    </span>
+                                  <td className="py-2.5 px-3 text-right font-medium text-muted-foreground">
+                                    <div>{(item.consumed ?? item.used ?? 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</div>
+                                    <div className="text-[9px] text-muted-foreground">site usage</div>
+                                  </td>
+                                  <td className="py-2.5 px-3 text-right">
+                                    <div className="font-bold">
+                                      <span className={remaining === 0 && item.planned > 0 ? 'text-blue-700' : remaining < 0 ? 'text-rose-600' : 'text-emerald-700'}>
+                                        {remaining.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                                      </span>
+                                      <span className="text-[10px] text-muted-foreground font-normal ml-0.5">to order</span>
+                                    </div>
+                                    <div className="text-[10px] text-muted-foreground font-medium" title="Allowable site consumption remaining">
+                                      Avail: {(item.remainingToConsume ?? Math.max(0, item.planned - (item.consumed ?? item.used ?? 0))).toLocaleString('en-IN', { maximumFractionDigits: 1 })}
+                                    </div>
                                   </td>
                                   <td className="py-2.5 px-3 text-muted-foreground truncate max-w-[200px]" title={item.remarks || ''}>
                                     {item.remarks || '-'}

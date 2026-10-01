@@ -640,12 +640,16 @@ model Task {
   created_by    String
   status        TaskStatus   @default(TODO)
   priority      TaskPriority @default(MEDIUM)
-  due_date      DateTime?
-  completed_at  DateTime?
-  reminder_days Int?         @default(1)
-  reminder_sent Boolean?     @default(false)
-  created_at    DateTime     @default(now())
-  updated_at    DateTime     @updatedAt
+  due_date           DateTime?
+  completed_at       DateTime?
+  planned_start_date DateTime?
+  planned_end_date   DateTime?
+  actual_start_date  DateTime?
+  actual_end_date    DateTime?
+  reminder_days      Int?         @default(1)
+  reminder_sent      Boolean?     @default(false)
+  created_at         DateTime     @default(now())
+  updated_at         DateTime     @updatedAt
 
   project      Project?         @relation(fields: [project_id], references: [id])
   site         Site?            @relation(fields: [site_id], references: [id])
@@ -710,12 +714,16 @@ model TaskDependency {
 }
 
 model Milestone {
-  id          String          @id @default(cuid())
-  project_id  String
-  name        String
-  description String?
-  target_date DateTime
-  actual_date DateTime?
+  id                  String          @id @default(cuid())
+  project_id          String
+  name                String
+  description         String?
+  target_date         DateTime
+  actual_date         DateTime?
+  planned_start_date  DateTime?
+  planned_end_date    DateTime?
+  actual_start_date   DateTime?
+  actual_end_date     DateTime?
   weight              Int?            @default(1)
   progress_percentage Int?            @default(0)
   status              MilestoneStatus @default(PENDING)
@@ -1068,6 +1076,7 @@ model MaterialRequest {
   material_id            String
   quantity               Float
   approved_quantity      Float?
+  ordered_quantity       Float?
   assigned_vendor_id     String?
   expected_delivery_date DateTime?             @db.Date
   status                 MaterialRequestStatus @default(DRAFT)
