@@ -478,6 +478,12 @@ export async function requestTrial(userId: string) {
   if (user.subscription_status === "ACTIVE") {
     throw new Error("You already have an active subscription");
   }
+  if (user.subscription_status === "TRIAL_ACTIVE") {
+    throw new Error("You already have an active trial");
+  }
+  if (user.subscription_status === "PENDING_TRIAL") {
+    throw new Error("Your trial request is already awaiting admin approval");
+  }
 
   // Ensure workspace exists
   let companyId = user.company_id;
@@ -499,14 +505,15 @@ export async function requestTrial(userId: string) {
     }
   }
 
-  const now = new Date();
-  const expiresAt = new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000); // 15 days
-
   // Check existing trial
   const existingTrial = await prisma.subscription.findFirst({
     where: { user_id: userId, type: "TRIAL" },
     orderBy: { created_at: "desc" },
   });
+
+  if (existingTrial && existingTrial.status === "TRIAL_ACTIVE") {
+    throw new Error("Trial already active");
+  }
 
   let subscription;
   if (existingTrial) {
@@ -515,11 +522,7 @@ export async function requestTrial(userId: string) {
       data: {
         company_id: companyId,
         plan: "ENTERPRISE",
-        status: "TRIAL_ACTIVE",
-        start_date: now,
-        end_date: expiresAt,
-        starts_at: now,
-        expires_at: expiresAt,
+        status: "PENDING_TRIAL",
         duration_months: 1,
         price: 0,
         currency: "INR",
@@ -534,11 +537,7 @@ export async function requestTrial(userId: string) {
         type: "TRIAL",
         plan: "ENTERPRISE",
         duration_months: 1,
-        status: "TRIAL_ACTIVE",
-        start_date: now,
-        end_date: expiresAt,
-        starts_at: now,
-        expires_at: expiresAt,
+        status: "PENDING_TRIAL",
         price: 0,
         currency: "INR",
       },
@@ -548,9 +547,8 @@ export async function requestTrial(userId: string) {
   const updatedUser = await prisma.user.update({
     where: { id: userId },
     data: {
-      subscription_status: "TRIAL_ACTIVE",
+      subscription_status: "PENDING_TRIAL",
       company_id: companyId,
-      onboarded: true,
     },
   });
 
@@ -570,8 +568,8 @@ export async function requestTrial(userId: string) {
       email: updatedUser.email || updatedUser.username || "",
       role: updatedUser.role,
       company_id: companyId,
-      subscription_status: "TRIAL_ACTIVE",
-      onboarded: true,
+      subscription_status: "PENDING_TRIAL",
+      onboarded: updatedUser.onboarded,
       profile_completed: updatedUser.profile_completed,
     },
     accessToken,

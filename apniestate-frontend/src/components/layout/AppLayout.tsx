@@ -23,14 +23,21 @@ export default function AppLayout() {
     if (currentPath.startsWith('/apni-admin')) return;
 
     if (user) {
-      // 1. Profile must be completed
-      if (!user.profile_completed && currentPath !== '/complete-profile') {
+      const crmRole = user.crm_role || (user.role === 'CRM_MANAGER' ? 'CRM_MANAGER' : (user.role === 'TELECALLER' || user.role === 'SALES_EXECUTIVE') ? 'TELECALLER' : null);
+      const companyRoles = user.company_roles || [];
+      const hasErpRole = companyRoles.some((r: string) => ['BUILDER', 'ADMIN', 'PROJECT_MANAGER', 'SITE_SUPERVISOR', 'ACCOUNTANT', 'INVENTORY_MANAGER'].includes(r)) || ['BUILDER', 'ADMIN', 'PROJECT_MANAGER', 'SITE_SUPERVISOR', 'ACCOUNTANT', 'INVENTORY_MANAGER'].includes(user.role || '');
+      const isCrmOnly = Boolean(crmRole) && !hasErpRole;
+      const isOwner = user.role === 'BUILDER' || !user.company_id;
+
+      // 1. Profile must be completed (only for workspace owner)
+      if (isOwner && !user.profile_completed && currentPath !== '/complete-profile') {
         navigate('/complete-profile', { replace: true });
         return;
       }
       
-      // 2. Must have some subscription interaction
-      if (user.profile_completed) {
+      // 2. Subscription redirect - ONLY for workspace owner/builder!
+      // Staff / team members (telecallers, supervisors, accountants, etc.) never purchase subscriptions!
+      if (isOwner && user.profile_completed) {
         if (user.subscription_status === 'NONE' && currentPath !== '/subscription') {
           navigate('/subscription', { replace: true });
           return;
@@ -47,8 +54,14 @@ export default function AppLayout() {
         }
       }
 
-      // 3. Normal workspace redirect if everything is good
-      if (!projectLoading && projects.length === 0 && !allowedPaths.includes(currentPath) && !currentPath.startsWith('/crm')) {
+      // If user is pure CRM, keep them in CRM workspace
+      if (isCrmOnly && !currentPath.startsWith('/crm') && !['/profile', '/notifications', '/settings'].includes(currentPath)) {
+        navigate('/crm', { replace: true });
+        return;
+      }
+
+      // 3. Normal workspace redirect for ERP users if everything is good
+      if (!isCrmOnly && !projectLoading && projects.length === 0 && !allowedPaths.includes(currentPath) && !currentPath.startsWith('/crm')) {
         if (user?.role === 'BUILDER') {
           navigate('/projects?create=true');
         } else {

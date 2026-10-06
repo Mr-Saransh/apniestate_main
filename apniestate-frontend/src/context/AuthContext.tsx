@@ -94,8 +94,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.removeItem('user');
         setToken(null);
         setUser(null);
-        setPermissions([]);
-        if (window.location.pathname !== '/login' && window.location.pathname !== '/landing') {
+        const publicPages = ['/login', '/signup', '/landing'];
+        if (!publicPages.includes(window.location.pathname)) {
           window.location.href = '/login';
         }
         timer = null;

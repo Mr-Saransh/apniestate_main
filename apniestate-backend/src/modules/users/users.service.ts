@@ -73,15 +73,40 @@ export const getUserById = (id: string, companyId?: string | null) => {
 };
 
 export async function createUser(input: CreateUserInput, companyId?: string | null, assignerId?: string | null) {
-  const whereClause = input.email ? { email: input.email.toLowerCase() } : { username: input.username };
+  const whereClause = input.email ? { email: input.email.toLowerCase().trim() } : { username: input.username?.trim() };
   const existing = await prisma.user.findUnique({ where: whereClause as any });
   const password_hash = await bcrypt.hash(input.password, 12);
   const baseRole = (input.role || "SITE_SUPERVISOR") as Role;
-  const crmRole = input.crm_role && input.crm_role !== "NONE" ? (input.crm_role as Role) : null;
+  let crmRole = input.crm_role && input.crm_role !== "NONE" ? (input.crm_role as Role) : null;
+  if (!crmRole && (baseRole === "TELECALLER" || baseRole === "SALES_EXECUTIVE")) {
+    crmRole = "TELECALLER" as Role;
+  } else if (!crmRole && baseRole === "CRM_MANAGER") {
+    crmRole = "CRM_MANAGER" as Role;
+  }
 
   const targetRoles: Role[] = [baseRole];
   if (crmRole && !targetRoles.includes(crmRole)) {
     targetRoles.push(crmRole);
+  }
+
+  // Fetch inherited company subscription status
+  let inheritedSubStatus: any = "NONE";
+  if (companyId) {
+    const builder = await prisma.user.findFirst({
+      where: { company_id: companyId, role: "BUILDER" },
+      select: { subscription_status: true },
+    });
+    if (builder?.subscription_status && builder.subscription_status !== "NONE") {
+      inheritedSubStatus = builder.subscription_status;
+    } else {
+      const companySub = await prisma.subscription.findFirst({
+        where: { company_id: companyId, status: { in: ["ACTIVE", "TRIAL_ACTIVE"] } },
+        select: { status: true },
+      });
+      if (companySub?.status) {
+        inheritedSubStatus = companySub.status;
+      }
+    }
   }
 
   if (existing) {
@@ -94,6 +119,9 @@ export async function createUser(input: CreateUserInput, companyId?: string | nu
           password_hash,
           name: input.name || existing.name,
           phone: input.phone || existing.phone,
+          ...(existing.subscription_status === "NONE" && inheritedSubStatus !== "NONE"
+            ? { subscription_status: inheritedSubStatus }
+            : {}),
         },
       });
 
@@ -158,8 +186,8 @@ export async function createUser(input: CreateUserInput, companyId?: string | nu
     const user = await tx.user.create({
       data: {
         name: input.name,
-        email: input.email ? input.email.toLowerCase() : null,
-        username: input.username || null,
+        email: input.email ? input.email.toLowerCase().trim() : null,
+        username: input.username ? input.username.trim() : null,
         password_hash,
         role: baseRole,
         phone: input.phone,
@@ -168,6 +196,7 @@ export async function createUser(input: CreateUserInput, companyId?: string | nu
         company_id: companyId || null,
         profile_completed: true,
         onboarded: true,
+        subscription_status: inheritedSubStatus,
       },
       select: { id: true, name: true, email: true, username: true, role: true, city: true, state: true, created_at: true },
     });

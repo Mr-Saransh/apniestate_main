@@ -267,12 +267,12 @@ export default function SubscriptionPage() {
         if (res.data?.user) {
           updateUser(res.data.user);
         } else {
-          updateUser({ ...user!, subscription_status: 'TRIAL_ACTIVE', onboarded: true });
+          updateUser({ ...user!, subscription_status: 'PENDING_TRIAL' });
         }
-        navigate('/projects?create=true', { replace: true });
+        navigate('/pending-approval', { replace: true });
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to activate trial');
+      setError(err.message || 'Failed to submit trial request');
     } finally {
       setRequestingTrial(false);
     }

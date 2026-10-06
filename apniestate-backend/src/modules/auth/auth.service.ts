@@ -93,24 +93,7 @@ export async function loginUser(input: LoginInput) {
     },
   });
 
-  let effectiveSubscriptionStatus = user.subscription_status;
-  
-  const identifier = user.email || user.username || "";
-  const demoAccounts = ["admin@gmail.com", "site@gmail.com", "pm1@apniestate.com", "accounts@apniestate.com"];
-  
-  if (demoAccounts.includes(identifier)) {
-    effectiveSubscriptionStatus = "ACTIVE" as any;
-  } else if (user.role !== "BUILDER" && user.company_id) {
-    const builder = await prisma.user.findFirst({
-      where: {
-        company_id: user.company_id,
-        role: "BUILDER"
-      }
-    });
-    if (builder) {
-      effectiveSubscriptionStatus = builder.subscription_status;
-    }
-  }
+  const effectiveSubscriptionStatus = await getEffectiveSubscriptionStatus(user);
 
   return {
     accessToken,
@@ -145,6 +128,55 @@ export async function loginUser(input: LoginInput) {
       }
     })),
   };
+}
+
+export async function getEffectiveSubscriptionStatus(user: {
+  id: string;
+  role: string;
+  company_id: string | null;
+  subscription_status: any;
+  email?: string | null;
+  username?: string | null;
+}): Promise<any> {
+  const identifier = (user.email || user.username || "").toLowerCase().trim();
+  const demoAccounts = ["admin@gmail.com", "site@gmail.com", "pm1@apniestate.com", "accounts@apniestate.com"];
+  if (demoAccounts.includes(identifier)) {
+    return "ACTIVE";
+  }
+
+  // If user is a builder or admin, their own subscription status applies
+  if (user.role === "BUILDER" || user.role === "ADMIN") {
+    return user.subscription_status;
+  }
+
+  // If user belongs to a company (e.g. TELECALLER, SITE_SUPERVISOR, ACCOUNTANT, PM)
+  if (user.company_id) {
+    // 1. Check company subscription
+    const companySub = await prisma.subscription.findFirst({
+      where: {
+        company_id: user.company_id,
+        status: { in: ["ACTIVE", "TRIAL_ACTIVE", "EXPIRING_SOON"] },
+      },
+      orderBy: { created_at: "desc" },
+    });
+    if (companySub) {
+      return companySub.status;
+    }
+
+    // 2. Or check the builder / owner of the company
+    const builder = await prisma.user.findFirst({
+      where: {
+        company_id: user.company_id,
+        role: "BUILDER",
+      },
+      orderBy: { created_at: "asc" },
+    });
+    if (builder && builder.subscription_status && builder.subscription_status !== "NONE") {
+      return builder.subscription_status;
+    }
+  }
+
+  return user.subscription_status;
 }
 
 export async function logoutUser(userId: string, tokenId?: string) {
@@ -188,6 +220,7 @@ export async function refreshUserTokens(token: string) {
   });
 
   const newRefreshToken = signRefreshToken(user.id);
+  const effectiveSubscriptionStatus = await getEffectiveSubscriptionStatus(user);
 
   return {
     accessToken,
@@ -201,7 +234,7 @@ export async function refreshUserTokens(token: string) {
       company_id: user.company_id,
       onboarded: user.onboarded,
       profile_completed: user.profile_completed,
-      subscription_status: user.subscription_status,
+      subscription_status: effectiveSubscriptionStatus,
       phone: user.phone,
       city: user.city,
       state: user.state,
@@ -222,11 +255,17 @@ export async function refreshUserTokens(token: string) {
 }
 
 export async function signupUser(input: import("./auth.schema").SignupInput) {
-  const existing = await prisma.user.findUnique({ where: { email: input.email } });
-  if (existing) return null;
+  const cleanEmail = input.email.trim().toLowerCase();
+  const existing = await prisma.user.findFirst({
+    where: { email: { equals: cleanEmail, mode: "insensitive" } },
+  });
+  if (existing) {
+    throw new Error("An account with this email already exists. Please sign in instead.");
+  }
 
+  const cleanOtp = input.otp.trim();
   const otpRecord = await prisma.otpVerification.findFirst({
-    where: { email: input.email, otp: input.otp }
+    where: { email: cleanEmail, otp: cleanOtp }
   });
   if (!otpRecord || otpRecord.expires_at < new Date()) {
     throw new Error("Invalid or expired OTP");
@@ -234,13 +273,13 @@ export async function signupUser(input: import("./auth.schema").SignupInput) {
   await prisma.otpVerification.delete({ where: { id: otpRecord.id } });
 
   const passwordHash = await bcrypt.hash(input.password, 10);
-  const name = input.email.split("@")[0];
+  const name = cleanEmail.split("@")[0];
 
   // Create user only — NO company/workspace yet.
   // User must complete profile + subscribe before getting a workspace.
   const user = await prisma.user.create({
     data: {
-      email: input.email,
+      email: cleanEmail,
       password_hash: passwordHash,
       name,
       role: "BUILDER",

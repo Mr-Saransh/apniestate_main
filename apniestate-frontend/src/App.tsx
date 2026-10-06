@@ -1,13 +1,27 @@
 import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { AuthProvider } from '@/context/AuthContext';
+import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { ProjectProvider } from '@/context/ProjectContext';
 import { AppModeProvider } from '@/context/AppModeContext';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import AppLayout from '@/components/layout/AppLayout';
 import RouteGuard from '@/components/shared/RouteGuard';
 import SubscriptionBanner from '@/components/shared/SubscriptionBanner';
+
+function IndexRedirect() {
+  const { user } = useAuth();
+  const crmRole = user?.crm_role || (user?.role === 'CRM_MANAGER' ? 'CRM_MANAGER' : (user?.role === 'TELECALLER' || user?.role === 'SALES_EXECUTIVE') ? 'TELECALLER' : null);
+  const companyRoles = user?.company_roles || [];
+  const hasErpRole = companyRoles.some((r: string) => ['BUILDER', 'ADMIN', 'PROJECT_MANAGER', 'SITE_SUPERVISOR', 'ACCOUNTANT', 'INVENTORY_MANAGER'].includes(r)) || ['BUILDER', 'ADMIN', 'PROJECT_MANAGER', 'SITE_SUPERVISOR', 'ACCOUNTANT', 'INVENTORY_MANAGER'].includes(user?.role || '');
+  const isCrmOnly = Boolean(crmRole) && !hasErpRole;
+  const savedMode = localStorage.getItem('apniestate_app_mode');
+
+  if (isCrmOnly || savedMode === 'CRM') {
+    return <Navigate to="/crm" replace />;
+  }
+  return <Navigate to="/dashboard" replace />;
+}
 
 // Lazy-loaded pages for lightning-fast initial load & route code splitting
 const LoginPage = lazy(() => import('@/pages/LoginPage'));
@@ -107,7 +121,7 @@ export default function App() {
 
                     {/* Main App */}
                     <Route path="/" element={<AppLayout />}>
-                      <Route index element={<Navigate to="/dashboard" replace />} />
+                      <Route index element={<IndexRedirect />} />
                       <Route path="/dashboard" element={<DashboardPage />} />
                       
                       {/* CRM Workspace & Direct Aliases */}

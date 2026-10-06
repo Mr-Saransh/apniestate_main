@@ -12,15 +12,17 @@ export const LoginSchema = z.object({
 export type LoginInput = z.infer<typeof LoginSchema>;
 
 export const SignupSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(6),
+  email: z.string().trim().toLowerCase().email("Please provide a valid email address"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
   otp: z.string().min(6, "OTP is required"),
 });
 
 export type SignupInput = z.infer<typeof SignupSchema>;
 
 export const SendOtpSchema = z.object({
-  email: z.string().email(),
+  email: z.string().trim().toLowerCase().email("Please provide a valid email address"),
+  type: z.enum(["signup", "login"]).optional(),
 });
 
 export type SendOtpInput = z.infer<typeof SendOtpSchema>;
+

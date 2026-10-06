@@ -63,15 +63,16 @@ export default function UsersPage() {
 
     try {
       const isEmail = formIdentifier.includes('@');
+      const isCrmOnly = formRole === 'TELECALLER' || formRole === 'CRM_MANAGER';
       const data: CreateUserData = {
         name: formName,
-        email: isEmail ? formIdentifier : undefined,
-        username: !isEmail ? formIdentifier : undefined,
+        email: isEmail ? formIdentifier.trim() : undefined,
+        username: !isEmail ? formIdentifier.trim() : undefined,
         password: formPassword,
         role: formRole,
-        crm_role: formCrmAccess ? formCrmRole : 'NONE',
+        crm_role: isCrmOnly ? (formRole as any) : (formCrmAccess ? formCrmRole : 'NONE'),
         phone: formPhone || undefined,
-        project_ids: formRole !== 'BUILDER' ? formProjectIds : undefined,
+        project_ids: (formRole !== 'BUILDER' && !isCrmOnly) ? formProjectIds : undefined,
       };
       await usersApi.create(data);
       setShowCreateModal(false);
@@ -324,7 +325,7 @@ export default function UsersPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">ERP Role *</label>
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Role *</label>
                     <select
                       required
                       className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary"
@@ -336,6 +337,8 @@ export default function UsersPage() {
                       <option value="SITE_SUPERVISOR">Site Supervisor</option>
                       <option value="ACCOUNTANT">Accountant</option>
                       <option value="INVENTORY_MANAGER">Inventory Manager</option>
+                      <option value="TELECALLER">Sales Executive / Telecaller (CRM)</option>
+                      <option value="CRM_MANAGER">CRM Manager (CRM)</option>
                     </select>
                   </div>
                   <div>
@@ -352,38 +355,40 @@ export default function UsersPage() {
                   </div>
                 </div>
 
-                {/* CRM Access Checkbox (Dual Role) */}
-                <div className="p-3.5 rounded-xl bg-blue-50/60 border border-blue-200/80 space-y-2.5">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formCrmAccess}
-                      onChange={(e) => setFormCrmAccess(e.target.checked)}
-                      className="rounded border-border text-primary focus:ring-primary accent-primary"
-                    />
-                    <div className="flex items-center gap-1.5">
-                      <Sparkles size={14} className="text-[#2648E7]" />
-                      <span className="text-xs font-bold text-slate-800">Grant CRM Access (Dual Role)</span>
-                    </div>
-                  </label>
+                {/* CRM Access Checkbox (Dual Role for non-CRM roles) */}
+                {formRole !== 'TELECALLER' && formRole !== 'CRM_MANAGER' && (
+                  <div className="p-3.5 rounded-xl bg-blue-50/60 border border-blue-200/80 space-y-2.5">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formCrmAccess}
+                        onChange={(e) => setFormCrmAccess(e.target.checked)}
+                        className="rounded border-border text-primary focus:ring-primary accent-primary"
+                      />
+                      <div className="flex items-center gap-1.5">
+                        <Sparkles size={14} className="text-[#2648E7]" />
+                        <span className="text-xs font-bold text-slate-800">Grant CRM Access (Dual Role)</span>
+                      </div>
+                    </label>
 
-                  {formCrmAccess && (
-                    <div className="pl-6 space-y-1.5 animate-in fade-in">
-                      <label className="text-[10px] font-bold text-slate-600 uppercase">Select CRM Role</label>
-                      <select
-                        value={formCrmRole}
-                        onChange={(e) => setFormCrmRole(e.target.value as any)}
-                        className="w-full p-2 bg-white border border-border rounded-lg text-xs font-semibold outline-none focus:ring-1 focus:ring-primary"
-                      >
-                        <option value="CRM_MANAGER">CRM Manager (Team Leads, Leaderboard & Reports)</option>
-                        <option value="TELECALLER">Sales Executive / Telecaller (Own Leads Only)</option>
-                      </select>
-                      <p className="text-[10px] text-slate-500">
-                        This user will have access to both ERP and CRM, with the ERP/CRM switcher in the sidebar.
-                      </p>
-                    </div>
-                  )}
-                </div>
+                    {formCrmAccess && (
+                      <div className="pl-6 space-y-1.5 animate-in fade-in">
+                        <label className="text-[10px] font-bold text-slate-600 uppercase">Select CRM Role</label>
+                        <select
+                          value={formCrmRole}
+                          onChange={(e) => setFormCrmRole(e.target.value as any)}
+                          className="w-full p-2 bg-white border border-border rounded-lg text-xs font-semibold outline-none focus:ring-1 focus:ring-primary"
+                        >
+                          <option value="CRM_MANAGER">CRM Manager (Team Leads, Leaderboard & Reports)</option>
+                          <option value="TELECALLER">Sales Executive / Telecaller (Own Leads Only)</option>
+                        </select>
+                        <p className="text-[10px] text-slate-500">
+                          This user will have access to both ERP and CRM, with the ERP/CRM switcher in the sidebar.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {formRole !== 'BUILDER' && projects.length > 0 && (
                   <div>

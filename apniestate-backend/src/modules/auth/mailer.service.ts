@@ -20,7 +20,9 @@ function getTransporter() {
     },
     tls: {
       rejectUnauthorized: false
-    }
+    },
+    connectionTimeout: 10000,
+    socketTimeout: 15000,
   });
 }
 

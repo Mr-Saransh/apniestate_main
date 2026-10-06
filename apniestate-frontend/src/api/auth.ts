@@ -78,8 +78,8 @@ export const authApi = {
   refreshToken: (token?: string) =>
     apiClient.post<AuthResponse>('/auth/refresh', { refreshToken: token }),
 
-  sendOtp: (email: string) =>
-    apiClient.post<{success: boolean, message: string}>('/auth/send-otp', { email }),
+  sendOtp: (email: string, type?: 'signup' | 'login') =>
+    apiClient.post<{success: boolean, message: string}>('/auth/send-otp', { email, type }),
 
   switchWorkspace: (companyId: string, role: string) =>
     apiClient.post<AuthResponse>('/auth/switch-workspace', { company_id: companyId, role }),

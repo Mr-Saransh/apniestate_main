@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     return conflict(error.message);
   }
-  if (!result) return conflict("User with this email already exists");
+  if (!result) return conflict("An account with this email already exists. Please sign in instead.");
 
   const refreshCookie = serialize("refresh_token", result.refreshToken, {
     httpOnly: true,

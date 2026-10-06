@@ -225,11 +225,11 @@ export async function getCompanySubscription(companyId: string) {
 
   if (!subscription) return null;
 
-  // Check if expired (demo accounts never expire naturally)
+  // Check if expired (demo accounts and pending trials never expire)
   const now = new Date();
   const endDate = subscription.end_date || subscription.expires_at;
-  // If endDate is not specified yet (e.g. pending trial), it is NOT expired!
-  const isExpired = !subscription.is_demo && endDate ? (new Date(endDate).getTime() < now.getTime()) : false;
+  const isPendingTrial = subscription.status === SubscriptionStatus.PENDING_TRIAL;
+  const isExpired = !subscription.is_demo && !isPendingTrial && endDate ? (new Date(endDate).getTime() < now.getTime()) : false;
 
   if (isExpired && subscription.status !== SubscriptionStatus.EXPIRED && subscription.status !== SubscriptionStatus.TRIAL_EXPIRED) {
     const expiredStatus = subscription.type === "TRIAL" || subscription.status === SubscriptionStatus.TRIAL_ACTIVE
@@ -377,6 +377,9 @@ export async function getCompanyEntitlements(companyId: string | null | undefine
   if (!sub) {
     canCreateProject = false;
     canCreateProjectReason = "No active subscription. Please select a plan or start a 15-day free trial.";
+  } else if (sub.status === SubscriptionStatus.PENDING_TRIAL) {
+    canCreateProject = false;
+    canCreateProjectReason = "Your 15-day free trial request is pending admin approval. You will receive full access once approved.";
   } else if (isExpired) {
     canCreateProject = false;
     canCreateProjectReason = isTrial

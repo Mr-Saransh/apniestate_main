@@ -6,7 +6,7 @@ import { ok, badRequest } from "@/lib/response";
 export const POST = withAuth(async (_req: NextRequest, user) => {
   try {
     const result = await requestTrial(user.sub);
-    return ok(result, "15-day Enterprise trial activated successfully");
+    return ok(result, "15-day Enterprise trial request submitted. Pending admin approval.");
   } catch (err: any) {
     return badRequest(err.message || "Failed to request trial");
   }

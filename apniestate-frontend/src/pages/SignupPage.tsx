@@ -16,20 +16,24 @@ export default function SignupPage() {
   const [otpSent, setOtpSent] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [infoMessage, setInfoMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [sendingOtp, setSendingOtp] = useState(false);
 
   const handleSendOtp = async () => {
-    if (!email) {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail) {
       setError('Please enter your email to receive an OTP.');
+      setInfoMessage('');
       return;
     }
     setError('');
+    setInfoMessage('');
     setSendingOtp(true);
     try {
-      await authApi.sendOtp(email);
+      await authApi.sendOtp(cleanEmail, 'signup');
       setOtpSent(true);
-      setError('OTP sent to your email.');
+      setInfoMessage('OTP sent to your email. Please check your inbox.');
     } catch (err: any) {
       setError(err.message || 'Failed to send OTP.');
     } finally {
@@ -50,6 +54,7 @@ export default function SignupPage() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
+    setInfoMessage('');
     setSubmitting(true);
 
     try {
@@ -59,7 +64,8 @@ export default function SignupPage() {
         return;
       }
       
-      const res = await signup({ email, password, otp });
+      const cleanEmail = email.trim().toLowerCase();
+      const res = await signup({ email: cleanEmail, password, otp: otp.trim() });
       
       // Navigate based on profile/subscription status
       if (!res.user.profile_completed) {
@@ -79,6 +85,8 @@ export default function SignupPage() {
       setSubmitting(false);
     }
   };
+
+  const isExistingAccount = error.toLowerCase().includes('already exists');
 
   return (
     <div className="login-page-premium">
@@ -104,10 +112,42 @@ export default function SignupPage() {
               <h2>Create an Account</h2>
               <p className="login-subtitle">Join the future of construction management</p>
 
+              {infoMessage && (
+                <div 
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    border: '1px solid rgba(16, 185, 129, 0.3)',
+                    color: '#10B981',
+                    fontSize: '13px',
+                    marginBottom: '16px',
+                  }}
+                >
+                  <ShieldCheck size={18} />
+                  <span>{infoMessage}</span>
+                </div>
+              )}
+
               {error && (
-                <div className="login-error">
+                <div className="login-error" style={{ marginBottom: '16px' }}>
                   <AlertCircle size={18} />
-                  <span>{error}</span>
+                  <div>
+                    <span>{error}</span>
+                    {isExistingAccount && (
+                      <div style={{ marginTop: '6px' }}>
+                        <Link 
+                          to="/login" 
+                          style={{ color: '#2648E7', fontWeight: 600, textDecoration: 'underline', fontSize: '13px' }}
+                        >
+                          Sign in to your account &rarr;
+                        </Link>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
