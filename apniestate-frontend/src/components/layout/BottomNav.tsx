@@ -31,11 +31,13 @@ export default function BottomNav() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { mode } = useAppMode();
+  const { mode, isCrmOnly } = useAppMode();
   const role = user?.role || 'BUILDER';
   const crmRole = user?.crm_role || (user?.role === 'CRM_MANAGER' ? 'CRM_MANAGER' : (user?.role === 'TELECALLER' || user?.role === 'SALES_EXECUTIVE') ? 'TELECALLER' : 'BUILDER');
 
-  let navItems = mode === 'CRM'
+  const isCrmActive = mode === 'CRM' || isCrmOnly;
+
+  let navItems = isCrmActive
     ? (crmRole === 'TELECALLER' ? [...TELECALLER_BOTTOM_NAV] : [...CRM_BOTTOM_NAV])
     : [...ERP_BOTTOM_NAV];
 
@@ -53,7 +55,7 @@ export default function BottomNav() {
     <nav className="lg:hidden shrink-0 flex items-center bg-white border-t border-border pb-safe shadow-lg z-30">
       {navItems.map(({ id, path, Icon, label }) => {
         let isActive = false;
-        if (mode === 'CRM') {
+        if (isCrmActive) {
           if (path === '/crm?tab=overview') {
             isActive = location.pathname === '/crm' && (location.search === '' || location.search.includes('tab=overview'));
           } else {

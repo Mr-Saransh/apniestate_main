@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useTranslation } from 'react-i18next';
 import { subscriptionApi, CompanyEntitlements } from '@/api/subscription';
+import { apiClient } from '@/api/client';
 
 type NavItem = { id: string; label: string; icon: React.ElementType; badge?: number; hideOnMobile?: boolean };
 type NavGroup = { label: string; items: NavItem[]; hideOnMobile?: boolean };
@@ -27,6 +28,8 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
   const navigate = useNavigate();
   const [entitlements, setEntitlements] = React.useState<CompanyEntitlements | null>(null);
 
+  const [unreadCount, setUnreadCount] = React.useState(0);
+
   React.useEffect(() => {
     subscriptionApi.getEntitlements()
       .then(res => {
@@ -36,6 +39,16 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
       })
       .catch(() => {});
   }, []);
+
+  React.useEffect(() => {
+    apiClient.get<any>('/notifications?unread=true')
+      .then(res => {
+        if (res.data?.unread_count !== undefined) {
+          setUnreadCount(res.data.unread_count);
+        }
+      })
+      .catch(() => {});
+  }, [location.pathname]);
 
   const initials = user?.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : 'AS';
   const role = user?.role || 'BUILDER';
@@ -74,7 +87,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
     },
     {
       label: "Account", items: [
-        { id: "/notifications", label: "Notifications", icon: Bell, badge: 3 },
+        { id: "/notifications", label: "Notifications", icon: Bell, badge: unreadCount > 0 ? unreadCount : undefined },
         { id: "/settings", label: "Settings", icon: Settings },
       ]
     }
@@ -94,7 +107,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
     {
       label: "Account", items: [
         { id: "/profile", label: "Profile", icon: UserCheck },
-        { id: "/notifications", label: "Notifications", icon: Bell, badge: 3 },
+        { id: "/notifications", label: "Notifications", icon: Bell, badge: unreadCount > 0 ? unreadCount : undefined },
       ]
     }
   ];
@@ -119,7 +132,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
     {
       label: "Account", items: [
         { id: "/profile", label: "Profile", icon: UserCheck },
-        { id: "/notifications", label: "Notifications", icon: Bell, badge: 3 },
+        { id: "/notifications", label: "Notifications", icon: Bell, badge: unreadCount > 0 ? unreadCount : undefined },
       ]
     }
   ];
@@ -146,7 +159,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
     {
       label: "Administration", items: [
         { id: "/crm?tab=settings", label: "CRM Settings", icon: Settings },
-        { id: "/notifications", label: "Notifications", icon: Bell, badge: 3 },
+        { id: "/notifications", label: "Notifications", icon: Bell, badge: unreadCount > 0 ? unreadCount : undefined },
       ]
     }
   ];

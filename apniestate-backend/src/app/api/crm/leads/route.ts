@@ -138,6 +138,22 @@ export const POST = withCrmAuth(async (req, user) => {
       },
     });
 
+    if (lead.assigned_to) {
+      await prisma.notification.create({
+        data: {
+          user_id: lead.assigned_to,
+          company_id: user.company_id,
+          title: `New Lead Assigned: ${lead.name}`,
+          message: `Lead ${lead.name} (${lead.phone || 'No phone'}) has been assigned to you.`,
+          type: "info",
+          link: "/crm?tab=leads",
+          entity_type: "CrmLead",
+          entity_id: lead.id,
+          priority: "NORMAL",
+        },
+      }).catch(err => console.warn("Failed to create lead assignment notification:", err));
+    }
+
     return created(lead, "Lead created successfully");
   } catch (err: any) {
     console.error("CRM Leads POST error:", err);

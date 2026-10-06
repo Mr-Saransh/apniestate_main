@@ -122,6 +122,23 @@ export const POST = withCrmAuth(async (req, user) => {
       },
     });
 
+    const notifyTarget = followup.lead.assigned_to || user.sub;
+    await prisma.notification.create({
+      data: {
+        user_id: notifyTarget,
+        company_id: user.company_id,
+        title: `Follow-up Scheduled: ${followup.lead.name}`,
+        message: body.note
+          ? `Follow-up on ${new Date(body.due_at).toLocaleDateString()}: "${body.note}"`
+          : `Follow-up scheduled with ${followup.lead.name} on ${new Date(body.due_at).toLocaleDateString()}`,
+        type: "info",
+        link: "/crm?tab=followups",
+        entity_type: "CrmFollowup",
+        entity_id: followup.id,
+        priority: "NORMAL",
+      },
+    }).catch(err => console.warn("Failed to create followup notification:", err));
+
     return created(followup, "Follow-up scheduled");
   } catch (err: any) {
     console.error("CRM Followup POST error:", err);

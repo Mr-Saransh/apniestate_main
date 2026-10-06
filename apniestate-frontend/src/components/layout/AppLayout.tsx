@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Outlet, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useProject } from '@/context/ProjectContext';
+import { useAppMode } from '@/context/AppModeContext';
 import Sidebar from './Sidebar';
 import TopBar from './Topbar';
 import BottomNav from './BottomNav';
@@ -27,7 +28,8 @@ export default function AppLayout() {
       const companyRoles = user.company_roles || [];
       const hasErpRole = companyRoles.some((r: string) => ['BUILDER', 'ADMIN', 'PROJECT_MANAGER', 'SITE_SUPERVISOR', 'ACCOUNTANT', 'INVENTORY_MANAGER'].includes(r)) || ['BUILDER', 'ADMIN', 'PROJECT_MANAGER', 'SITE_SUPERVISOR', 'ACCOUNTANT', 'INVENTORY_MANAGER'].includes(user.role || '');
       const isCrmOnly = Boolean(crmRole) && !hasErpRole;
-      const isOwner = user.role === 'BUILDER' || !user.company_id;
+      const isStaffOrCrm = isCrmOnly || user.role === 'TELECALLER' || user.role === 'SALES_EXECUTIVE' || user.role === 'CRM_MANAGER';
+      const isOwner = (user.role === 'BUILDER' || (user.role === 'ADMIN' && !isStaffOrCrm)) && !isStaffOrCrm;
 
       // 1. Profile must be completed (only for workspace owner)
       if (isOwner && !user.profile_completed && currentPath !== '/complete-profile') {
@@ -86,8 +88,11 @@ export default function AppLayout() {
     return <Navigate to="/login" replace />;
   }
 
+  const { mode, isCrmOnly: crmOnlyFromContext } = useAppMode();
   const isCrmRoute = location.pathname.startsWith('/crm');
-  const showNav = (activeProject !== null && location.pathname !== '/projects') || isCrmRoute;
+  const isAuxRoute = ['/notifications', '/profile', '/settings'].includes(location.pathname);
+  const isCrmActive = crmOnlyFromContext || mode === 'CRM';
+  const showNav = (activeProject !== null && location.pathname !== '/projects') || isCrmRoute || (isAuxRoute && isCrmActive);
 
   return (
     <div className="h-screen w-screen flex flex-col overflow-hidden bg-background">

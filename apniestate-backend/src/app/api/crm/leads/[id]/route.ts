@@ -131,6 +131,22 @@ export const PUT = withCrmAuth(async (req, user, context) => {
       });
     }
 
+    if (lead.assigned_to && lead.assigned_to !== existing.assigned_to) {
+      await prisma.notification.create({
+        data: {
+          user_id: lead.assigned_to,
+          company_id: user.company_id,
+          title: `Lead Assigned: ${lead.name}`,
+          message: `Lead ${lead.name} (${lead.phone || 'No phone'}) has been assigned to you.`,
+          type: "info",
+          link: "/crm?tab=leads",
+          entity_type: "CrmLead",
+          entity_id: lead.id,
+          priority: "NORMAL",
+        },
+      }).catch(err => console.warn("Failed to create lead reassignment notification:", err));
+    }
+
     return ok(lead, "Lead updated");
   } catch (err: any) {
     console.error("CRM Lead PUT error:", err);
