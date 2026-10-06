@@ -1,13 +1,13 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Users, UserCheck, TrendingUp, IndianRupee, Clock, CheckCircle2,
   AlertTriangle, Calendar, Plus, ArrowUpRight, Building2, Phone, MessageCircle,
   FileSpreadsheet, Sparkles, Zap, Shield, UserPlus, ArrowRight, UserCog,
-  BarChart3, Activity, AlertCircle, ArrowDownRight, Award
+  BarChart3, Activity, AlertCircle, ArrowDownRight, Award, Check
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { getUserCrmRole } from '@/config/crm-permissions';
-import { type CrmAnalytics, type CrmLead, type CrmFollowup } from '@/api/crm';
+import { crmApi, type CrmAnalytics, type CrmLead, type CrmFollowup } from '@/api/crm';
 
 interface CrmOverviewTabProps {
   analytics: CrmAnalytics | null;
@@ -21,6 +21,7 @@ interface CrmOverviewTabProps {
   onOpenInviteMember?: () => void;
   onSelectLead: (leadId: string) => void;
   onNavigateTab: (tabId: string) => void;
+  onRefresh?: () => void;
 }
 
 export default function CrmOverviewTab({
@@ -35,21 +36,104 @@ export default function CrmOverviewTab({
   onOpenInviteMember,
   onSelectLead,
   onNavigateTab,
+  onRefresh,
 }: CrmOverviewTabProps) {
   const { user } = useAuth();
   const crmRole = getUserCrmRole(user);
 
-  const todayFollowups = followups.filter((f) => {
-    if (f.status !== 'PENDING') return false;
+  const [followupFilter, setFollowupFilter] = useState<'ALL' | 'TODAY' | 'OVERDUE' | 'UPCOMING'>('ALL');
+  const [completingFollowupId, setCompletingFollowupId] = useState<string | null>(null);
+
+  const pendingFollowups = followups
+    .filter((f) => f.status === 'PENDING')
+    .sort((a, b) => new Date(a.due_at).getTime() - new Date(b.due_at).getTime());
+
+  const todayFollowups = pendingFollowups.filter((f) => {
     const d = new Date(f.due_at);
     const now = new Date();
     return d.toDateString() === now.toDateString();
   });
 
-  const overdueFollowups = followups.filter((f) => {
-    if (f.status !== 'PENDING') return false;
+  const overdueFollowups = pendingFollowups.filter((f) => {
     return new Date(f.due_at).getTime() < new Date().setHours(0, 0, 0, 0);
   });
+
+  const upcomingFollowups = pendingFollowups.filter((f) => {
+    const now = new Date();
+    const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).getTime();
+    return new Date(f.due_at).getTime() > todayEnd;
+  });
+
+  const displayedFollowups =
+    followupFilter === 'TODAY'
+      ? todayFollowups
+      : followupFilter === 'OVERDUE'
+      ? overdueFollowups
+      : followupFilter === 'UPCOMING'
+      ? upcomingFollowups
+      : pendingFollowups;
+
+  const handleOverviewCall = (lead?: any) => {
+    if (!lead?.phone) return;
+    crmApi.createActivity({
+      lead_id: lead.id,
+      type: 'CALL',
+      title: `Outbound call dialed from Overview to ${lead.name} (${lead.phone})`,
+    }).catch(() => {});
+  };
+
+  const handleOverviewWhatsApp = (lead?: any) => {
+    if (!lead?.phone) return;
+    const cleanPhone = lead.phone.replace(/[^\d]/g, '');
+    crmApi.createActivity({
+      lead_id: lead.id,
+      type: 'NOTE',
+      title: `WhatsApp message initiated from Overview with ${lead.name} (${cleanPhone})`,
+    }).catch(() => {});
+    const msg = encodeURIComponent(`Hello ${lead.name}, this is regarding your property inquiry at Apni Estate.`);
+    window.open(`https://wa.me/${cleanPhone}?text=${msg}`, '_blank');
+  };
+
+  const handleCompleteFollowup = async (fId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      setCompletingFollowupId(fId);
+      await crmApi.updateFollowup(fId, { status: 'COMPLETED', outcome: 'Followed up successfully' });
+      if (onRefresh) onRefresh();
+    } catch (err: any) {
+      alert(err.message || 'Failed to complete followup');
+    } finally {
+      setCompletingFollowupId(null);
+    }
+  };
+
+  const getFollowupBadge = (dueAt: string) => {
+    const d = new Date(dueAt);
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const todayEnd = todayStart + 86400000;
+    const time = d.getTime();
+
+    if (time < todayStart) {
+      return {
+        label: `Overdue (${d.toLocaleDateString([], { month: 'short', day: 'numeric' })})`,
+        bg: 'bg-red-50 text-red-700 border-red-200',
+      };
+    } else if (time < todayEnd) {
+      return {
+        label: `Today • ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+        bg: 'bg-amber-50 text-amber-800 border-amber-200',
+      };
+    } else {
+      const isTomorrow = time < todayEnd + 86400000;
+      return {
+        label: isTomorrow
+          ? `Tomorrow • ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+          : `${d.toLocaleDateString([], { month: 'short', day: 'numeric' })} • ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+        bg: 'bg-blue-50 text-blue-700 border-blue-200',
+      };
+    }
+  };
 
   const recentLeads = leads.slice(0, 5);
 
@@ -126,13 +210,16 @@ export default function CrmOverviewTab({
 
           <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-sm">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-500">Today's Follow-ups</span>
+              <span className="text-xs font-bold text-slate-500">Pending Follow-ups</span>
               <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
                 <Clock size={16} />
               </div>
             </div>
-            <p className="text-2xl font-black text-slate-900 mt-2">{todayFollowupCount}</p>
-            <p className="text-[11px] text-amber-600 font-semibold mt-0.5">Scheduled for today</p>
+            <p className="text-2xl font-black text-slate-900 mt-2">{pendingFollowups.length}</p>
+            <p className="text-[11px] text-slate-500 font-semibold mt-0.5">
+              <span className="text-amber-600 font-bold">{todayFollowups.length} today</span>
+              {overdueFollowups.length > 0 && <span className="text-red-600 font-bold ml-1.5">• {overdueFollowups.length} overdue</span>}
+            </p>
           </div>
 
           <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-sm">
@@ -173,27 +260,84 @@ export default function CrmOverviewTab({
 
         {/* Telecaller Personal Follow-ups & Recent Leads Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Today's Follow-up Agenda */}
+          {/* Overall Follow-up Agenda List */}
           <div className="p-5 rounded-3xl bg-white border border-slate-200/80 shadow-sm space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
               <div className="flex items-center gap-2">
                 <Clock size={18} className="text-[#2648E7]" />
-                <h3 className="text-sm font-bold text-slate-900">Today's Scheduled Follow-ups</h3>
+                <h3 className="text-sm font-bold text-slate-900">Follow-up Agenda</h3>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-blue-50 text-[#2648E7]">
+                  {pendingFollowups.length}
+                </span>
               </div>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => onNavigateTab('followups')}
+                  className="text-xs font-bold text-[#2648E7] hover:underline flex items-center gap-1"
+                >
+                  <span>All Details</span>
+                  <ArrowRight size={13} />
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Segmented Filter Tabs */}
+            <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl">
               <button
-                onClick={() => onNavigateTab('followups')}
-                className="text-xs font-bold text-[#2648E7] hover:underline flex items-center gap-1"
+                onClick={() => setFollowupFilter('ALL')}
+                className={`flex-1 py-1.5 text-[11px] font-bold rounded-lg transition-all ${
+                  followupFilter === 'ALL'
+                    ? 'bg-white text-slate-900 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-900'
+                }`}
               >
-                <span>View All</span>
-                <ArrowRight size={13} />
+                All ({pendingFollowups.length})
+              </button>
+              <button
+                onClick={() => setFollowupFilter('TODAY')}
+                className={`flex-1 py-1.5 text-[11px] font-bold rounded-lg transition-all ${
+                  followupFilter === 'TODAY'
+                    ? 'bg-white text-amber-800 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-900'
+                }`}
+              >
+                Today ({todayFollowups.length})
+              </button>
+              <button
+                onClick={() => setFollowupFilter('OVERDUE')}
+                className={`flex-1 py-1.5 text-[11px] font-bold rounded-lg transition-all ${
+                  followupFilter === 'OVERDUE'
+                    ? 'bg-white text-red-700 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-900'
+                }`}
+              >
+                Overdue ({overdueFollowups.length})
+              </button>
+              <button
+                onClick={() => setFollowupFilter('UPCOMING')}
+                className={`flex-1 py-1.5 text-[11px] font-bold rounded-lg transition-all ${
+                  followupFilter === 'UPCOMING'
+                    ? 'bg-white text-blue-700 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-900'
+                }`}
+              >
+                Upcoming ({upcomingFollowups.length})
               </button>
             </div>
 
-            {todayFollowups.length === 0 ? (
+            {displayedFollowups.length === 0 ? (
               <div className="p-8 text-center bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
                 <CheckCircle2 size={32} className="text-emerald-500 mx-auto mb-2 opacity-80" />
-                <p className="text-xs font-bold text-slate-700">All caught up for today!</p>
-                <p className="text-[11px] text-slate-400 mt-0.5">No pending follow-ups scheduled for right now</p>
+                <p className="text-xs font-bold text-slate-700">
+                  {followupFilter === 'ALL'
+                    ? 'All caught up! No pending follow-ups.'
+                    : followupFilter === 'TODAY'
+                    ? 'No follow-ups scheduled for today.'
+                    : followupFilter === 'OVERDUE'
+                    ? 'No overdue follow-ups! Great job.'
+                    : 'No upcoming follow-ups scheduled.'}
+                </p>
+                <p className="text-[11px] text-slate-400 mt-0.5">Stay proactive by scheduling upcoming calls and visits</p>
                 <button
                   onClick={onOpenAddFollowup}
                   className="mt-3 px-3.5 py-1.5 rounded-xl text-xs font-bold text-[#2648E7] bg-white border border-slate-200 shadow-sm hover:bg-slate-50"
@@ -202,41 +346,76 @@ export default function CrmOverviewTab({
                 </button>
               </div>
             ) : (
-              <div className="space-y-2.5">
-                {todayFollowups.map((f) => (
-                  <div
-                    key={f.id}
-                    onClick={() => f.lead && onSelectLead(f.lead.id)}
-                    className="p-3 rounded-2xl bg-slate-50 hover:bg-blue-50/50 border border-slate-100 hover:border-blue-200 transition-all cursor-pointer flex items-center justify-between"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div
-                        className="size-9 rounded-xl flex items-center justify-center font-bold text-white text-xs shrink-0 shadow-sm"
-                        style={{ backgroundColor: f.lead?.avatar_color || '#2648E7' }}
-                      >
-                        {f.lead?.initials || 'L'}
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold text-slate-900">{f.lead?.name || 'Lead'}</p>
-                        <p className="text-[11px] text-slate-500 truncate max-w-[200px]">{f.note || 'Scheduled call/visit'}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {f.lead?.phone && (
-                        <a
-                          href={`tel:${f.lead.phone}`}
-                          onClick={(e) => e.stopPropagation()}
-                          className="size-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:text-[#2648E7] hover:border-[#2648E7]"
+              <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1">
+                {displayedFollowups.map((f) => {
+                  const badge = getFollowupBadge(f.due_at);
+                  const isCompleting = completingFollowupId === f.id;
+
+                  return (
+                    <div
+                      key={f.id}
+                      onClick={() => f.lead && onSelectLead(f.lead.id)}
+                      className="p-3 rounded-2xl bg-slate-50 hover:bg-blue-50/50 border border-slate-100 hover:border-blue-200 transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-2.5"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div
+                          className="size-9 rounded-xl flex items-center justify-center font-bold text-white text-xs shrink-0 shadow-sm"
+                          style={{ backgroundColor: f.lead?.avatar_color || '#2648E7' }}
                         >
-                          <Phone size={13} />
-                        </a>
-                      )}
-                      <span className="text-[10px] font-bold text-slate-500 bg-white px-2 py-1 rounded-lg border border-slate-200">
-                        {new Date(f.due_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </span>
+                          {f.lead?.initials || 'L'}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="text-xs font-bold text-slate-900 truncate">{f.lead?.name || 'Lead'}</p>
+                            {f.lead?.status && (
+                              <span className="px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-slate-200/70 text-slate-700">
+                                {f.lead.status}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-slate-500 truncate max-w-[220px]">
+                            {f.note || 'Scheduled follow-up contact'}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto" onClick={(e) => e.stopPropagation()}>
+                        <span className={`text-[10px] font-bold px-2 py-1 rounded-lg border ${badge.bg}`}>
+                          {badge.label}
+                        </span>
+
+                        {f.lead?.phone && (
+                          <>
+                            <a
+                              href={`tel:${f.lead.phone}`}
+                              onClick={() => handleOverviewCall(f.lead)}
+                              className="size-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:text-[#2648E7] hover:border-[#2648E7] transition-colors"
+                              title={`Call ${f.lead.phone}`}
+                            >
+                              <Phone size={13} />
+                            </a>
+                            <button
+                              onClick={() => handleOverviewWhatsApp(f.lead)}
+                              className="size-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-emerald-600 hover:border-emerald-500 transition-colors"
+                              title={`WhatsApp ${f.lead.phone}`}
+                            >
+                              <MessageCircle size={13} />
+                            </button>
+                          </>
+                        )}
+
+                        <button
+                          onClick={(e) => handleCompleteFollowup(f.id, e)}
+                          disabled={isCompleting}
+                          className="size-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-emerald-600 hover:border-emerald-500 transition-colors"
+                          title="Mark Follow-up as Completed"
+                        >
+                          <Check size={13} className={isCompleting ? 'animate-spin' : ''} />
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

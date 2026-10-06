@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Search, Filter, Plus, UploadCloud, Phone, MessageCircle, Mail,
   MapPin, IndianRupee, Tag, Building2, MoreHorizontal, Edit3, Trash2,
   CheckCircle2, LayoutGrid, List, UserCheck, Clock, ArrowUpDown,
   Sparkles, CheckSquare, Square, UserPlus, ArrowRightLeft, UserX,
   ChevronDown, AlertCircle, X, ShieldCheck, Flame, Zap, Sprout, Star,
-  User as UserIcon, Users
+  User as UserIcon, Users, MoreVertical, ThumbsUp, ThumbsDown, PhoneOff, CalendarPlus
 } from 'lucide-react';
 import { type CrmLead, type CrmTeamMember, crmApi } from '@/api/crm';
 import { useProject } from '@/context/ProjectContext';
@@ -22,6 +22,7 @@ interface CrmLeadsTabProps {
   onOpenEditLead: (lead: CrmLead) => void;
   onDeleteLead: (leadId: string) => void;
   onRefreshLeads?: () => void;
+  onOpenAddFollowup?: (leadId: string) => void;
 }
 
 export default function CrmLeadsTab({
@@ -33,6 +34,7 @@ export default function CrmLeadsTab({
   onOpenEditLead,
   onDeleteLead,
   onRefreshLeads,
+  onOpenAddFollowup,
 }: CrmLeadsTabProps) {
   const { projects } = useProject();
   const { user } = useAuth();
@@ -62,6 +64,81 @@ export default function CrmLeadsTab({
   const [quickAssignLeadId, setQuickAssignLeadId] = useState<string | null>(null);
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
   const [actionSuccessMsg, setActionSuccessMsg] = useState('');
+
+  // Quick action menu state
+  const [quickActionLeadId, setQuickActionLeadId] = useState<string | null>(null);
+  const quickActionRef = useRef<HTMLDivElement>(null);
+
+  // Close quick action menu on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (quickActionRef.current && !quickActionRef.current.contains(e.target as Node)) {
+        setQuickActionLeadId(null);
+      }
+    };
+    if (quickActionLeadId) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [quickActionLeadId]);
+
+  // Quick Action Handlers
+  const handleQuickInterested = async (lead: CrmLead) => {
+    try {
+      await crmApi.updateLead(lead.id, {
+        status: 'QUALIFIED',
+        activity_title: `Marked as Interested (Qualified)`,
+        activity_type: 'NOTE',
+      });
+      setActionSuccessMsg(`${lead.name} marked as Interested (Qualified)`);
+      setQuickActionLeadId(null);
+      if (onRefreshLeads) onRefreshLeads();
+      setTimeout(() => setActionSuccessMsg(''), 3000);
+    } catch (err: any) {
+      alert(err.message || 'Failed to update lead');
+    }
+  };
+
+  const handleQuickNotInterested = async (lead: CrmLead) => {
+    try {
+      await crmApi.updateLead(lead.id, {
+        status: 'LOST',
+        activity_title: `Marked as Not Interested (Lost)`,
+        activity_type: 'NOTE',
+      });
+      setActionSuccessMsg(`${lead.name} marked as Not Interested (Lost)`);
+      setQuickActionLeadId(null);
+      if (onRefreshLeads) onRefreshLeads();
+      setTimeout(() => setActionSuccessMsg(''), 3000);
+    } catch (err: any) {
+      alert(err.message || 'Failed to update lead');
+    }
+  };
+
+  const handleQuickCallNotReceived = async (lead: CrmLead) => {
+    try {
+      await crmApi.updateLead(lead.id, {
+        status: 'CONTACTED',
+        last_contacted_at: new Date().toISOString(),
+        activity_title: `Call Not Received — Attempted call to ${lead.phone || 'lead'}`,
+        activity_type: 'CALL',
+      } as any);
+      setActionSuccessMsg(`${lead.name} — Call Not Received recorded`);
+      setQuickActionLeadId(null);
+      if (onRefreshLeads) onRefreshLeads();
+      setTimeout(() => setActionSuccessMsg(''), 3000);
+    } catch (err: any) {
+      alert(err.message || 'Failed to update lead');
+    }
+  };
+
+  const handleOutboundCallClick = (lead: CrmLead) => {
+    crmApi.createActivity({
+      lead_id: lead.id,
+      type: 'CALL',
+      title: `Outbound phone call dialed to ${lead.name} (${lead.phone || 'No phone'})`,
+    }).catch(() => {});
+  };
 
   // Fetch active team members
   const fetchTeamMembers = async () => {
@@ -263,11 +340,18 @@ export default function CrmLeadsTab({
     }
   };
 
-  const openWhatsApp = (phone: string, name: string) => {
+  const openWhatsApp = (phone: string, name: string, leadId?: string) => {
     const cleanPhone = phone.replace(/[^\d]/g, '');
     const message = encodeURIComponent(
       `Hello ${name}, thank you for your interest with Apni Estate. How can I assist you today?`
     );
+    if (leadId) {
+      crmApi.createActivity({
+        lead_id: leadId,
+        type: 'NOTE',
+        title: `WhatsApp conversation initiated with ${name} (${cleanPhone})`,
+      }).catch(() => {});
+    }
     window.open(`https://wa.me/${cleanPhone}?text=${message}`, '_blank');
   };
 
@@ -747,13 +831,14 @@ export default function CrmLeadsTab({
                             <>
                               <a
                                 href={`tel:${lead.phone}`}
+                                onClick={() => handleOutboundCallClick(lead)}
                                 className="p-1.5 rounded-xl bg-blue-50 text-[#2648E7] hover:bg-blue-100 transition-colors"
                                 title={`Call ${lead.phone}`}
                               >
                                 <Phone size={14} />
                               </a>
                               <button
-                                onClick={() => openWhatsApp(lead.phone!, lead.name)}
+                                onClick={() => openWhatsApp(lead.phone!, lead.name, lead.id)}
                                 className="p-1.5 rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors"
                                 title={`WhatsApp ${lead.phone}`}
                               >
@@ -862,15 +947,15 @@ export default function CrmLeadsTab({
                         )}
                       </td>
 
-                      {/* Actions */}
+                      {/* Actions — 3-dot Quick Action Menu */}
                       <td className="p-4 text-right" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-end gap-1.5">
+                        <div className="relative flex items-center justify-end gap-1.5">
                           <button
-                            onClick={() => onOpenEditLead(lead)}
+                            onClick={() => setQuickActionLeadId(quickActionLeadId === lead.id ? null : lead.id)}
                             className="p-1.5 rounded-xl text-slate-500 hover:text-[#2648E7] hover:bg-slate-100 transition-colors"
-                            title="Edit Lead"
+                            title="Quick Actions"
                           >
-                            <Edit3 size={15} />
+                            <MoreVertical size={16} />
                           </button>
                           {isManagerOrBuilder && (
                             <button
@@ -880,6 +965,62 @@ export default function CrmLeadsTab({
                             >
                               <Trash2 size={15} />
                             </button>
+                          )}
+
+                          {/* Quick Action Dropdown */}
+                          {quickActionLeadId === lead.id && (
+                            <div
+                              ref={quickActionRef}
+                              className="absolute right-0 top-full mt-1 z-50 w-52 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in slide-in-from-top-1 duration-150"
+                            >
+                              <div className="py-1">
+                                <button
+                                  onClick={() => handleQuickInterested(lead)}
+                                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-emerald-700 hover:bg-emerald-50 transition-colors text-left"
+                                >
+                                  <ThumbsUp size={14} className="text-emerald-600" />
+                                  <span>Interested</span>
+                                </button>
+                                <button
+                                  onClick={() => handleQuickNotInterested(lead)}
+                                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-red-700 hover:bg-red-50 transition-colors text-left"
+                                >
+                                  <ThumbsDown size={14} className="text-red-600" />
+                                  <span>Not Interested</span>
+                                </button>
+                                <div className="border-t border-slate-100 my-0.5" />
+                                {lead.phone && (
+                                  <button
+                                    onClick={() => {
+                                      openWhatsApp(lead.phone!, lead.name, lead.id);
+                                      setQuickActionLeadId(null);
+                                    }}
+                                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-emerald-700 hover:bg-emerald-50 transition-colors text-left"
+                                  >
+                                    <MessageCircle size={14} className="text-emerald-600" />
+                                    <span>WhatsApp</span>
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => {
+                                    if (onOpenAddFollowup) onOpenAddFollowup(lead.id);
+                                    setQuickActionLeadId(null);
+                                  }}
+                                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-[#2648E7] hover:bg-blue-50 transition-colors text-left"
+                                >
+                                  <CalendarPlus size={14} className="text-[#2648E7]" />
+                                  <span>Follow Up</span>
+                                </button>
+                                <div className="border-t border-slate-100 my-0.5" />
+                                <button
+                                  onClick={() => handleQuickCallNotReceived(lead)}
+                                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-amber-700 hover:bg-amber-50 transition-colors text-left"
+                                >
+                                  <PhoneOff size={14} className="text-amber-600" />
+                                  <span>Call Not Received</span>
+                                </button>
+                              </div>
+                            </div>
                           )}
                         </div>
                       </td>
@@ -976,12 +1117,13 @@ export default function CrmLeadsTab({
                       <>
                         <a
                           href={`tel:${lead.phone}`}
+                          onClick={() => handleOutboundCallClick(lead)}
                           className="p-1.5 rounded-xl bg-blue-50 text-[#2648E7] hover:bg-blue-100 transition-colors"
                         >
                           <Phone size={13} />
                         </a>
                         <button
-                          onClick={() => openWhatsApp(lead.phone!, lead.name)}
+                          onClick={() => openWhatsApp(lead.phone!, lead.name, lead.id)}
                           className="p-1.5 rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors"
                         >
                           <MessageCircle size={13} />
@@ -990,9 +1132,70 @@ export default function CrmLeadsTab({
                     )}
                   </div>
 
-                  <span className="text-xs font-bold text-[#2648E7] hover:underline flex items-center gap-0.5">
-                    Manage →
-                  </span>
+                  <div className="relative" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      onClick={() => setQuickActionLeadId(quickActionLeadId === lead.id ? null : lead.id)}
+                      className="p-1.5 rounded-xl text-slate-500 hover:text-[#2648E7] hover:bg-slate-100 transition-colors"
+                      title="Quick Actions"
+                    >
+                      <MoreVertical size={16} />
+                    </button>
+
+                    {quickActionLeadId === lead.id && (
+                      <div
+                        ref={quickActionRef}
+                        className="absolute right-0 bottom-full mb-1 z-50 w-52 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in slide-in-from-bottom-1 duration-150"
+                      >
+                        <div className="py-1">
+                          <button
+                            onClick={() => handleQuickInterested(lead)}
+                            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-emerald-700 hover:bg-emerald-50 transition-colors text-left"
+                          >
+                            <ThumbsUp size={14} className="text-emerald-600" />
+                            <span>Interested</span>
+                          </button>
+                          <button
+                            onClick={() => handleQuickNotInterested(lead)}
+                            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-red-700 hover:bg-red-50 transition-colors text-left"
+                          >
+                            <ThumbsDown size={14} className="text-red-600" />
+                            <span>Not Interested</span>
+                          </button>
+                          <div className="border-t border-slate-100 my-0.5" />
+                          {lead.phone && (
+                            <button
+                              onClick={() => {
+                                openWhatsApp(lead.phone!, lead.name, lead.id);
+                                setQuickActionLeadId(null);
+                              }}
+                              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-emerald-700 hover:bg-emerald-50 transition-colors text-left"
+                            >
+                              <MessageCircle size={14} className="text-emerald-600" />
+                              <span>WhatsApp</span>
+                            </button>
+                          )}
+                          <button
+                            onClick={() => {
+                              if (onOpenAddFollowup) onOpenAddFollowup(lead.id);
+                              setQuickActionLeadId(null);
+                            }}
+                            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-[#2648E7] hover:bg-blue-50 transition-colors text-left"
+                          >
+                            <CalendarPlus size={14} className="text-[#2648E7]" />
+                            <span>Follow Up</span>
+                          </button>
+                          <div className="border-t border-slate-100 my-0.5" />
+                          <button
+                            onClick={() => handleQuickCallNotReceived(lead)}
+                            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-amber-700 hover:bg-amber-50 transition-colors text-left"
+                          >
+                            <PhoneOff size={14} className="text-amber-600" />
+                            <span>Call Not Received</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             );

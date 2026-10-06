@@ -144,6 +144,15 @@ export default function CrmWorkspace() {
     fetchCrmData();
   }, []);
 
+  // Periodic session heartbeat ping for CRM time tracking
+  useEffect(() => {
+    crmApi.sendActivityPing().catch(() => {});
+    const interval = setInterval(() => {
+      crmApi.sendActivityPing().catch(() => {});
+    }, 2 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   const handleTabChange = (tabId: string) => {
     setSearchParams({ tab: tabId }, { replace: true });
   };
@@ -294,6 +303,7 @@ export default function CrmWorkspace() {
           onOpenAddProperty={() => setIsAddPropertyOpen(true)}
           onSelectLead={handleOpenLeadDetail}
           onNavigateTab={handleTabChange}
+          onRefresh={() => fetchCrmData(true)}
         />
       )}
 
@@ -307,6 +317,7 @@ export default function CrmWorkspace() {
           onOpenEditLead={handleOpenEditLead}
           onDeleteLead={handleDeleteLead}
           onRefreshLeads={() => fetchCrmData(true)}
+          onOpenAddFollowup={handleOpenAddFollowup}
         />
       )}
 

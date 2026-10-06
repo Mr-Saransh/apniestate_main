@@ -191,6 +191,65 @@ export interface CrmAnalytics {
   recentActivityLogs?: any[];
 }
 
+export interface CrmMemberSession {
+  id: string;
+  login_at: string;
+  logout_at: string | null;
+  duration_minutes: number;
+  is_current: boolean;
+}
+
+export interface CrmMemberActivityItem {
+  id: string;
+  type: string;
+  title: string;
+  description?: string | null;
+  created_at: string;
+  lead?: {
+    id: string;
+    name: string;
+    phone?: string | null;
+    status: string;
+    initials: string;
+    avatar_color: string;
+  } | null;
+}
+
+export interface CrmMemberActivityResponse {
+  member: {
+    id: string;
+    name: string;
+    email: string | null;
+    phone: string | null;
+    role: string;
+    crm_roles: string[];
+    status: string;
+    last_active_at: string | null;
+    created_at: string;
+  };
+  timeTracking: {
+    totalActiveMinutes: number;
+    totalActiveHours: string;
+    lastLoginAt: string | null;
+    lastLogoutAt: string | null;
+    isCurrentlyOnline: boolean;
+    sessions: CrmMemberSession[];
+  };
+  actionSummary: {
+    totalActions: number;
+    callAttempts: number;
+    whatsappMessages: number;
+    statusChanges: number;
+    notesAdded: number;
+    siteVisits: number;
+    assignedLeads: number;
+    pipelineBreakdown: Record<string, number>;
+    followupsCount: number;
+    completedFollowups: number;
+  };
+  activities: CrmMemberActivityItem[];
+}
+
 // ─── API Client ──────────────────────────────────────────────
 
 export const crmApi = {
@@ -260,6 +319,10 @@ export const crmApi = {
 
   // Team Management
   getTeam: () => apiClient.get<CrmTeamResponse>('/crm/team'),
+  getMemberActivity: (userId: string) =>
+    apiClient.get<CrmMemberActivityResponse>(`/crm/team/${userId}/activity`),
+  sendActivityPing: () =>
+    apiClient.post<{ timestamp: string }>('/crm/team/activity-ping'),
   createTeamMember: (data: { name: string; email: string; password: string; role: string; phone?: string }) =>
     apiClient.post<any>('/crm/team', data),
   inviteTeamMember: (data: { name?: string; email: string; password?: string; role: string; phone?: string }) =>

@@ -107,8 +107,19 @@ export const PUT = withCrmAuth(async (req, user, context) => {
       },
     });
 
-    // Auto-create followup activity on status change
-    if (body.status && body.status !== existing.status) {
+    // Auto-create activity on lead update or status change
+    if (body.activity_title) {
+      await prisma.crmActivity.create({
+        data: {
+          company_id: user.company_id,
+          lead_id: id,
+          created_by: user.sub,
+          type: (body.activity_type as any) || "NOTE",
+          title: body.activity_title,
+          description: body.activity_description || null,
+        },
+      });
+    } else if (body.status && body.status !== existing.status) {
       await prisma.crmActivity.create({
         data: {
           company_id: user.company_id,

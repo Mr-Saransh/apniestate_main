@@ -95,6 +95,29 @@ export async function loginUser(input: LoginInput) {
 
   const effectiveSubscriptionStatus = await getEffectiveSubscriptionStatus(user);
 
+  // Track login session activity
+  await prisma.activityLog.create({
+    data: {
+      user_id: user.id,
+      company_id: user.company_id || null,
+      entity_type: "CRM_SESSION",
+      entity_id: user.id,
+      action: "LOGIN",
+      metadata: {
+        login_at: new Date().toISOString(),
+        user_name: user.name,
+        role: activeCrmRole || user.role,
+      },
+    },
+  }).catch(() => {});
+
+  if (user.company_id) {
+    await prisma.companyMembership.updateMany({
+      where: { user_id: user.id, company_id: user.company_id },
+      data: { last_active_at: new Date() },
+    }).catch(() => {});
+  }
+
   return {
     accessToken,
     refreshToken,
@@ -185,6 +208,20 @@ export async function logoutUser(userId: string, tokenId?: string) {
   } else {
     await prisma.refreshToken.updateMany({ where: { user_id: userId }, data: { revoked: true } });
   }
+
+  const u = await prisma.user.findUnique({ where: { id: userId }, select: { company_id: true } });
+  await prisma.activityLog.create({
+    data: {
+      user_id: userId,
+      company_id: u?.company_id || null,
+      entity_type: "CRM_SESSION",
+      entity_id: userId,
+      action: "LOGOUT",
+      metadata: {
+        logout_at: new Date().toISOString(),
+      },
+    },
+  }).catch(() => {});
 }
 
 export async function refreshUserTokens(token: string) {
