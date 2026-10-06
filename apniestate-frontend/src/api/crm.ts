@@ -265,7 +265,10 @@ export const crmApi = {
   },
   getLead: (id: string) => apiClient.get<CrmLead>(`/crm/leads/${id}`),
   createLead: (data: Partial<CrmLead>) => apiClient.post<CrmLead>('/crm/leads', data),
-  updateLead: (id: string, data: Partial<CrmLead>) => apiClient.put<CrmLead>(`/crm/leads/${id}`, data),
+  updateLead: (
+    id: string,
+    data: Partial<CrmLead> & { activity_title?: string; activity_type?: string }
+  ) => apiClient.put<CrmLead>(`/crm/leads/${id}`, data),
   deleteLead: (id: string) => apiClient.delete(`/crm/leads/${id}`),
   importLeads: (leads: any[]) => apiClient.post('/crm/leads/import', { leads }),
 
