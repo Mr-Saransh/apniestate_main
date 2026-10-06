@@ -53,7 +53,13 @@ export default function CrmLeadsTab({
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [priorityFilter, setPriorityFilter] = useState('ALL');
   const [projectFilter, setProjectFilter] = useState('ALL');
-  const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
+  const [viewMode, setViewMode] = useState<'table' | 'grid'>(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      return 'grid';
+    }
+    return 'table';
+  });
+  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
 
   // Selection state
   const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
@@ -163,6 +169,17 @@ export default function CrmLeadsTab({
     (l) => l.assigned_to === user?.id || (user as any)?.sub === l.assigned_to
   ).length;
   const unassignedCount = leads.filter((l) => !l.assigned_to).length;
+
+  const activeFilterCount =
+    (statusFilter !== 'ALL' ? 1 : 0) +
+    (priorityFilter !== 'ALL' ? 1 : 0) +
+    (projectFilter !== 'ALL' ? 1 : 0);
+
+  const handleResetAllFilters = () => {
+    setStatusFilter('ALL');
+    setPriorityFilter('ALL');
+    setProjectFilter('ALL');
+  };
 
   // Filtering
   const filteredLeads = leads.filter((lead) => {
@@ -491,18 +508,18 @@ export default function CrmLeadsTab({
         </div>
       )}
 
-      {/* ─── 3. SEARCH & STREAMLINED FILTER BAR ───────────────────── */}
-      <div className="bg-white p-4 rounded-3xl border border-slate-200/80 shadow-sm space-y-3">
-        <div className="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center">
-          {/* Full-width clean Search */}
+      {/* ─── 3. SIMPLIFIED SEARCH & AMAZON/FLIPKART STYLE FILTER BAR ───────────────────── */}
+      <div className="bg-white p-3 sm:p-4 rounded-3xl border border-slate-200/80 shadow-sm space-y-2.5">
+        <div className="flex items-center gap-2">
+          {/* Simple Clean Search Input */}
           <div className="relative flex-1">
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search leads by name, phone, city, tag..."
-              className="w-full pl-9 pr-8 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#2648E7]/20 focus:border-[#2648E7] transition-all"
+              placeholder="Search leads..."
+              className="w-full pl-9 pr-8 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#2648E7]/20 focus:border-[#2648E7] transition-all font-medium"
             />
             {search && (
               <button
@@ -515,84 +532,87 @@ export default function CrmLeadsTab({
             )}
           </div>
 
-          {/* Secondary Dropdown Controls (Clean Grid) */}
-          <div className="grid grid-cols-3 gap-2 shrink-0">
-            <select
-              value={priorityFilter}
-              onChange={(e) => setPriorityFilter(e.target.value)}
-              className="px-2.5 py-2 text-xs font-bold bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:border-[#2648E7] truncate"
-            >
-              <option value="ALL">All Priorities</option>
-              <option value="HIGH">🔥 Hot</option>
-              <option value="MEDIUM">⚡ Warm</option>
-              <option value="LOW">🌱 Cold</option>
-            </select>
+          {/* Amazon / Flipkart Style Filter Button beside search */}
+          <button
+            type="button"
+            onClick={() => setIsFilterModalOpen(true)}
+            className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all border shrink-0 active:scale-95 ${
+              activeFilterCount > 0
+                ? 'bg-blue-50 text-[#2648E7] border-blue-200 shadow-sm'
+                : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200 shadow-sm'
+            }`}
+          >
+            <Filter size={15} className={activeFilterCount > 0 ? 'text-[#2648E7]' : 'text-slate-500'} />
+            <span>Filters</span>
+            {activeFilterCount > 0 && (
+              <span className="size-4.5 px-1 rounded-full bg-[#2648E7] text-white text-[10px] font-black flex items-center justify-center shrink-0">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
 
-            <select
-              value={projectFilter}
-              onChange={(e) => setProjectFilter(e.target.value)}
-              className="px-2.5 py-2 text-xs font-bold bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:border-[#2648E7] truncate"
+          {/* Layout Switcher (List / Grid) */}
+          <div className="flex items-center bg-slate-100 p-1 rounded-2xl shrink-0">
+            <button
+              type="button"
+              onClick={() => setViewMode('table')}
+              className={`p-1.5 sm:px-2 rounded-xl transition-all flex items-center justify-center ${
+                viewMode === 'table' ? 'bg-white text-[#2648E7] shadow-sm' : 'text-slate-500 hover:text-slate-700'
+              }`}
+              title="Table View"
             >
-              <option value="ALL">All Projects</option>
-              {projects.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-
-            {/* Layout Switcher */}
-            <div className="flex items-center bg-slate-100 p-1 rounded-2xl justify-center">
-              <button
-                type="button"
-                onClick={() => setViewMode('table')}
-                className={`flex-1 py-1 rounded-xl transition-all flex items-center justify-center ${
-                  viewMode === 'table' ? 'bg-white text-[#2648E7] shadow-sm' : 'text-slate-500'
-                }`}
-                title="Table View"
-              >
-                <List size={15} />
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode('grid')}
-                className={`flex-1 py-1 rounded-xl transition-all flex items-center justify-center ${
-                  viewMode === 'grid' ? 'bg-white text-[#2648E7] shadow-sm' : 'text-slate-500'
-                }`}
-                title="Grid Cards View"
-              >
-                <LayoutGrid size={15} />
-              </button>
-            </div>
+              <List size={15} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('grid')}
+              className={`p-1.5 sm:px-2 rounded-xl transition-all flex items-center justify-center ${
+                viewMode === 'grid' ? 'bg-white text-[#2648E7] shadow-sm' : 'text-slate-500 hover:text-slate-700'
+              }`}
+              title="Grid Cards View"
+            >
+              <LayoutGrid size={15} />
+            </button>
           </div>
         </div>
 
-        {/* Status Funnel Horizontal Scroll Pills */}
-        <div className="flex gap-1.5 overflow-x-auto pb-1 hide-scrollbar">
-          {STATUS_PILLS.map((p) => {
-            const count = p.id === 'ALL' ? leads.length : leads.filter((l) => l.status === p.id).length;
-            const active = statusFilter === p.id;
-            return (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => setStatusFilter(p.id)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 ${
-                  active ? 'bg-[#2648E7] text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200/80'
-                }`}
-              >
-                <span>{p.label}</span>
-                <span
-                  className={`text-[10px] px-1.5 py-0.2 rounded-full ${
-                    active ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
-                  }`}
-                >
-                  {count}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+        {/* Active Filter Removable Tags (only when filters are active) */}
+        {activeFilterCount > 0 && (
+          <div className="flex items-center gap-1.5 flex-wrap pt-0.5 text-xs animate-in fade-in duration-150">
+            <span className="text-[11px] text-slate-400 font-semibold">Active:</span>
+            {statusFilter !== 'ALL' && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-blue-50 text-[#2648E7] text-[11px] font-bold border border-blue-200/80">
+                <span>Status: {statusFilter}</span>
+                <button type="button" onClick={() => setStatusFilter('ALL')} className="hover:opacity-75">
+                  <X size={12} />
+                </button>
+              </span>
+            )}
+            {priorityFilter !== 'ALL' && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-amber-50 text-amber-800 text-[11px] font-bold border border-amber-200/80">
+                <span>Priority: {priorityFilter}</span>
+                <button type="button" onClick={() => setPriorityFilter('ALL')} className="hover:opacity-75">
+                  <X size={12} />
+                </button>
+              </span>
+            )}
+            {projectFilter !== 'ALL' && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-purple-50 text-purple-700 text-[11px] font-bold border border-purple-200/80">
+                <span>Project: {projects.find((p) => p.id === projectFilter)?.name || 'Selected'}</span>
+                <button type="button" onClick={() => setProjectFilter('ALL')} className="hover:opacity-75">
+                  <X size={12} />
+                </button>
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={handleResetAllFilters}
+              className="text-[11px] font-bold text-red-600 hover:underline ml-1"
+            >
+              Clear all
+            </button>
+          </div>
+        )}
 
         {/* Selection Helper Checkbox */}
         {isManagerOrBuilder && filteredLeads.length > 0 && (
@@ -1217,6 +1237,190 @@ export default function CrmLeadsTab({
         allLeads={filteredLeads}
         unassignedCount={unassignedCount}
       />
+
+      {/* ─── AMAZON / FLIPKART STYLE FILTER MODAL / BOTTOM SHEET ─── */}
+      {isFilterModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full sm:max-w-lg bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[85vh] animate-in slide-in-from-bottom sm:zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 shrink-0">
+              <div className="flex items-center gap-2">
+                <Filter size={18} className="text-[#2648E7]" />
+                <h3 className="text-base font-black text-slate-900">Filter Leads</h3>
+                {activeFilterCount > 0 && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-[#2648E7] text-white">
+                    {activeFilterCount} Active
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                {activeFilterCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleResetAllFilters}
+                    className="text-xs font-bold text-red-600 hover:underline px-2 py-1"
+                  >
+                    Reset All
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setIsFilterModalOpen(false)}
+                  className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            {/* Filter Options Body */}
+            <div className="p-5 overflow-y-auto space-y-5 text-xs">
+              {/* 1. Lead Stage & Status */}
+              <div>
+                <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-400 mb-2.5">
+                  Lead Stage & Status
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {STATUS_PILLS.map((p) => {
+                    const count = p.id === 'ALL' ? leads.length : leads.filter((l) => l.status === p.id).length;
+                    const isSelected = statusFilter === p.id;
+
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => setStatusFilter(p.id)}
+                        className={`p-2.5 rounded-2xl text-xs font-bold transition-all flex items-center justify-between border ${
+                          isSelected
+                            ? 'bg-[#2648E7] text-white border-[#2648E7] shadow-md shadow-[#2648E7]/25 font-black'
+                            : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200/80'
+                        }`}
+                      >
+                        <span className="truncate">{p.label}</span>
+                        <span
+                          className={`text-[10px] px-1.5 py-0.2 rounded-full ml-1 ${
+                            isSelected ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+                          }`}
+                        >
+                          {count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 2. Priority Flag */}
+              <div>
+                <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-400 mb-2.5">
+                  Priority Flag
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {[
+                    { id: 'ALL', label: 'All Priorities', icon: null },
+                    { id: 'HIGH', label: 'Hot', icon: '🔥' },
+                    { id: 'MEDIUM', label: 'Warm', icon: '⚡' },
+                    { id: 'LOW', label: 'Cold', icon: '🌱' },
+                  ].map((p) => {
+                    const isSelected = priorityFilter === p.id;
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => setPriorityFilter(p.id)}
+                        className={`p-2.5 rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 border ${
+                          isSelected
+                            ? 'bg-[#2648E7] text-white border-[#2648E7] shadow-md shadow-[#2648E7]/25 font-black'
+                            : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200/80'
+                        }`}
+                      >
+                        {p.icon && <span>{p.icon}</span>}
+                        <span>{p.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 3. Project Filter */}
+              <div>
+                <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-400 mb-2.5">
+                  Property Project
+                </label>
+                <select
+                  value={projectFilter}
+                  onChange={(e) => setProjectFilter(e.target.value)}
+                  className="w-full px-3.5 py-2.5 text-xs font-bold bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#2648E7]/20 focus:border-[#2648E7]"
+                >
+                  <option value="ALL">All Projects ({projects.length})</option>
+                  {projects.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 4. Workspace Scope (Manager / Builder) */}
+              {isManagerOrBuilder && (
+                <div>
+                  <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-400 mb-2.5">
+                    Workspace Scope
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { id: 'ALL', label: 'All Team Leads', count: leads.length },
+                      { id: 'MINE', label: 'My Leads', count: myLeadsCount },
+                      { id: 'UNASSIGNED', label: 'Unassigned', count: unassignedCount },
+                    ].map((w) => {
+                      const isSelected = workspaceFilter === w.id;
+                      return (
+                        <button
+                          key={w.id}
+                          type="button"
+                          onClick={() => setWorkspaceFilter(w.id as any)}
+                          className={`p-2.5 rounded-2xl text-xs font-bold transition-all flex flex-col items-center justify-center border text-center ${
+                            isSelected
+                              ? 'bg-[#2648E7] text-white border-[#2648E7] shadow-md shadow-[#2648E7]/25 font-black'
+                              : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200/80'
+                          }`}
+                        >
+                          <span>{w.label}</span>
+                          <span
+                            className={`text-[10px] mt-0.5 px-1.5 py-0.2 rounded-full ${
+                              isSelected ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+                            }`}
+                          >
+                            {w.count}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-slate-100 flex items-center justify-between gap-3 bg-slate-50/50 shrink-0">
+              <button
+                type="button"
+                onClick={handleResetAllFilters}
+                className="px-4 py-2.5 rounded-2xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors"
+              >
+                Reset All
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsFilterModalOpen(false)}
+                className="flex-1 px-5 py-2.5 rounded-2xl text-xs font-black text-white bg-[#2648E7] hover:bg-[#1f3bbd] shadow-md shadow-[#2648E7]/25 transition-all text-center"
+              >
+                Show {filteredLeads.length} Leads
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -197,121 +197,213 @@ export default function CrmCustomersTab({
             <p className="text-xs text-slate-400 mt-0.5">Click "Record Deal" to register your first booked client.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200/80">
-                <tr>
-                  <th className="p-4">Customer Name</th>
-                  <th className="p-4">Property / Unit</th>
-                  <th className="p-4">Total Value</th>
-                  <th className="p-4 text-emerald-700">Customer Paid</th>
-                  <th className="p-4 text-red-700">Customer Due</th>
-                  <th className="p-4">Channel Partner</th>
-                  <th className="p-4">Payment Mode</th>
-                  <th className="p-4">Deal Date</th>
-                  <th className="p-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {deals.map((d) => {
-                  const dealVal = d.deal_value || 0;
-                  const received = d.amount_received || 0;
-                  const due = d.due_amount !== undefined ? d.due_amount : Math.max(0, dealVal - received);
-                  const isFullyPaid = due <= 0;
+          <>
+            {/* Mobile Cards View (Visible on < 768px) */}
+            <div className="md:hidden divide-y divide-slate-100">
+              {deals.map((d) => {
+                const dealVal = d.deal_value || 0;
+                const received = d.amount_received || 0;
+                const due = d.due_amount !== undefined ? d.due_amount : Math.max(0, dealVal - received);
+                const isFullyPaid = due <= 0;
+                const paidPct = dealVal > 0 ? Math.min(100, Math.round((received / dealVal) * 100)) : 0;
 
-                  return (
-                    <tr key={d.id} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="p-4 font-bold text-slate-900">
+                return (
+                  <div key={d.id} className="p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
                         <span
                           onClick={() => onSelectLead(d.lead_id)}
-                          className="hover:text-[#2648E7] cursor-pointer hover:underline"
+                          className="font-bold text-sm text-slate-900 hover:text-[#2648E7] cursor-pointer hover:underline"
                         >
                           {d.customer_name}
                         </span>
-                      </td>
+                        {d.property_name && (
+                          <p className="text-xs text-slate-500 font-medium flex items-center gap-1 mt-0.5">
+                            <Building2 size={12} className="text-slate-400" />
+                            {d.property_name}
+                          </p>
+                        )}
+                      </div>
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                          isFullyPaid
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : received > 0
+                            ? 'bg-amber-100 text-amber-800'
+                            : 'bg-red-100 text-red-800'
+                        }`}
+                      >
+                        {isFullyPaid ? 'Settled' : received > 0 ? 'Partial Due' : 'Unpaid'}
+                      </span>
+                    </div>
 
-                      <td className="p-4 text-slate-700 font-semibold">{d.property_name || '—'}</td>
+                    {/* Progress Bar & Amount Summary */}
+                    <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100 space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-slate-500 font-medium">Total Deal:</span>
+                        <span className="font-extrabold text-slate-900">₹{dealVal.toLocaleString('en-IN')}</span>
+                      </div>
+                      <div className="w-full h-1.5 rounded-full bg-slate-200 overflow-hidden">
+                        <div
+                          className="h-full bg-emerald-500 rounded-full transition-all"
+                          style={{ width: `${paidPct}%` }}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between text-[11px] font-bold">
+                        <span className="text-emerald-700">Paid: ₹{received.toLocaleString('en-IN')} ({paidPct}%)</span>
+                        <span className="text-red-600">Due: ₹{due.toLocaleString('en-IN')}</span>
+                      </div>
+                    </div>
 
-                      <td className="p-4 font-extrabold text-slate-900">
-                        ₹{dealVal.toLocaleString('en-IN')}
-                      </td>
+                    {/* Deal Meta & Action Buttons */}
+                    <div className="flex items-center justify-between text-xs pt-1">
+                      <span className="text-slate-400 text-[11px]">
+                        {new Date(d.deal_date).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
+                        {d.payment_mode && ` • ${d.payment_mode}`}
+                      </span>
 
-                      <td className="p-4 font-bold text-emerald-700">
-                        ₹{received.toLocaleString('en-IN')}
-                      </td>
-
-                      <td className="p-4">
-                        <div className="flex items-center gap-1.5">
-                          <span className={`font-bold ${isFullyPaid ? 'text-slate-400' : 'text-red-700'}`}>
-                            ₹{due.toLocaleString('en-IN')}
-                          </span>
-                          <span
-                            className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                              isFullyPaid
-                                ? 'bg-emerald-100 text-emerald-700'
-                                : received > 0
-                                ? 'bg-amber-100 text-amber-700'
-                                : 'bg-red-100 text-red-700'
-                            }`}
+                      <div className="flex items-center gap-2">
+                        {!isFullyPaid && (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenPay(d)}
+                            className="px-3 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-sm transition-all active:scale-95"
                           >
-                            {isFullyPaid ? 'Settled' : received > 0 ? 'Partial Due' : 'Unpaid'}
-                          </span>
-                        </div>
-                      </td>
+                            + Record Pay
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteDeal(d.id)}
+                          className="p-1.5 text-slate-400 hover:text-red-600 rounded-xl hover:bg-red-50 transition-colors"
+                          title="Delete Deal"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
 
-                      <td className="p-4 text-slate-700">
-                        {d.channel_partner ? (
-                          <div className="space-y-0.5">
-                            <span className="font-bold text-amber-900 block">{d.channel_partner.name}</span>
-                            <span className="font-mono text-[10px] text-amber-700 px-1.5 py-0.2 rounded bg-amber-50 border border-amber-200">
-                              {d.channel_partner.referral_code}
+            {/* Desktop Table View (Visible on >= 768px) */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200/80">
+                  <tr>
+                    <th className="p-4">Customer Name</th>
+                    <th className="p-4">Property / Unit</th>
+                    <th className="p-4">Total Value</th>
+                    <th className="p-4 text-emerald-700">Customer Paid</th>
+                    <th className="p-4 text-red-700">Customer Due</th>
+                    <th className="p-4">Channel Partner</th>
+                    <th className="p-4">Payment Mode</th>
+                    <th className="p-4">Deal Date</th>
+                    <th className="p-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {deals.map((d) => {
+                    const dealVal = d.deal_value || 0;
+                    const received = d.amount_received || 0;
+                    const due = d.due_amount !== undefined ? d.due_amount : Math.max(0, dealVal - received);
+                    const isFullyPaid = due <= 0;
+
+                    return (
+                      <tr key={d.id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="p-4 font-bold text-slate-900">
+                          <span
+                            onClick={() => onSelectLead(d.lead_id)}
+                            className="hover:text-[#2648E7] cursor-pointer hover:underline"
+                          >
+                            {d.customer_name}
+                          </span>
+                        </td>
+
+                        <td className="p-4 text-slate-700 font-semibold">{d.property_name || '—'}</td>
+
+                        <td className="p-4 font-extrabold text-slate-900">
+                          ₹{dealVal.toLocaleString('en-IN')}
+                        </td>
+
+                        <td className="p-4 font-bold text-emerald-700">
+                          ₹{received.toLocaleString('en-IN')}
+                        </td>
+
+                        <td className="p-4">
+                          <div className="flex items-center gap-1.5">
+                            <span className={`font-bold ${isFullyPaid ? 'text-slate-400' : 'text-red-700'}`}>
+                              ₹{due.toLocaleString('en-IN')}
+                            </span>
+                            <span
+                              className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                isFullyPaid
+                                  ? 'bg-emerald-100 text-emerald-700'
+                                  : received > 0
+                                  ? 'bg-amber-100 text-amber-700'
+                                  : 'bg-red-100 text-red-700'
+                              }`}
+                            >
+                              {isFullyPaid ? 'Settled' : received > 0 ? 'Partial Due' : 'Unpaid'}
                             </span>
                           </div>
-                        ) : d.referral_code ? (
-                          <span className="font-mono text-[11px] text-amber-800 font-semibold">
-                            {d.referral_code}
-                          </span>
-                        ) : (
-                          <span className="text-slate-400">Direct / None</span>
-                        )}
-                      </td>
+                        </td>
 
-                      <td className="p-4 text-slate-600">
-                        <span className="px-2 py-0.5 rounded-md bg-slate-100 font-semibold">
-                          {d.payment_mode || 'UPI'}
-                        </span>
-                      </td>
-
-                      <td className="p-4 text-slate-500 font-medium">
-                        {new Date(d.deal_date).toLocaleDateString()}
-                      </td>
-
-                      <td className="p-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          {!isFullyPaid && (
-                            <button
-                              onClick={() => handleOpenPay(d)}
-                              className="px-2.5 py-1 text-[11px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition-all"
-                              title="Record Customer Payment"
-                            >
-                              + Pay
-                            </button>
+                        <td className="p-4 text-slate-700">
+                          {d.channel_partner ? (
+                            <div className="space-y-0.5">
+                              <span className="font-bold text-amber-900 block">{d.channel_partner.name}</span>
+                              <span className="font-mono text-[10px] text-amber-700 px-1.5 py-0.2 rounded bg-amber-50 border border-amber-200">
+                                {d.channel_partner.referral_code}
+                              </span>
+                            </div>
+                          ) : d.referral_code ? (
+                            <span className="font-mono text-[11px] text-amber-800 font-semibold">
+                              {d.referral_code}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400">Direct / None</span>
                           )}
-                          <button
-                            onClick={() => handleDeleteDeal(d.id)}
-                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            title="Delete Deal"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                        </td>
+
+                        <td className="p-4 text-slate-600">
+                          <span className="px-2 py-0.5 rounded-md bg-slate-100 font-semibold">
+                            {d.payment_mode || 'UPI'}
+                          </span>
+                        </td>
+
+                        <td className="p-4 text-slate-500 font-medium">
+                          {new Date(d.deal_date).toLocaleDateString()}
+                        </td>
+
+                        <td className="p-4 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {!isFullyPaid && (
+                              <button
+                                onClick={() => handleOpenPay(d)}
+                                className="px-2.5 py-1 text-[11px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition-all"
+                                title="Record Customer Payment"
+                              >
+                                + Pay
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleDeleteDeal(d.id)}
+                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Delete Deal"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
 

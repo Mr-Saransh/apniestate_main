@@ -52,9 +52,25 @@ export default function CrmFollowupsTab({
     }
   };
 
-  const openWhatsApp = (phone: string, name: string) => {
+  const handleFollowupCallClick = (f: CrmFollowup) => {
+    if (!f.lead?.id) return;
+    crmApi.createActivity({
+      lead_id: f.lead.id,
+      type: 'CALL',
+      title: `Follow-up call dialed to ${f.lead.name} (${f.lead.phone || 'No phone'})`,
+    }).catch(() => {});
+  };
+
+  const openWhatsApp = (phone: string, name: string, leadId?: string) => {
     const cleanPhone = phone.replace(/[^\d]/g, '');
     const message = encodeURIComponent(`Hello ${name}, following up from Apni Estate regarding your property requirement.`);
+    if (leadId) {
+      crmApi.createActivity({
+        lead_id: leadId,
+        type: 'NOTE',
+        title: `WhatsApp message initiated from Follow-ups tab with ${name} (${cleanPhone})`,
+      }).catch(() => {});
+    }
     window.open(`https://wa.me/${cleanPhone}?text=${message}`, '_blank');
   };
 
@@ -157,13 +173,15 @@ export default function CrmFollowupsTab({
                     <>
                       <a
                         href={`tel:${f.lead.phone}`}
+                        onClick={() => handleFollowupCallClick(f)}
                         className="p-2 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
                         title="Call"
                       >
                         <Phone size={15} />
                       </a>
                       <button
-                        onClick={() => openWhatsApp(f.lead!.phone!, f.lead!.name)}
+                        type="button"
+                        onClick={() => openWhatsApp(f.lead!.phone!, f.lead!.name, f.lead!.id)}
                         className="p-2 rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors"
                         title="WhatsApp"
                       >

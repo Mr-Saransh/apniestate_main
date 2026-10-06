@@ -629,54 +629,94 @@ export default function CrmOverviewTab({
               </button>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-slate-100 text-slate-400 font-bold uppercase tracking-wider">
-                    <th className="pb-3 px-3">Sales Executive</th>
-                    <th className="pb-3 px-3">Role</th>
-                    <th className="pb-3 px-3 text-center">Assigned Leads</th>
-                    <th className="pb-3 px-3 text-center">Bookings</th>
-                    <th className="pb-3 px-3 text-right">Conversion Rate</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {teamPerformance.map((member) => (
-                    <tr key={member.userId} className="hover:bg-slate-50/60 transition-colors">
-                      <td className="py-3 px-3">
-                        <div className="flex items-center gap-2.5">
-                          <div className="size-8 rounded-xl bg-[#2648E7]/10 text-[#2648E7] font-bold flex items-center justify-center text-xs">
-                            {member.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
-                          </div>
-                          <div>
-                            <p className="font-bold text-slate-900">{member.name}</p>
-                            <p className="text-[11px] text-slate-400">{member.email || member.phone || 'No contact'}</p>
-                          </div>
+            <>
+              {/* Mobile Cards List (< 768px) */}
+              <div className="md:hidden divide-y divide-slate-100">
+                {teamPerformance.map((member) => (
+                  <div key={member.userId} className="py-3 space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="size-8 rounded-xl bg-[#2648E7]/10 text-[#2648E7] font-bold flex items-center justify-center text-xs shrink-0">
+                          {member.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
                         </div>
-                      </td>
-                      <td className="py-3 px-3">
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-50 text-[#2648E7]">
-                          {member.role}
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 text-center font-bold text-slate-800">{member.assignedLeads}</td>
-                      <td className="py-3 px-3 text-center font-bold text-emerald-600">{member.bookedLeads}</td>
-                      <td className="py-3 px-3 text-right">
-                        <div className="inline-flex items-center gap-1.5">
-                          <span className="font-black text-slate-900">{member.conversionRate}%</span>
-                          <div className="w-12 h-1.5 rounded-full bg-slate-100 overflow-hidden">
-                            <div
-                              className="h-full bg-gradient-to-r from-[#2648E7] to-emerald-500 rounded-full"
-                              style={{ width: `${Math.min(100, member.conversionRate)}%` }}
-                            />
-                          </div>
+                        <div className="min-w-0">
+                          <p className="font-bold text-xs text-slate-900 truncate">{member.name}</p>
+                          <p className="text-[10px] text-slate-400 truncate">{member.email || member.phone || 'No contact'}</p>
                         </div>
-                      </td>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-50 text-[#2648E7] shrink-0">
+                        {member.role}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs bg-slate-50 p-2.5 rounded-xl">
+                      <div>
+                        <span className="text-[10px] text-slate-400 font-semibold block">Leads</span>
+                        <span className="font-black text-slate-800">{member.assignedLeads}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 font-semibold block">Booked</span>
+                        <span className="font-black text-emerald-600">{member.bookedLeads}</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[10px] text-slate-400 font-semibold block">Conversion</span>
+                        <span className="font-black text-[#2648E7]">{member.conversionRate}%</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop Table (>= 768px) */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-100 text-slate-400 font-bold uppercase tracking-wider">
+                      <th className="pb-3 px-3">Sales Executive</th>
+                      <th className="pb-3 px-3">Role</th>
+                      <th className="pb-3 px-3 text-center">Assigned Leads</th>
+                      <th className="pb-3 px-3 text-center">Bookings</th>
+                      <th className="pb-3 px-3 text-right">Conversion Rate</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {teamPerformance.map((member) => (
+                      <tr key={member.userId} className="hover:bg-slate-50/60 transition-colors">
+                        <td className="py-3 px-3">
+                          <div className="flex items-center gap-2.5">
+                            <div className="size-8 rounded-xl bg-[#2648E7]/10 text-[#2648E7] font-bold flex items-center justify-center text-xs">
+                              {member.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+                            </div>
+                            <div>
+                              <p className="font-bold text-slate-900">{member.name}</p>
+                              <p className="text-[11px] text-slate-400">{member.email || member.phone || 'No contact'}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-3 px-3">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-50 text-[#2648E7]">
+                            {member.role}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 text-center font-bold text-slate-800">{member.assignedLeads}</td>
+                        <td className="py-3 px-3 text-center font-bold text-emerald-600">{member.bookedLeads}</td>
+                        <td className="py-3 px-3 text-right">
+                          <div className="inline-flex items-center gap-1.5">
+                            <span className="font-black text-slate-900">{member.conversionRate}%</span>
+                            <div className="w-12 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                              <div
+                                className="h-full bg-gradient-to-r from-[#2648E7] to-emerald-500 rounded-full"
+                                style={{ width: `${Math.min(100, member.conversionRate)}%` }}
+                              />
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </div>
       </div>

@@ -60,8 +60,34 @@ export default function CrmPipelineTab({
         </button>
       </div>
 
+      {/* Mobile Stage Quick Switcher */}
+      <div className="md:hidden flex items-center gap-1.5 overflow-x-auto hide-scrollbar pb-1">
+        {PIPELINE_COLUMNS.map((col) => {
+          const count = leads.filter((l) => l.status === col.key).length;
+          return (
+            <button
+              key={col.key}
+              type="button"
+              onClick={() => {
+                document.getElementById(`kanban-col-${col.key}`)?.scrollIntoView({
+                  behavior: 'smooth',
+                  block: 'nearest',
+                  inline: 'start',
+                });
+              }}
+              className="px-3 py-1.5 rounded-xl text-xs font-bold bg-white border border-slate-200/80 shadow-xs flex items-center gap-1.5 whitespace-nowrap active:scale-95 shrink-0"
+            >
+              <span>{col.label}</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${col.badgeColor}`}>
+                {count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
       {/* Kanban Board Container */}
-      <div className="flex gap-4 overflow-x-auto pb-4 custom-scrollbar min-h-[70vh]">
+      <div className="flex gap-4 overflow-x-auto pb-4 custom-scrollbar min-h-[70vh] scroll-smooth">
         {PIPELINE_COLUMNS.map((col, colIdx) => {
           const colLeads = leads.filter(l => l.status === col.key);
           const nextCol = PIPELINE_COLUMNS[colIdx + 1];
@@ -69,6 +95,7 @@ export default function CrmPipelineTab({
           return (
             <div
               key={col.key}
+              id={`kanban-col-${col.key}`}
               className="w-72 shrink-0 bg-slate-100/70 rounded-2xl p-3 border border-slate-200/70 flex flex-col"
             >
               {/* Column Header */}

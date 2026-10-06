@@ -357,19 +357,94 @@ export default function CrmTeamTab({ onNavigateToLeads }: CrmTeamTabProps) {
             <p className="text-xs text-slate-400 mt-1">Try adjusting your search or filters</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-slate-100 bg-slate-50/50 text-slate-400 font-bold uppercase tracking-wider">
-                  <th className="py-3 px-4">Member Name</th>
-                  <th className="py-3 px-4">CRM Role</th>
-                  <th className="py-3 px-4 text-center">Status</th>
-                  <th className="py-3 px-4 text-center">Assigned Leads</th>
-                  <th className="py-3 px-4">Last Activity</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
+          <>
+            {/* Mobile Cards List (< 768px) */}
+            <div className="md:hidden divide-y divide-slate-100">
+              {filteredMembers.map((m) => {
+                const isSelf = m.id === user?.id;
+                return (
+                  <div
+                    key={m.id}
+                    onClick={() => handleOpenMemberDetail(m)}
+                    className="p-4 space-y-3 cursor-pointer hover:bg-blue-50/20 transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="size-10 rounded-2xl bg-gradient-to-tr from-[#2648E7] to-[#4F6DFF] text-white font-bold flex items-center justify-center text-xs shadow-sm shrink-0">
+                          {m.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-bold text-sm text-slate-900 truncate">{m.name}</span>
+                            {isSelf && (
+                              <span className="px-1.5 py-0.2 rounded text-[9px] font-black bg-blue-100 text-[#2648E7]">
+                                YOU
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-0.5">
+                            {m.phone ? <span>{m.phone}</span> : m.email ? <span className="truncate">{m.email}</span> : null}
+                          </div>
+                        </div>
+                      </div>
+
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider shrink-0 ${
+                          m.crm_role === 'BUILDER'
+                            ? 'bg-amber-100 text-amber-800'
+                            : m.crm_role === 'CRM_MANAGER'
+                            ? 'bg-indigo-50 text-indigo-700'
+                            : 'bg-blue-50 text-[#2648E7]'
+                        }`}
+                      >
+                        {m.crm_role === 'BUILDER' ? 'Builder' : m.crm_role === 'CRM_MANAGER' ? 'Manager' : 'Executive'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-50">
+                      <div className="flex items-center gap-3">
+                        <span className={`inline-flex items-center gap-1 text-[11px] font-bold ${
+                          m.status === 'ACTIVE' ? 'text-emerald-700' : 'text-red-600'
+                        }`}>
+                          <span className={`size-1.5 rounded-full ${m.status === 'ACTIVE' ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                          {m.status}
+                        </span>
+                        <span className="text-slate-500 text-[11px]">
+                          <strong>{m.assigned_leads_count}</strong> leads
+                        </span>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenMemberDetail(m);
+                        }}
+                        className="px-2.5 py-1 rounded-xl text-xs font-bold text-[#2648E7] bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-colors flex items-center gap-1"
+                      >
+                        <Activity size={12} />
+                        <span>Work Log</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Desktop Table (>= 768px) */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-slate-100 bg-slate-50/50 text-slate-400 font-bold uppercase tracking-wider">
+                    <th className="py-3 px-4">Member Name</th>
+                    <th className="py-3 px-4">CRM Role</th>
+                    <th className="py-3 px-4 text-center">Status</th>
+                    <th className="py-3 px-4 text-center">Assigned Leads</th>
+                    <th className="py-3 px-4">Last Activity</th>
+                    <th className="py-3 px-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
                 {filteredMembers.map((m) => {
                   const isSelf = m.id === user?.id;
                   const isMemberBuilder = m.crm_role === 'BUILDER';
@@ -515,7 +590,8 @@ export default function CrmTeamTab({ onNavigateToLeads }: CrmTeamTabProps) {
               </tbody>
             </table>
           </div>
-        )}
+        </>
+      )}
       </div>
 
       {/* ─── MODAL: Create CRM Member Account ───────────────── */}
