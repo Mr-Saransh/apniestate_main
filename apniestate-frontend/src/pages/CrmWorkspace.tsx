@@ -5,19 +5,8 @@ import {
   Sparkles,
   Lock,
   ArrowRight,
-  Building2,
-  Users,
-  GitCommit,
-  Clock,
-  IndianRupee,
   Layers,
-  ShieldCheck,
   CheckCircle2,
-  LayoutDashboard,
-  Calendar,
-  Handshake,
-  FileBarChart,
-  Settings,
 } from 'lucide-react';
 import { crmApi, type CrmLead, type CrmAnalytics, type CrmFollowup, type CrmProperty } from '@/api/crm';
 import { subscriptionApi, type CompanyEntitlements } from '@/api/subscription';
@@ -277,24 +266,8 @@ export default function CrmWorkspace() {
     );
   }
 
-  const pendingFollowupsCount = followups.filter((f) => f.status === 'PENDING').length;
-
-  const availableTabs: { id: CrmTab; label: string; icon: any; badge?: number }[] = [
-    { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-    { id: 'leads', label: crmRole === 'TELECALLER' ? 'My Leads' : 'Leads', icon: Users, badge: leads.length },
-    ...(crmRole !== 'TELECALLER' ? [{ id: 'pipeline' as CrmTab, label: 'Pipeline', icon: GitCommit }] : []),
-    { id: 'followups', label: 'Follow-ups', icon: Clock, badge: pendingFollowupsCount },
-    { id: 'customers', label: crmRole === 'TELECALLER' ? 'Won Deals' : 'Customers', icon: IndianRupee },
-    ...(crmRole === 'TELECALLER' || crmRole === 'BUILDER' ? [{ id: 'activities' as CrmTab, label: 'Visits & Tasks', icon: Calendar }] : []),
-    ...(crmRole === 'BUILDER' ? [{ id: 'properties' as CrmTab, label: 'Properties', icon: Building2 }] : []),
-    ...(crmRole !== 'TELECALLER' ? [{ id: 'channel-partners' as CrmTab, label: 'Channel Partners', icon: Handshake }] : []),
-    ...(crmRole !== 'TELECALLER' ? [{ id: 'team' as CrmTab, label: 'Team', icon: Users }] : []),
-    ...(crmRole !== 'TELECALLER' ? [{ id: 'reports' as CrmTab, label: 'Reports', icon: FileBarChart }] : []),
-    ...(crmRole === 'BUILDER' ? [{ id: 'settings' as CrmTab, label: 'Settings', icon: Settings }] : []),
-  ];
-
   return (
-    <div className="p-3 sm:p-5 md:p-6 max-w-7xl mx-auto space-y-4 sm:space-y-6 animate-in fade-in duration-300">
+    <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-300">
       {/* Workspace Header */}
       <div className="border-b border-slate-200/80 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <div>
@@ -308,40 +281,6 @@ export default function CrmWorkspace() {
               ? 'Manage sales team leads, telecallers, pipeline funnel, and performance'
               : 'Enterprise CRM Command Center: Leads, team hierarchy, and bookings'}
           </p>
-        </div>
-      </div>
-
-      {/* Horizontal Responsive Tab Navigation Bar */}
-      <div className="-mx-3 sm:mx-0 px-3 sm:px-0 overflow-x-auto hide-scrollbar">
-        <div className="flex items-center gap-1.5 p-1.5 bg-slate-100/90 rounded-2xl w-max min-w-full sm:min-w-0 border border-slate-200/60 shadow-xs">
-          {availableTabs.map((t) => {
-            const isActive = tab === t.id;
-            const Icon = t.icon;
-            return (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => handleTabChange(t.id)}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap active:scale-95 ${
-                  isActive
-                    ? 'bg-[#2648E7] text-white shadow-sm font-black'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/70'
-                }`}
-              >
-                <Icon size={14} className={isActive ? 'text-white' : 'text-slate-500'} />
-                <span>{t.label}</span>
-                {t.badge !== undefined && t.badge > 0 && (
-                  <span
-                    className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
-                      isActive ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
-                    }`}
-                  >
-                    {t.badge}
-                  </span>
-                )}
-              </button>
-            );
-          })}
         </div>
       </div>
 

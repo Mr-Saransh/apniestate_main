@@ -17,7 +17,7 @@ interface CrmLeadsTabProps {
   leads: CrmLead[];
   loading: boolean;
   onOpenAddLead: () => void;
-  onOpenImportLeads: () => void;
+  onOpenImportLeads?: () => void;
   onSelectLead: (leadId: string) => void;
   onOpenEditLead: (lead: CrmLead) => void;
   onDeleteLead: (leadId: string) => void;
@@ -409,31 +409,20 @@ export default function CrmLeadsTab({
         {/* Clean, perfectly aligned Action Buttons */}
         <div className="flex items-center gap-2">
           {isManagerOrBuilder && (
-            <>
-              <button
-                type="button"
-                onClick={() => setIsDistributeModalOpen(true)}
-                className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold text-[#2648E7] bg-blue-50/80 hover:bg-blue-100 border border-blue-200/80 transition-all active:scale-95"
-                title="Smart Lead Distribution"
-              >
-                <Sparkles size={14} className="text-[#2648E7] shrink-0" />
-                <span>Distribute</span>
-                {unassignedCount > 0 && (
-                  <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-[#2648E7] text-white">
-                    {unassignedCount}
-                  </span>
-                )}
-              </button>
-
-              <button
-                type="button"
-                onClick={onOpenImportLeads}
-                className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200/60 transition-all active:scale-95"
-              >
-                <UploadCloud size={14} className="shrink-0" />
-                <span>Import</span>
-              </button>
-            </>
+            <button
+              type="button"
+              onClick={() => setIsDistributeModalOpen(true)}
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold text-[#2648E7] bg-blue-50/80 hover:bg-blue-100 border border-blue-200/80 transition-all active:scale-95"
+              title="Smart Lead Distribution"
+            >
+              <Sparkles size={14} className="text-[#2648E7] shrink-0" />
+              <span>Distribute</span>
+              {unassignedCount > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-[#2648E7] text-white">
+                  {unassignedCount}
+                </span>
+              )}
+            </button>
           )}
 
           <button
