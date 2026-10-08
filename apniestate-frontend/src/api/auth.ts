@@ -22,7 +22,8 @@ export type Role =
   | 'WORKER'
   | 'CRM_MANAGER'
   | 'TELECALLER'
-  | 'SALES_EXECUTIVE';
+  | 'SALES_EXECUTIVE'
+  | 'SUB_CONTRACTOR';
 
 export type CrmRole = 'BUILDER' | 'CRM_MANAGER' | 'TELECALLER';
 

@@ -1,4 +1,4 @@
-import { Home, ShoppingCart, Wallet, Users, BarChart2, LayoutDashboard, GitCommit, Clock, IndianRupee, Calendar } from 'lucide-react';
+import { Home, ShoppingCart, Wallet, Users, BarChart2, LayoutDashboard, GitCommit, Clock, IndianRupee, Calendar, Receipt, ListTodo } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useAppMode } from '@/context/AppModeContext';
@@ -9,6 +9,12 @@ const ERP_BOTTOM_NAV = [
   { id: "finance", path: "/finance", Icon: Wallet, label: "Finance" },
   { id: "operations", path: "/operations", Icon: Users, label: "Labour" },
   { id: "progress", path: "/progress", Icon: BarChart2, label: "Progress" },
+];
+
+const SUBCONTRACTOR_BOTTOM_NAV = [
+  { id: "dashboard", path: "/subcontractor/dashboard", Icon: Home, label: "Home" },
+  { id: "expenses", path: "/subcontractor/expenses", Icon: Receipt, label: "Expenses" },
+  { id: "tasks", path: "/subcontractor/tasks", Icon: ListTodo, label: "Tasks" },
 ];
 
 const TELECALLER_BOTTOM_NAV = [
@@ -39,6 +45,8 @@ export default function BottomNav() {
 
   let navItems = isCrmActive
     ? (crmRole === 'TELECALLER' ? [...TELECALLER_BOTTOM_NAV] : [...CRM_BOTTOM_NAV])
+    : role === 'SUB_CONTRACTOR'
+    ? [...SUBCONTRACTOR_BOTTOM_NAV]
     : [...ERP_BOTTOM_NAV];
 
   if (mode === 'ERP') {

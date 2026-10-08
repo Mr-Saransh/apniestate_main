@@ -61,6 +61,13 @@ export const getProjects = async (userId: string, role: string, companyId?: stri
             user_id: userId
           }
         }
+      },
+      {
+        subcontractor_assignments: {
+          some: {
+            user_id: userId
+          }
+        }
       }
     ];
   }

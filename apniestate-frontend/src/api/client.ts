@@ -152,10 +152,19 @@ class ApiClient {
             window.dispatchEvent(new CustomEvent('auth:unauthorized'));
           }
         }
-        const errorMsg =
+        let errorMsg =
           (typeof json?.error === 'string' ? json.error : json?.error?.message) ||
           json?.message ||
           'Something went wrong';
+
+        if (json?.error?.details && typeof json.error.details === 'object') {
+          const detailEntries = Object.entries(json.error.details)
+            .map(([field, errs]) => `${field}: ${Array.isArray(errs) ? errs.join(', ') : errs}`)
+            .filter(Boolean);
+          if (detailEntries.length > 0) {
+            errorMsg = `${errorMsg} (${detailEntries.join('; ')})`;
+          }
+        }
 
         throw new ApiError(
           errorMsg,

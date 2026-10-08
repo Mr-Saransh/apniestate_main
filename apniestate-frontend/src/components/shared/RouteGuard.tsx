@@ -19,14 +19,14 @@ export default function RouteGuard({ permission }: RouteGuardProps) {
     );
   }
 
-  // if (permission && !hasPermission(permission)) {
-  //   return <AccessDeniedPage />;
-  // }
-
-  // Also verify against the strict UI configuration to ensure module visibility matches
-  // if (user && !isRouteVisible(location.pathname, user.role)) {
-  //   return <AccessDeniedPage />;
-  // }
+  // Strict role enforcement for SUB_CONTRACTOR: cannot access ERP/CRM modules
+  if (user?.role === 'SUB_CONTRACTOR') {
+    const allowed = ['/subcontractor', '/profile', '/notifications'];
+    const isAllowed = allowed.some((prefix) => location.pathname.startsWith(prefix));
+    if (!isAllowed) {
+      return <AccessDeniedPage />;
+    }
+  }
 
   return <Outlet />;
 }

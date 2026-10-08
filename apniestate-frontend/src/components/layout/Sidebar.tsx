@@ -10,7 +10,7 @@ import {
   BarChart2, FileSpreadsheet, Package, ClipboardList, Archive,
   Truck, BookOpen, FolderOpen, FileBarChart, Bell, Settings, X,
   LogOut, UserCheck, GitCommit, Clock, IndianRupee, Calendar,
-  Sparkles, Layers, Lock, Shield, Handshake
+  Sparkles, Layers, Lock, Shield, Handshake, Briefcase, Receipt, ListTodo
 } from "lucide-react";
 import { useTranslation } from 'react-i18next';
 import { subscriptionApi, CompanyEntitlements } from '@/api/subscription';
@@ -69,6 +69,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
     },
     {
       label: "Daily Work", hideOnMobile: true, items: [
+        { id: "/sub-contractors", label: "Sub Contractors", icon: Briefcase },
         { id: "/purchase", label: t('sidebar.procurement', 'Procurement'), icon: ShoppingCart },
         { id: "/finance", label: t('sidebar.finance', 'Finance'), icon: Wallet },
         { id: "/operations", label: t('sidebar.operations', 'Operations'), icon: Users },
@@ -171,24 +172,39 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
     selectedCrmGroups = managerCrmNavGroups;
   }
 
-  const activeNavGroups = mode === 'CRM' ? selectedCrmGroups : erpNavGroups;
-
-  const filteredGroups = activeNavGroups.map(group => {
-    let items = group.items;
-    if (mode === 'ERP') {
-      if (role === 'ACCOUNTANT') {
-        const allowed = ['/dashboard', '/finance', '/purchase', '/operations', '/reports', '/boq', '/purchase-orders', '/inventory', '/vendors', '/documents', '/notifications', '/settings'];
-        items = items.filter(item => allowed.includes(item.id));
-      } else if (role === 'PROJECT_MANAGER') {
-        const allowed = ['/dashboard', '/projects', '/progress', '/purchase', '/finance', '/operations', '/boq', '/material-requests', '/purchase-orders', '/inventory', '/vendors', '/dpr', '/documents', '/reports', '/milestone-report', '/notifications', '/settings'];
-        items = items.filter(item => allowed.includes(item.id));
-      }
-      if (role !== 'BUILDER') {
-        items = items.filter(item => item.id !== '/users');
-      }
+  const subContractorNavGroups: NavGroup[] = [
+    {
+      label: "Sub Contractor Portal", items: [
+        { id: "/subcontractor/dashboard", label: "Dashboard", icon: LayoutDashboard },
+        { id: "/subcontractor/expenses", label: "Expenses", icon: Receipt },
+        { id: "/subcontractor/tasks", label: "Tasks", icon: ListTodo },
+      ]
     }
-    return { ...group, items };
-  }).filter(group => group.items.length > 0);
+  ];
+
+  let activeNavGroups = mode === 'CRM' ? selectedCrmGroups : erpNavGroups;
+  if (role === 'SUB_CONTRACTOR') {
+    activeNavGroups = subContractorNavGroups;
+  }
+
+  const filteredGroups = role === 'SUB_CONTRACTOR'
+    ? subContractorNavGroups
+    : activeNavGroups.map(group => {
+        let items = group.items;
+        if (mode === 'ERP') {
+          if (role === 'ACCOUNTANT') {
+            const allowed = ['/dashboard', '/finance', '/purchase', '/operations', '/reports', '/boq', '/purchase-orders', '/inventory', '/vendors', '/documents', '/notifications', '/settings'];
+            items = items.filter(item => allowed.includes(item.id));
+          } else if (role === 'PROJECT_MANAGER') {
+            const allowed = ['/dashboard', '/projects', '/progress', '/purchase', '/finance', '/operations', '/boq', '/material-requests', '/purchase-orders', '/inventory', '/vendors', '/dpr', '/documents', '/reports', '/milestone-report', '/notifications', '/settings'];
+            items = items.filter(item => allowed.includes(item.id));
+          }
+          if (role !== 'BUILDER') {
+            items = items.filter(item => item.id !== '/users');
+          }
+        }
+        return { ...group, items };
+      }).filter(group => group.items.length > 0);
 
   return (
     <div className="flex flex-col h-full bg-[#2648E7] text-white border-r border-[#2648E7] overflow-hidden">
@@ -341,7 +357,9 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
           <div className="flex-1 min-w-0">
             <p className="text-sm font-bold text-white truncate leading-tight">{user?.name || 'Aditya Sharma'}</p>
             <p className="text-[10px] text-white/60 truncate leading-tight">
-              {crmRole === 'CRM_MANAGER'
+              {role === 'SUB_CONTRACTOR'
+                ? 'Sub Contractor'
+                : crmRole === 'CRM_MANAGER'
                 ? 'CRM Manager'
                 : crmRole === 'TELECALLER'
                 ? 'Sales Executive'

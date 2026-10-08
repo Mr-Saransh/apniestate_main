@@ -5,7 +5,7 @@ import { apiClient } from '@/api/client';
 import { vendorsApi, type Vendor, type VendorRating } from '@/api/vendors';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 
-const CATEGORIES = ['All', 'Suppliers', 'Subcontractors', 'Consultants', 'Logistics', 'Services'];
+const CATEGORIES = ['All', 'Suppliers', 'Consultants', 'Logistics', 'Services'];
 
 const QUICK_TAGS = [
   '⚡ Fast & On-Time',
@@ -375,7 +375,6 @@ export default function VendorsPage() {
                     <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Category</label>
                     <select className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary" value={category} onChange={e => setCategory(e.target.value)}>
                       <option value="Suppliers">Suppliers</option>
-                      <option value="Subcontractors">Subcontractors</option>
                       <option value="Consultants">Consultants</option>
                       <option value="Logistics">Logistics</option>
                       <option value="Services">Services</option>
@@ -437,7 +436,6 @@ export default function VendorsPage() {
                     <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Category</label>
                     <select className="w-full mt-1 p-2 bg-muted border border-border rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary" value={category} onChange={e => setCategory(e.target.value)}>
                       <option value="Suppliers">Suppliers</option>
-                      <option value="Subcontractors">Subcontractors</option>
                       <option value="Consultants">Consultants</option>
                       <option value="Logistics">Logistics</option>
                       <option value="Services">Services</option>

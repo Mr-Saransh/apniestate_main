@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MapPin, Bell, Menu, ChevronDown, Check, Building2, Plus, Sparkles } from 'lucide-react';
+import { MapPin, Bell, Menu, ChevronDown, Check, Building2, Plus, Sparkles, Briefcase } from 'lucide-react';
 import { useProject } from '@/context/ProjectContext';
 import { useAuth } from '@/context/AuthContext';
 import { useAppMode } from '@/context/AppModeContext';
@@ -82,9 +82,23 @@ export default function TopBar({ onOpenSidebar }: { onOpenSidebar: () => void })
         <Menu size={18} className="text-white" />
       </button>
 
-      {/* Left Branding / Switcher: CRM vs ERP */}
+      {/* Left Branding / Switcher: CRM vs ERP vs Sub Contractor */}
       <div className="flex-1 min-w-0 relative" ref={switcherRef}>
-        {isCrmModeActive ? (
+        {user?.role === 'SUB_CONTRACTOR' ? (
+          <div className="flex items-center gap-2.5">
+            <div className="size-8 rounded-lg bg-white/15 text-white flex items-center justify-center font-black shrink-0 shadow-xs">
+              <Briefcase size={16} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm lg:text-base font-extrabold text-white truncate leading-tight" style={{ fontFamily: "var(--font-display)" }}>
+                Sub Contractor Portal
+              </p>
+              <p className="text-[11px] text-white/75 font-medium leading-none mt-0.5 truncate">
+                Apni Estate Construction ERP
+              </p>
+            </div>
+          </div>
+        ) : isCrmModeActive ? (
           <div className="flex items-center gap-2">
             <button
               onClick={() => navigate('/crm')}

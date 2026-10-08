@@ -11,6 +11,10 @@ import SubscriptionBanner from '@/components/shared/SubscriptionBanner';
 
 function IndexRedirect() {
   const { user } = useAuth();
+  if (user?.role === 'SUB_CONTRACTOR') {
+    return <Navigate to="/subcontractor/dashboard" replace />;
+  }
+
   const crmRole = user?.crm_role || (user?.role === 'CRM_MANAGER' ? 'CRM_MANAGER' : (user?.role === 'TELECALLER' || user?.role === 'SALES_EXECUTIVE') ? 'TELECALLER' : null);
   const companyRoles = user?.company_roles || [];
   const hasErpRole = companyRoles.some((r: string) => ['BUILDER', 'ADMIN', 'PROJECT_MANAGER', 'SITE_SUPERVISOR', 'ACCOUNTANT', 'INVENTORY_MANAGER'].includes(r)) || ['BUILDER', 'ADMIN', 'PROJECT_MANAGER', 'SITE_SUPERVISOR', 'ACCOUNTANT', 'INVENTORY_MANAGER'].includes(user?.role || '');
@@ -59,6 +63,12 @@ const DprPage = lazy(() => import('@/pages/DprPage'));
 const LeavesPage = lazy(() => import('@/pages/LeavesPage'));
 const PayrollPage = lazy(() => import('@/pages/PayrollPage'));
 const ApprovalsPage = lazy(() => import('@/pages/ApprovalsPage'));
+
+// Sub Contractor Pages
+const SubContractorsPage = lazy(() => import('@/pages/SubContractorsPage'));
+const SubContractorDashboardPage = lazy(() => import('@/pages/subcontractor/SubContractorDashboardPage'));
+const SubContractorExpensesPage = lazy(() => import('@/pages/subcontractor/SubContractorExpensesPage'));
+const SubContractorTasksPage = lazy(() => import('@/pages/subcontractor/SubContractorTasksPage'));
 
 // Workspaces
 const ProgressWorkspace = lazy(() => import('@/pages/ProgressWorkspace'));
@@ -124,7 +134,14 @@ export default function App() {
                       <Route index element={<IndexRedirect />} />
                       <Route path="/dashboard" element={<DashboardPage />} />
                       
-                      {/* CRM Workspace & Direct Aliases */}
+                      {/* Sub Contractor Dedicated Portal */}
+                      <Route path="/subcontractor/dashboard" element={<SubContractorDashboardPage />} />
+                      <Route path="/subcontractor/expenses" element={<SubContractorExpensesPage />} />
+                      <Route path="/subcontractor/tasks" element={<SubContractorTasksPage />} />
+
+                      {/* Builder Sub Contractors Workspace */}
+                      <Route path="/sub-contractors" element={<SubContractorsPage />} />
+                      <Route path="/subcontractors" element={<Navigate to="/sub-contractors" replace />} />
                       <Route path="/crm" element={<CrmWorkspace />} />
                       <Route path="/leads" element={<Navigate to="/crm?tab=leads" replace />} />
                       <Route path="/pipeline" element={<Navigate to="/crm?tab=pipeline" replace />} />

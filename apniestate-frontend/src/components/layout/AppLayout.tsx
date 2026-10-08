@@ -24,6 +24,13 @@ export default function AppLayout() {
     if (currentPath.startsWith('/apni-admin')) return;
 
     if (user) {
+      if (user.role === 'SUB_CONTRACTOR') {
+        if (!currentPath.startsWith('/subcontractor') && !['/profile', '/notifications'].includes(currentPath)) {
+          navigate('/subcontractor/dashboard', { replace: true });
+        }
+        return;
+      }
+
       const crmRole = user.crm_role || (user.role === 'CRM_MANAGER' ? 'CRM_MANAGER' : (user.role === 'TELECALLER' || user.role === 'SALES_EXECUTIVE') ? 'TELECALLER' : null);
       const companyRoles = user.company_roles || [];
       const hasErpRole = companyRoles.some((r: string) => ['BUILDER', 'ADMIN', 'PROJECT_MANAGER', 'SITE_SUPERVISOR', 'ACCOUNTANT', 'INVENTORY_MANAGER'].includes(r)) || ['BUILDER', 'ADMIN', 'PROJECT_MANAGER', 'SITE_SUPERVISOR', 'ACCOUNTANT', 'INVENTORY_MANAGER'].includes(user.role || '');
@@ -92,7 +99,8 @@ export default function AppLayout() {
   const isCrmRoute = location.pathname.startsWith('/crm');
   const isAuxRoute = ['/notifications', '/profile', '/settings'].includes(location.pathname);
   const isCrmActive = crmOnlyFromContext || mode === 'CRM';
-  const showNav = (activeProject !== null && location.pathname !== '/projects') || isCrmRoute || (isAuxRoute && isCrmActive);
+  const isSubContractor = user?.role === 'SUB_CONTRACTOR';
+  const showNav = (activeProject !== null && location.pathname !== '/projects') || isCrmRoute || (isAuxRoute && isCrmActive) || isSubContractor || location.pathname.startsWith('/sub-contractors');
 
   return (
     <div className="h-screen w-screen flex flex-col overflow-hidden bg-background">

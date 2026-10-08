@@ -3,11 +3,14 @@ import { withAuth } from "@/middleware/auth.middleware";
 import { validateBody } from "@/middleware/validate.middleware";
 import { UpdateVendorSchema } from "@/modules/vendors/vendors.schema";
 import { updateVendor, deleteVendor } from "@/modules/vendors/vendors.service";
-import { ok } from "@/lib/response";
+import { ok, forbidden } from "@/lib/response";
 
 type Ctx = { params: Promise<{ id: string }> };
 
 export const PATCH = withAuth(async (req: NextRequest, user: any, context?: Ctx) => {
+  if (user.role === "SUB_CONTRACTOR") {
+    return forbidden("Sub contractors cannot access vendors.");
+  }
   const { id } = await context!.params;
   const parsed = await validateBody(req, UpdateVendorSchema);
   if ("error" in parsed) return parsed.error;
@@ -17,6 +20,9 @@ export const PATCH = withAuth(async (req: NextRequest, user: any, context?: Ctx)
 });
 
 export const DELETE = withAuth(async (_req: NextRequest, user: any, context?: Ctx) => {
+  if (user.role === "SUB_CONTRACTOR") {
+    return forbidden("Sub contractors cannot access vendors.");
+  }
   const { id } = await context!.params;
   const success = await deleteVendor(id, user.company_id);
   if (!success) return ok(null, "Vendor not found or access denied");

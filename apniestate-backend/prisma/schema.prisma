@@ -23,6 +23,7 @@ enum Role {
   CRM_MANAGER
   TELECALLER
   SALES_EXECUTIVE
+  SUB_CONTRACTOR
 }
 
 enum ProjectStatus {
@@ -58,6 +59,14 @@ enum TaskPriority {
   MEDIUM
   HIGH
   URGENT
+}
+
+enum SubContractorTaskStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED_PENDING_APPROVAL
+  APPROVED
+  REJECTED
 }
 
 enum MilestoneStatus {
@@ -458,6 +467,12 @@ model User {
   crm_activities       CrmActivity[]
   crm_deals            CrmDeal[]
 
+  // Sub Contractor relations
+  subcontractor_assignments         SubContractorProjectAssignment[] @relation("SubContractorUser")
+  subcontractor_assignments_created SubContractorProjectAssignment[] @relation("SubContractorCreator")
+  approved_sc_expenses              SubContractorExpense[]           @relation("SubContractorExpenseApprover")
+  approved_sc_tasks                 SubContractorTask[]              @relation("SubContractorTaskApprover")
+
   @@index([company_id], name: "idx_user_company_id")
   @@map("users")
 }
@@ -555,6 +570,8 @@ model Project {
   crm_activities  CrmActivity[]
   crm_deals       CrmDeal[]
   crm_properties  CrmProperty[]
+
+  subcontractor_assignments SubContractorProjectAssignment[] @relation("SubContractorProject")
 
   @@index([builder_id], name: "idx_projects_builder_id")
   @@index([manager_id], name: "idx_projects_manager_id")
@@ -1965,6 +1982,7 @@ model Company {
   approval_chains  ApprovalChain[]
   approval_logs    ApprovalLog[]
   memberships      CompanyMembership[]
+  subcontractor_assignments SubContractorProjectAssignment[] @relation("SubContractorCompany")
 
   // Enterprise membership relations
   invitations         Invitation[]
@@ -2599,3 +2617,73 @@ model IntelligenceSuggestion {
   @@index([status], name: "idx_suggestion_status")
   @@map("intelligence_suggestions")
 }
+
+// ─── Sub Contractor Management ───────────────────────────
+
+model SubContractorProjectAssignment {
+  id               String                 @id @default(cuid())
+  user_id          String
+  project_id       String
+  company_id       String?
+  work_type        String
+  allocated_budget Float                  @default(0)
+  created_by       String?
+  created_at       DateTime               @default(now())
+  updated_at       DateTime               @updatedAt
+
+  user             User                   @relation("SubContractorUser", fields: [user_id], references: [id], onDelete: Cascade)
+  project          Project                @relation("SubContractorProject", fields: [project_id], references: [id], onDelete: Cascade)
+  company          Company?               @relation("SubContractorCompany", fields: [company_id], references: [id])
+  creator          User?                  @relation("SubContractorCreator", fields: [created_by], references: [id])
+  expenses         SubContractorExpense[]
+  tasks            SubContractorTask[]
+
+  @@unique([user_id, project_id, work_type])
+  @@index([user_id], name: "idx_sc_assignment_user")
+  @@index([project_id], name: "idx_sc_assignment_project")
+  @@index([company_id], name: "idx_sc_assignment_company")
+  @@map("sub_contractor_project_assignments")
+}
+
+model SubContractorExpense {
+  id               String                         @id @default(cuid())
+  assignment_id    String
+  amount           Float
+  description      String?
+  bill_url         String?
+  status           ExpenseStatus                  @default(PENDING)
+  date             DateTime                       @default(now()) @db.Date
+  approved_at      DateTime?
+  approved_by      String?
+  rejection_reason String?
+  created_at       DateTime                       @default(now())
+  updated_at       DateTime                       @updatedAt
+
+  assignment       SubContractorProjectAssignment @relation(fields: [assignment_id], references: [id], onDelete: Cascade)
+  approver         User?                          @relation("SubContractorExpenseApprover", fields: [approved_by], references: [id])
+
+  @@index([assignment_id], name: "idx_sc_expense_assignment")
+  @@index([status], name: "idx_sc_expense_status")
+  @@map("sub_contractor_expenses")
+}
+
+model SubContractorTask {
+  id            String                         @id @default(cuid())
+  assignment_id String
+  description   String
+  deadline      DateTime?
+  status        SubContractorTaskStatus        @default(OPEN)
+  completed_at  DateTime?
+  approved_at   DateTime?
+  approved_by   String?
+  created_at    DateTime                       @default(now())
+  updated_at    DateTime                       @updatedAt
+
+  assignment    SubContractorProjectAssignment @relation(fields: [assignment_id], references: [id], onDelete: Cascade)
+  approver      User?                          @relation("SubContractorTaskApprover", fields: [approved_by], references: [id])
+
+  @@index([assignment_id], name: "idx_sc_task_assignment")
+  @@index([status], name: "idx_sc_task_status")
+  @@map("sub_contractor_tasks")
+}
+
