@@ -135,6 +135,9 @@ export const subcontractorsApi = {
   assignToProject: (data: AssignSubContractorPayload) =>
     apiClient.post<SubContractorAssignment>('/subcontractors/assignments', data),
 
+  deleteAssignment: (assignmentId: string) =>
+    apiClient.delete<{ success: boolean }>(`/subcontractors/assignments/${assignmentId}`),
+
   reviewExpense: (
     expenseId: string,
     data: { status: 'APPROVED' | 'REJECTED'; rejection_reason?: string }

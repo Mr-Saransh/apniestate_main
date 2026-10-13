@@ -34,7 +34,7 @@ export const PATCH = withAuth(async (req: NextRequest, user, context?: any) => {
 });
 
 export const DELETE = withAuth(async (_req: NextRequest, user, context?: any) => {
-  if (user.role !== "BUILDER" && user.role !== "ADMIN") {
+  if (user.role !== "BUILDER" && user.role !== "ADMIN" && user.role !== "PROJECT_MANAGER") {
     return forbidden("Only Builders and Admins can delete assignments.");
   }
 

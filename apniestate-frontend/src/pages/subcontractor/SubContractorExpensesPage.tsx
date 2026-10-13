@@ -144,9 +144,7 @@ export default function SubContractorExpensesPage() {
         const formData = new FormData();
         formData.append('file', billFile);
         const uploadRes = await apiClient.upload<any>('/documents/upload', formData);
-        if (uploadRes.data?.file_url) {
-          billUrl = uploadRes.data.file_url;
-        }
+        billUrl = uploadRes.data?.file_url || (uploadRes as any).file_url || (uploadRes as any).url || null;
         setUploading(false);
       }
 
@@ -491,7 +489,7 @@ export default function SubContractorExpensesPage() {
             </div>
 
             <div className="p-4 flex-1 overflow-auto flex items-center justify-center bg-slate-900/5">
-              {previewUrl.toLowerCase().endsWith('.pdf') ? (
+              {previewUrl.toLowerCase().includes('.pdf') || previewUrl.startsWith('data:application/pdf') ? (
                 <iframe
                   src={previewUrl}
                   className="w-full h-[65vh] rounded-xl border border-border"

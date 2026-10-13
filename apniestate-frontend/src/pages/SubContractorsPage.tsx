@@ -30,6 +30,7 @@ import {
   Sparkles,
   RefreshCw,
   FolderOpen,
+  Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -112,6 +113,10 @@ export default function SubContractorsPage() {
   const [assignProjectId, setAssignProjectId] = useState('');
   const [assignWorkType, setAssignWorkType] = useState('');
   const [assignBudget, setAssignBudget] = useState('');
+
+  // Delete Assignment modal states
+  const [deletingAssignment, setDeletingAssignment] = useState<SubContractorAssignment | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const loadSubContractors = async () => {
     try {
@@ -258,6 +263,26 @@ export default function SubContractorsPage() {
     }
   };
 
+  const handleDeleteAssignment = async (assignment: SubContractorAssignment) => {
+    try {
+      setDeleting(true);
+      const res = await subcontractorsApi.deleteAssignment(assignment.id);
+      if (res.success) {
+        toast.success(`Removed assignment for ${assignment.user?.name} from ${assignment.project?.name}`);
+        setDeletingAssignment(null);
+        if (selectedAssignmentId === assignment.id) {
+          setSelectedAssignmentId(null);
+          navigate('/sub-contractors', { replace: true });
+        }
+        await loadSubContractors();
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete assignment');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const handleReviewExpense = async (expenseId: string, status: 'APPROVED' | 'REJECTED', reason?: string) => {
     try {
       const res = await subcontractorsApi.reviewExpense(expenseId, {
@@ -347,18 +372,29 @@ export default function SubContractorsPage() {
               <span>Back to all Sub Contractors</span>
             </button>
 
-            <button
-              onClick={() => {
-                if (projects.length > 0) setAssignProjectId(projects[0].id);
-                setAssignWorkType(selectedAssignment.work_type);
-                setAssignBudget('');
-                setShowAssignModal(true);
-              }}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs font-bold text-foreground hover:bg-muted/50 transition-colors"
-            >
-              <Plus size={14} />
-              <span>Assign to Another Project</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setDeletingAssignment(selectedAssignment)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-200 bg-red-50 text-xs font-bold text-red-700 hover:bg-red-100 hover:border-red-300 transition-colors shadow-2xs"
+                title="Delete this project assignment"
+              >
+                <Trash2 size={14} />
+                <span>Delete Assignment</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  if (projects.length > 0) setAssignProjectId(projects[0].id);
+                  setAssignWorkType(selectedAssignment.work_type);
+                  setAssignBudget('');
+                  setShowAssignModal(true);
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs font-bold text-foreground hover:bg-muted/50 transition-colors"
+              >
+                <Plus size={14} />
+                <span>Assign to Another Project</span>
+              </button>
+            </div>
           </div>
 
           {/* Sub Contractor Summary Card */}
@@ -721,11 +757,24 @@ export default function SubContractorsPage() {
                           </span>
                         </div>
 
-                        {hasPending && (
-                          <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-purple-100 text-purple-800 animate-pulse">
-                            Needs Review
-                          </span>
-                        )}
+                        <div className="flex items-center gap-1.5">
+                          {hasPending && (
+                            <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-purple-100 text-purple-800 animate-pulse">
+                              Needs Review
+                            </span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeletingAssignment(assignment);
+                            }}
+                            className="p-1.5 rounded-lg text-muted-foreground/60 hover:text-red-600 hover:bg-red-50 transition-colors"
+                            title="Delete this project assignment"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
                       </div>
 
                       <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1.5">
@@ -1117,7 +1166,7 @@ export default function SubContractorsPage() {
             </div>
 
             <div className="p-4 flex-1 overflow-auto flex items-center justify-center bg-slate-900/5">
-              {showBillModal.toLowerCase().endsWith('.pdf') ? (
+              {showBillModal.toLowerCase().includes('.pdf') || showBillModal.startsWith('data:application/pdf') ? (
                 <iframe
                   src={showBillModal}
                   className="w-full h-[65vh] rounded-xl border border-border"
@@ -1130,6 +1179,75 @@ export default function SubContractorsPage() {
                   className="max-h-[65vh] max-w-full object-contain rounded-xl shadow-md"
                 />
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── MODAL 6: DELETE ASSIGNMENT CONFIRMATION ─── */}
+      {deletingAssignment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="w-full max-w-md bg-white rounded-3xl border border-border shadow-2xl p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="size-10 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center shrink-0">
+                <Trash2 size={20} />
+              </div>
+              <div>
+                <h3 className="font-black text-foreground text-base">Delete Project Assignment</h3>
+                <p className="text-xs text-muted-foreground">Remove assignment and revert project allocations</p>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-slate-50 border border-border/80 space-y-2 text-xs">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Sub Contractor:</span>
+                <span className="font-bold text-foreground">{deletingAssignment.user?.name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Project:</span>
+                <span className="font-bold text-foreground">{deletingAssignment.project?.name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Trade / Work:</span>
+                <span className="font-bold text-foreground">{deletingAssignment.work_type}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Allocated Budget:</span>
+                <span className="font-bold text-foreground">{fmtINR(deletingAssignment.allocated_budget)}</span>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-amber-50 border border-amber-200/80 text-[11px] text-amber-800 leading-relaxed">
+              <strong>Note:</strong> Deleting this assignment will remove associated task records and uncommitted expenses, and automatically revert the allocated budget in your central project finance ledger.
+            </div>
+
+            <div className="flex justify-end gap-2.5 pt-2 border-t border-border">
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={() => setDeletingAssignment(null)}
+                className="px-4 py-2 rounded-xl border border-border text-xs font-bold text-muted-foreground hover:bg-slate-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={() => handleDeleteAssignment(deletingAssignment)}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold shadow-sm transition-all"
+              >
+                {deleting ? (
+                  <>
+                    <div className="size-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Deleting...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 size={13} />
+                    <span>Confirm Delete</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>

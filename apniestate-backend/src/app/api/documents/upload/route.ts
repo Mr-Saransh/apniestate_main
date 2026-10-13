@@ -4,14 +4,16 @@ import { v2 as cloudinary } from "cloudinary";
 import path from "path";
 import fs from "fs/promises";
 
-// Configure Cloudinary if credentials exist
-if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) {
-  cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET,
-  });
-}
+// Configure Cloudinary with fallback credentials
+const CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME || "j5vt6jez";
+const API_KEY = process.env.CLOUDINARY_API_KEY || "799181112798995";
+const API_SECRET = process.env.CLOUDINARY_API_SECRET || "kHyt__6eFxo45V8_OTk6PwCGylg";
+
+cloudinary.config({
+  cloud_name: CLOUD_NAME,
+  api_key: API_KEY,
+  api_secret: API_SECRET,
+});
 
 export const POST = withAuth(async (req: NextRequest) => {
   try {
@@ -27,8 +29,8 @@ export const POST = withAuth(async (req: NextRequest) => {
 
     let secureUrl: string | null = null;
 
-    // 1. Try Cloudinary if configured (with resource_type: auto for ANY format)
-    if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY) {
+    // 1. Try Cloudinary if credentials exist
+    if (CLOUD_NAME && API_KEY && API_SECRET) {
       try {
         const cloudRes: any = await new Promise((resolve, reject) => {
           const uploadStream = cloudinary.uploader.upload_stream(
@@ -50,21 +52,50 @@ export const POST = withAuth(async (req: NextRequest) => {
           secureUrl = cloudRes.secure_url;
         }
       } catch (cloudErr) {
-        console.warn("Cloudinary upload failed, falling back to local storage:", cloudErr);
+        console.warn("Cloudinary upload with auto resource_type failed, attempting raw:", cloudErr);
+        try {
+          const rawRes: any = await new Promise((resolve, reject) => {
+            const uploadStream = cloudinary.uploader.upload_stream(
+              {
+                folder: "apniestate/documents",
+                resource_type: "raw",
+                use_filename: true,
+                unique_filename: true,
+              },
+              (err, res) => {
+                if (err) reject(err);
+                else resolve(res);
+              }
+            );
+            uploadStream.end(buffer);
+          });
+
+          if (rawRes?.secure_url) {
+            secureUrl = rawRes.secure_url;
+          }
+        } catch (rawErr) {
+          console.warn("Cloudinary upload failed completely:", rawErr);
+        }
       }
     }
 
-    // 2. Fallback to Local Storage in public/uploads/documents/
+    // 2. Fallback to Local Storage if writable, or Data URL if in serverless read-only disk (e.g. Vercel)
     if (!secureUrl) {
-      const uploadDir = path.join(process.cwd(), "public", "uploads", "documents");
-      await fs.mkdir(uploadDir, { recursive: true });
+      try {
+        const uploadDir = path.join(process.cwd(), "public", "uploads", "documents");
+        await fs.mkdir(uploadDir, { recursive: true });
 
-      const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-      const safeFilename = `${Date.now()}_${sanitizedName}`;
-      const filePath = path.join(uploadDir, safeFilename);
+        const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+        const safeFilename = `${Date.now()}_${sanitizedName}`;
+        const filePath = path.join(uploadDir, safeFilename);
 
-      await fs.writeFile(filePath, buffer);
-      secureUrl = `/uploads/documents/${safeFilename}`;
+        await fs.writeFile(filePath, buffer);
+        secureUrl = `/uploads/documents/${safeFilename}`;
+      } catch (fsErr) {
+        console.warn("Local storage write failed (e.g. read-only serverless environment), falling back to data URL:", fsErr);
+        const mime = file.type || "application/octet-stream";
+        secureUrl = `data:${mime};base64,${buffer.toString("base64")}`;
+      }
     }
 
     return NextResponse.json({
