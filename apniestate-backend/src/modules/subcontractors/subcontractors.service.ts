@@ -723,8 +723,8 @@ export async function syncSubContractorAllocationToFinanceAndBudget(
     allocated_budget: number;
     user?: { name: string } | null;
   },
-  creatorId: string,
-  companyId: string | null
+  creatorId?: string | null,
+  companyId?: string | null
 ) {
   if (!assignment.allocated_budget || assignment.allocated_budget <= 0) {
     return;
@@ -732,12 +732,13 @@ export async function syncSubContractorAllocationToFinanceAndBudget(
 
   const project = await prisma.project.findUnique({
     where: { id: assignment.project_id },
-    select: { id: true, name: true, budget: true, actual_cost: true, company_id: true },
+    select: { id: true, name: true, budget: true, actual_cost: true, company_id: true, builder_id: true },
   });
 
   if (!project) return;
 
   const effectiveCompanyId = companyId || project.company_id || null;
+  const effectiveCreatorId = creatorId || project.builder_id || assignment.user_id;
   const userName = assignment.user?.name || "Sub Contractor";
 
   // 1. Record Upfront Expense in Central Finance (Logged by Admin/Builder)
@@ -749,7 +750,7 @@ export async function syncSubContractorAllocationToFinanceAndBudget(
       category: "SUBCONTRACT",
       description: `Sub Contractor Budget: ${userName} (${assignment.work_type.trim()})`,
       project_id: project.id,
-      user_id: creatorId,
+      user_id: effectiveCreatorId,
       date: new Date(),
       status: "APPROVED",
       reference_id: referenceId,
@@ -758,7 +759,7 @@ export async function syncSubContractorAllocationToFinanceAndBudget(
     update: {
       amount: assignment.allocated_budget,
       description: `Sub Contractor Budget: ${userName} (${assignment.work_type.trim()})`,
-      user_id: creatorId,
+      user_id: effectiveCreatorId,
       company_id: effectiveCompanyId,
       status: "APPROVED",
     },
@@ -846,7 +847,7 @@ export async function syncSubContractorAllocationToFinanceAndBudget(
         allocated: totalSubcontractorAllocations,
         spent: totalSubcontractorAllocations,
         description: "Subcontractor Allocations & Works",
-        created_by: creatorId,
+        created_by: effectiveCreatorId,
         company_id: effectiveCompanyId,
       },
     });

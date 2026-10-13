@@ -35,7 +35,7 @@ async function main() {
         allocated_budget: a.allocated_budget,
         user: { name: a.user.name },
       },
-      a.created_by,
+      a.created_by || a.project.builder_id,
       a.company_id || a.project.company_id
     );
     console.log(`  -> Synced to Central Finance & Budget successfully.`);
