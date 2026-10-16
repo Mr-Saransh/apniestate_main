@@ -18,6 +18,8 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { normalizeUnit, cleanNumeric, detectDiscipline } from '@/utils/constructionIntelligence';
 import ChallanCameraUpload from '@/components/shared/ChallanCameraUpload';
+import DateRangeFilter from '@/components/shared/DateRangeFilter';
+import { isWithinDateRange } from '@/utils/dateFilter';
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -526,6 +528,12 @@ function RequestsTab({
   const [newQty, setNewQty] = useState<string>('');
   const [modifyNotes, setModifyNotes] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
+  const [fromDate, setFromDate] = useState<string>('');
+  const [toDate, setToDate] = useState<string>('');
+
+  const filteredRequests = useMemo(() => {
+    return requests.filter(m => isWithinDateRange(m.createdAt || m.date, fromDate, toDate));
+  }, [requests, fromDate, toDate]);
   
   const handleApprove = async (id: string, approve: boolean) => {
     try {
@@ -593,7 +601,31 @@ function RequestsTab({
 
   return (
     <div className="space-y-3">
-      {requests.map((m) => (
+      {/* Date Range Filter for Requirements */}
+      <DateRangeFilter
+        fromDate={fromDate}
+        toDate={toDate}
+        onChange={(from, to) => {
+          setFromDate(from);
+          setToDate(to);
+        }}
+        label="Filter Requirements by Date"
+      />
+
+      {filteredRequests.length === 0 ? (
+        <div className="text-center text-muted-foreground py-10 bg-white rounded-2xl border border-border p-6">
+          <Package size={32} className="mx-auto text-muted-foreground/40 mb-2" />
+          <p className="font-bold text-foreground">No requirements match the selected date range.</p>
+          <button
+            type="button"
+            onClick={() => { setFromDate(''); setToDate(''); }}
+            className="text-xs font-bold text-[#2648E7] hover:underline mt-1 cursor-pointer"
+          >
+            Clear Date Filter
+          </button>
+        </div>
+      ) : (
+        filteredRequests.map((m) => (
         <Card key={m.id} className="p-4">
           <div className="flex items-start gap-3">
             <div className="size-10 rounded-xl bg-[#2648E7]/10 flex items-center justify-center shrink-0">
@@ -670,7 +702,8 @@ function RequestsTab({
             )}
           </div>
         </Card>
-      ))}
+      )))
+}
 
       {/* Modify Requirement Dialog */}
       {modifyingReq && (
@@ -932,16 +965,22 @@ function OrdersTab({
   onReceiveOrder?: (poId: string) => void;
 }) {
   const [filter, setFilter] = useState<'pending' | 'delivered' | 'all'>('pending');
+  const [fromDate, setFromDate] = useState<string>('');
+  const [toDate, setToDate] = useState<string>('');
 
-  const pendingOrders = orders.filter(o => o.status !== 'DELIVERED' && (!o.items || o.items.length === 0 || o.items.some(i => (i.pendingQty ?? i.orderedQty) > 0)));
-  const deliveredOrders = orders.filter(o => o.status === 'DELIVERED' || (o.items && o.items.length > 0 && o.items.every(i => (i.pendingQty ?? 0) <= 0)));
+  const dateFilteredOrders = useMemo(() => {
+    return orders.filter(o => isWithinDateRange(o.createdAt || o.date, fromDate, toDate));
+  }, [orders, fromDate, toDate]);
 
-  const displayedOrders = filter === 'pending' ? pendingOrders : filter === 'delivered' ? deliveredOrders : orders;
+  const pendingOrders = dateFilteredOrders.filter(o => o.status !== 'DELIVERED' && (!o.items || o.items.length === 0 || o.items.some(i => (i.pendingQty ?? i.orderedQty) > 0)));
+  const deliveredOrders = dateFilteredOrders.filter(o => o.status === 'DELIVERED' || (o.items && o.items.length > 0 && o.items.every(i => (i.pendingQty ?? 0) <= 0)));
+
+  const displayedOrders = filter === 'pending' ? pendingOrders : filter === 'delivered' ? deliveredOrders : dateFilteredOrders;
 
   // Calculate total negotiated savings across all orders
   const totalSavings = useMemo(() => {
     let saved = 0;
-    orders.forEach(o => {
+    dateFilteredOrders.forEach(o => {
       (o.items || []).forEach(it => {
         if (it.quotedPrice && it.quotedPrice > (it.unitPrice || 0)) {
           saved += (it.quotedPrice - (it.unitPrice || 0)) * (it.orderedQty || 1);
@@ -949,12 +988,23 @@ function OrdersTab({
       });
     });
     return saved;
-  }, [orders]);
+  }, [dateFilteredOrders]);
 
   if (orders.length === 0) return <div className="text-center text-muted-foreground py-10">No orders found.</div>;
 
   return (
     <div className="space-y-4">
+      {/* Date Range Filter for Orders */}
+      <DateRangeFilter
+        fromDate={fromDate}
+        toDate={toDate}
+        onChange={(from, to) => {
+          setFromDate(from);
+          setToDate(to);
+        }}
+        label="Filter Purchase Orders by Date"
+      />
+
       {/* Top Controls: Filter Pills & Download Price Variance Report */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
         <div className="flex p-1 bg-muted rounded-xl gap-1 flex-1">
@@ -1128,6 +1178,13 @@ function ReceivedTab({
   received: ReceivedSummary[]; 
   onRateVendor?: (vendorId: string, vendorName: string) => void;
 }) {
+  const [fromDate, setFromDate] = useState<string>('');
+  const [toDate, setToDate] = useState<string>('');
+
+  const filteredReceived = useMemo(() => {
+    return received.filter(r => isWithinDateRange(r.receivedAt || r.received, fromDate, toDate));
+  }, [received, fromDate, toDate]);
+
   const handleDownloadPDF = async (r: ReceivedSummary) => {
     const doc = new jsPDF();
     const pageW = doc.internal.pageSize.getWidth();
@@ -1253,7 +1310,31 @@ function ReceivedTab({
   if (received.length === 0) return <div className="text-center text-muted-foreground py-10">No received items found.</div>;
   return (
     <div className="space-y-3">
-      {received.map((r) => (
+      {/* Date Range Filter for Received Goods */}
+      <DateRangeFilter
+        fromDate={fromDate}
+        toDate={toDate}
+        onChange={(from, to) => {
+          setFromDate(from);
+          setToDate(to);
+        }}
+        label="Filter Received Goods by Delivery Date"
+      />
+
+      {filteredReceived.length === 0 ? (
+        <div className="text-center text-muted-foreground py-10 bg-white rounded-2xl border border-border p-6">
+          <CheckCircle2 size={32} className="mx-auto text-muted-foreground/40 mb-2" />
+          <p className="font-bold text-foreground">No received deliveries match the selected date range.</p>
+          <button
+            type="button"
+            onClick={() => { setFromDate(''); setToDate(''); }}
+            className="text-xs font-bold text-[#2648E7] hover:underline mt-1 cursor-pointer"
+          >
+            Clear Date Filter
+          </button>
+        </div>
+      ) : (
+        filteredReceived.map((r) => (
         <Card key={r.id} className="p-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-start gap-3 min-w-0">
@@ -1322,13 +1403,20 @@ function ReceivedTab({
             </div>
           </div>
         </Card>
-      ))}
+      )))
+}
     </div>
   );
 }
 
 function InventoryTab({ items, logs }: { items: any[], logs: ConsumptionLog[] }) {
   const [view, setView] = useState<'stock' | 'history'>('stock');
+  const [fromDate, setFromDate] = useState<string>('');
+  const [toDate, setToDate] = useState<string>('');
+
+  const filteredLogs = useMemo(() => {
+    return logs.filter(l => isWithinDateRange(l.dateRaw || l.date, fromDate, toDate));
+  }, [logs, fromDate, toDate]);
 
   return (
     <div className="space-y-4">
@@ -1363,9 +1451,32 @@ function InventoryTab({ items, logs }: { items: any[], logs: ConsumptionLog[] })
             ))}
           </div>
       ) : (
-        logs.length === 0 ? <div className="text-center text-muted-foreground py-10">No consumption logs found.</div> :
-          <div className="space-y-3">
-            {logs.map((log) => (
+        <div className="space-y-3">
+          {/* Date Range Filter for Consumption */}
+          <DateRangeFilter
+            fromDate={fromDate}
+            toDate={toDate}
+            onChange={(from, to) => {
+              setFromDate(from);
+              setToDate(to);
+            }}
+            label="Filter Consumption History by Date"
+          />
+
+          {filteredLogs.length === 0 ? (
+            <div className="text-center text-muted-foreground py-10 bg-white rounded-2xl border border-border p-6">
+              <Archive size={32} className="mx-auto text-muted-foreground/40 mb-2" />
+              <p className="font-bold text-foreground">No consumption logs match the selected date range.</p>
+              <button
+                type="button"
+                onClick={() => { setFromDate(''); setToDate(''); }}
+                className="text-xs font-bold text-[#2648E7] hover:underline mt-1 cursor-pointer"
+              >
+                Clear Date Filter
+              </button>
+            </div>
+          ) : (
+            filteredLogs.map((log) => (
               <Card key={log.id} className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
@@ -1377,8 +1488,9 @@ function InventoryTab({ items, logs }: { items: any[], logs: ConsumptionLog[] })
                   </div>
                 </div>
               </Card>
-            ))}
-          </div>
+            ))
+          )}
+        </div>
       )}
     </div>
   );

@@ -233,6 +233,7 @@ export const GET = withAuth(async (request: Request, user: any) => {
         isLocked,
         unit: r.material.unit,
         date: new Date(r.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
+        createdAt: r.created_at.toISOString(),
         priority: r.priority,
         notes: r.notes
       };
@@ -290,6 +291,8 @@ export const GET = withAuth(async (request: Request, user: any) => {
         numericAmount: o.total_amount,
         status: isDelivered ? 'DELIVERED' : o.status,
         date: new Date(o.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
+        createdAt: o.created_at.toISOString(),
+        deliveryDate: o.delivery_date ? o.delivery_date.toISOString() : null,
         eta: o.delivery_date ? new Date(o.delivery_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : 'Pending',
         items,
         pendingItemsCount: pendingItems.length,
@@ -351,6 +354,7 @@ export const GET = withAuth(async (request: Request, user: any) => {
         vendorId: g.purchase_order.vendor.id,
         amount: `₹${g.purchase_order.total_amount.toLocaleString()}`, // Approximate for GRN
         received: new Date(g.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
+        receivedAt: (g.date || g.created_at).toISOString(),
         receivedTime: deliveryTime,
         deliverySpeed,
         remarks: g.remarks,
@@ -422,6 +426,7 @@ export const GET = withAuth(async (request: Request, user: any) => {
       material: c.material.name,
       qty: `${c.quantity} ${c.material.unit}`,
       date: new Date(c.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
+      dateRaw: c.date.toISOString(),
       time: new Date(c.date).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
     }));
 

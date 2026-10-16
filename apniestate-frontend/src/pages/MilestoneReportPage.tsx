@@ -4,25 +4,17 @@ import { FileBarChart, Calendar as CalendarIcon, Download, ChevronRight } from '
 import { apiClient } from '@/api/client';
 import { milestonesApi, type Milestone } from '@/api/milestones';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
+import DateRangeFilter from '@/components/shared/DateRangeFilter';
+import { getDatePresetRange } from '@/utils/dateFilter';
 
 export default function MilestoneReportPage() {
   const { activeProjectId } = useProject();
-  
-  const [fromDate, setFromDate] = useState('');
-  const [toDate, setToDate] = useState('');
+  const initialMonth = getDatePresetRange('this_month');
+  const [fromDate, setFromDate] = useState(initialMonth.from);
+  const [toDate, setToDate] = useState(initialMonth.to);
   const [loading, setLoading] = useState(false);
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [dprs, setDprs] = useState<any[]>([]);
-
-  // Default dates to current month
-  useEffect(() => {
-    const today = new Date();
-    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-    const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-    
-    setFromDate(firstDay.toISOString().split('T')[0]);
-    setToDate(lastDay.toISOString().split('T')[0]);
-  }, []);
 
   const generateReport = async () => {
     if (!activeProjectId || !fromDate || !toDate) return;
@@ -46,7 +38,7 @@ export default function MilestoneReportPage() {
     if (activeProjectId && fromDate && toDate) {
       generateReport();
     }
-  }, [activeProjectId]);
+  }, [activeProjectId, fromDate, toDate]);
 
   if (!activeProjectId) {
     return (
@@ -79,32 +71,23 @@ export default function MilestoneReportPage() {
 
   return (
     <div className="flex flex-col h-full bg-background relative animate-fade-in">
-      <div className="bg-white border-b border-border px-4 py-5 sticky top-0 z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-white border-b border-border px-4 py-4 sticky top-0 z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-foreground mb-1" style={{ fontFamily: "var(--font-display)" }}>Milestone Progress Report</h2>
           <p className="text-sm text-muted-foreground">Track exact milestone progression over time based on DPRs.</p>
         </div>
         
-        <div className="flex items-center gap-2 self-start md:self-auto bg-muted p-1 rounded-xl">
-          <input 
-            type="date" 
-            value={fromDate} 
-            onChange={(e) => setFromDate(e.target.value)}
-            className="bg-white border border-transparent rounded-lg px-3 py-1.5 text-sm outline-none shadow-sm font-medium"
+        <div className="self-start md:self-auto">
+          <DateRangeFilter
+            compact
+            fromDate={fromDate}
+            toDate={toDate}
+            onChange={(fromVal, toVal) => {
+              setFromDate(fromVal);
+              setToDate(toVal);
+            }}
+            label="Milestone Period"
           />
-          <span className="text-muted-foreground text-sm font-medium">to</span>
-          <input 
-            type="date" 
-            value={toDate} 
-            onChange={(e) => setToDate(e.target.value)}
-            className="bg-white border border-transparent rounded-lg px-3 py-1.5 text-sm outline-none shadow-sm font-medium"
-          />
-          <button 
-            onClick={generateReport}
-            className="bg-[#2648E7] text-white p-2 rounded-lg ml-1 hover:bg-[#1a35b3] transition-colors"
-          >
-            <ChevronRight size={18} />
-          </button>
         </div>
       </div>
 

@@ -3,12 +3,16 @@ import { Receipt, Calendar, CreditCard, Plus, X } from 'lucide-react';
 import { PH, Card, Chip, SrchBar } from '@/components/shared/FigmaComponents';
 import { expensesApi, type Expense } from '@/api/expenses';
 import { useProject } from '@/context/ProjectContext';
+import DateRangeFilter from '@/components/shared/DateRangeFilter';
+import { isWithinDateRange } from '@/utils/dateFilter';
 
 export default function ExpensesPage() {
   const { activeProjectId } = useProject();
   const [search, setSearch] = useState('');
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
   
   // Modal state
   const [showModal, setShowModal] = useState(false);
@@ -36,10 +40,13 @@ export default function ExpensesPage() {
     }
   };
 
-  const filtered = expenses.filter(e => 
-    e.description?.toLowerCase().includes(search.toLowerCase()) || 
-    e.category.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = expenses.filter(e => {
+    const matchesSearch = 
+      e.description?.toLowerCase().includes(search.toLowerCase()) || 
+      e.category.toLowerCase().includes(search.toLowerCase());
+    if (!matchesSearch) return false;
+    return isWithinDateRange(e.date, fromDate, toDate);
+  });
 
   const formatMoney = (val: number) => `₨ ${val.toLocaleString()}`;
 
@@ -78,12 +85,22 @@ export default function ExpensesPage() {
           <SrchBar placeholder="Search expenses..." />
         </div>
         <button 
-          onClick={() => setShowModal(true)}
-          className="px-3 py-2 bg-primary text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 shadow-sm hover:bg-primary/90 transition-colors"
+          onClick={() => setShowModal(true)} 
+          className="px-3 py-2 bg-primary text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 shadow-sm hover:bg-primary/90 transition-colors cursor-pointer"
         >
           <Plus size={14} /> Log Expense
         </button>
       </div>
+
+      <DateRangeFilter
+        fromDate={fromDate}
+        toDate={toDate}
+        onChange={(from, to) => {
+          setFromDate(from);
+          setToDate(to);
+        }}
+        label="Filter Expenses by Date"
+      />
 
       {loading ? (
         <div className="py-12 flex justify-center"><div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>
@@ -91,7 +108,9 @@ export default function ExpensesPage() {
         <div className="py-12 text-center bg-white rounded-2xl border border-border">
           <Receipt className="mx-auto text-muted-foreground opacity-50 mb-3" size={32} />
           <h3 className="font-bold text-foreground">No expenses found</h3>
-          <p className="text-xs text-muted-foreground mt-1">Start tracking your petty cash and reimbursements</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            {expenses.length === 0 ? 'Start tracking your petty cash and reimbursements' : 'No expenses match the selected filters.'}
+          </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">

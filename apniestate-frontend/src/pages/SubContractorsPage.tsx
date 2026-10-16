@@ -33,6 +33,8 @@ import {
   Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import DateRangeFilter from '@/components/shared/DateRangeFilter';
+import { isWithinDateRange } from '@/utils/dateFilter';
 
 const WORK_TYPE_SUGGESTIONS = [
   'Painting',
@@ -77,6 +79,8 @@ export default function SubContractorsPage() {
 
   // Active detail tab
   const [activeTab, setActiveTab] = useState<'expenses' | 'tasks'>('expenses');
+  const [expFromDate, setExpFromDate] = useState<string>('');
+  const [expToDate, setExpToDate] = useState<string>('');
 
   // Modals
   const [showAddModal, setShowAddModal] = useState(false);
@@ -478,34 +482,51 @@ export default function SubContractorsPage() {
           </div>
 
           {/* TAB 1: EXPENSES */}
-          {activeTab === 'expenses' && (
-            <div className="bg-white rounded-2xl border border-border shadow-xs overflow-hidden">
-              <div className="p-4 border-b border-border flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-bold text-foreground">Submitted Expenses & Bills</h3>
-                  <p className="text-xs text-muted-foreground">Review reported expenditure against allocated project budget</p>
-                </div>
-              </div>
+          {activeTab === 'expenses' && (() => {
+            const filteredExpenses = (selectedAssignment.expenses || []).filter((exp) =>
+              isWithinDateRange(exp.date || exp.created_at, expFromDate, expToDate)
+            );
 
-              {!selectedAssignment.expenses || selectedAssignment.expenses.length === 0 ? (
-                <div className="p-8 text-center text-sm text-muted-foreground">
-                  No expenses submitted yet by this sub contractor.
+            return (
+              <div className="bg-white rounded-2xl border border-border shadow-xs overflow-hidden">
+                <div className="p-4 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-bold text-foreground">Submitted Expenses & Bills</h3>
+                    <p className="text-xs text-muted-foreground">Review reported expenditure against allocated project budget</p>
+                  </div>
+                  <DateRangeFilter
+                    compact
+                    fromDate={expFromDate}
+                    toDate={expToDate}
+                    onChange={(from, to) => {
+                      setExpFromDate(from);
+                      setExpToDate(to);
+                    }}
+                    label="Filter Bills"
+                  />
                 </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs sm:text-sm">
-                    <thead>
-                      <tr className="bg-slate-50/75 border-b border-border text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                        <th className="py-3 px-4">Date</th>
-                        <th className="py-3 px-4">Amount</th>
-                        <th className="py-3 px-4">Description</th>
-                        <th className="py-3 px-4">Bill Receipt</th>
-                        <th className="py-3 px-4">Status</th>
-                        <th className="py-3 px-4 text-right">Approval Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {selectedAssignment.expenses.map((exp) => (
+
+                {filteredExpenses.length === 0 ? (
+                  <div className="p-8 text-center text-sm text-muted-foreground">
+                    {selectedAssignment.expenses?.length === 0
+                      ? 'No expenses submitted yet by this sub contractor.'
+                      : 'No expenses match the selected date range.'}
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs sm:text-sm">
+                      <thead>
+                        <tr className="bg-slate-50/75 border-b border-border text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                          <th className="py-3 px-4">Date</th>
+                          <th className="py-3 px-4">Amount</th>
+                          <th className="py-3 px-4">Description</th>
+                          <th className="py-3 px-4">Bill Receipt</th>
+                          <th className="py-3 px-4">Status</th>
+                          <th className="py-3 px-4 text-right">Approval Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {filteredExpenses.map((exp) => (
                         <tr key={exp.id} className="hover:bg-slate-50/50 transition-colors">
                           <td className="py-3.5 px-4 whitespace-nowrap text-muted-foreground">
                             {formatDate(exp.date || exp.created_at)}
@@ -579,7 +600,8 @@ export default function SubContractorsPage() {
                 </div>
               )}
             </div>
-          )}
+          );
+        })()}
 
           {/* TAB 2: TASKS */}
           {activeTab === 'tasks' && (

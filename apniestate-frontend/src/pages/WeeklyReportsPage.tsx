@@ -3,6 +3,8 @@ import { Plus, Clock, FileText, CheckCircle, Upload, AlertCircle, Building2, Use
 import { dprApi, type WeeklyReport } from '@/api/dpr';
 import { apiClient } from '@/api/client';
 import { PH, Card, Badge, SrchBar, Button } from '@/components/shared/FigmaComponents';
+import DateRangeFilter from '@/components/shared/DateRangeFilter';
+import { isWithinDateRange } from '@/utils/dateFilter';
 
 interface Project { id: string; name: string; }
 interface Site { id: string; name: string; project_id: string; }
@@ -15,6 +17,8 @@ export default function WeeklyReportsPage() {
   
   const [filterProjectId, setFilterProjectId] = useState('');
   const [filterSiteId, setFilterSiteId] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
 
   const [showGenerateModal, setShowGenerateModal] = useState(false);
   const [selectedReport, setSelectedReport] = useState<WeeklyReport | null>(null);
@@ -79,7 +83,7 @@ export default function WeeklyReportsPage() {
         <Button onClick={() => setShowGenerateModal(true)} icon={<Plus size={16} />}>Generate Report</Button>
       </div>
 
-      <Card className="p-4 flex gap-4">
+      <Card className="p-4 flex flex-col md:flex-row gap-4 items-stretch md:items-center">
         <select 
           className="px-3 py-2 border rounded-lg text-sm bg-white"
           value={filterProjectId}
@@ -98,15 +102,33 @@ export default function WeeklyReportsPage() {
             <option key={s.id} value={s.id}>{s.name}</option>
           ))}
         </select>
+        <div className="flex-1">
+          <DateRangeFilter
+            compact
+            fromDate={fromDate}
+            toDate={toDate}
+            onChange={(from, to) => {
+              setFromDate(from);
+              setToDate(to);
+            }}
+            label="Filter Weeks"
+          />
+        </div>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {reports.length === 0 ? (
-          <div className="col-span-full text-center py-12 text-gray-500 bg-white rounded-xl border border-gray-100">
-            No Weekly Reports generated yet.
-          </div>
-        ) : (
-          reports.map(report => (
+      {(() => {
+        const filteredReports = reports.filter(r =>
+          isWithinDateRange(r.week_start_date || r.week_end_date, fromDate, toDate)
+        );
+
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredReports.length === 0 ? (
+              <div className="col-span-full text-center py-12 text-gray-500 bg-white rounded-xl border border-gray-100">
+                {reports.length === 0 ? 'No Weekly Reports generated yet.' : 'No reports match the selected date range.'}
+              </div>
+            ) : (
+              filteredReports.map(report => (
             <Card key={report.id} className="p-5 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setSelectedReport(report)}>
               <div className="flex justify-between items-start mb-3">
                 <Badge variant={report.site_health === 'ON_TRACK' ? 'success' : report.site_health === 'AT_RISK' ? 'warning' : 'danger'}>
@@ -137,6 +159,8 @@ export default function WeeklyReportsPage() {
           ))
         )}
       </div>
+    );
+  })()}
 
       {/* Generate Modal */}
       {showGenerateModal && (

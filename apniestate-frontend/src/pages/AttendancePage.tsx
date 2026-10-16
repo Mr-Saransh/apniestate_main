@@ -1,5 +1,5 @@
 import React, { useState, useEffect, type FormEvent } from 'react';
-import { Download, ChevronLeft, Calendar } from 'lucide-react';
+import { Download, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 import { apiClient } from '@/api/client';
 import { PH, Card, Chip, SrchBar } from '@/components/shared/FigmaComponents';
 import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip } from 'recharts';
@@ -114,16 +114,60 @@ export default function AttendancePage() {
 
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex justify-between items-start">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <PH title="Attendance" sub={`Daily labor turnout — ${format(date, 'dd MMM yyyy')}`} />
-        <select 
-          className="bg-card border border-border text-xs rounded-lg px-2 py-1 outline-none focus:ring-1 focus:ring-primary"
-          value={selectedSiteId}
-          onChange={(e) => setSelectedSiteId(e.target.value)}
-        >
-          <option value="">All Sites</option>
-          {sites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-        </select>
+        
+        {/* Date Selector & Site Filter Bar */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Day Stepper */}
+          <div className="flex items-center gap-1 bg-card border border-border rounded-xl p-1 shadow-2xs">
+            <button
+              type="button"
+              onClick={() => setDate(prev => addDays(prev, -1))}
+              className="p-1.5 hover:bg-muted rounded-lg text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              title="Previous Day"
+            >
+              <ChevronLeft size={14} />
+            </button>
+            <input
+              type="date"
+              value={format(date, 'yyyy-MM-dd')}
+              onChange={(e) => {
+                if (e.target.value) {
+                  const d = new Date(`${e.target.value}T12:00:00`);
+                  if (!isNaN(d.getTime())) setDate(d);
+                }
+              }}
+              className="text-xs font-bold text-foreground bg-transparent focus:outline-none px-1 cursor-pointer"
+            />
+            <button
+              type="button"
+              onClick={() => setDate(prev => addDays(prev, 1))}
+              className="p-1.5 hover:bg-muted rounded-lg text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              title="Next Day"
+            >
+              <ChevronRight size={14} />
+            </button>
+            {!isSameDay(date, new Date()) && (
+              <button
+                type="button"
+                onClick={() => setDate(new Date())}
+                className="text-[10px] font-bold px-2 py-1 bg-primary/10 text-primary hover:bg-primary/20 rounded-md transition-colors cursor-pointer"
+              >
+                Today
+              </button>
+            )}
+          </div>
+
+          <select 
+            className="bg-card border border-border text-xs font-semibold rounded-xl px-2.5 py-2 outline-none focus:ring-1 focus:ring-primary cursor-pointer shadow-2xs"
+            value={selectedSiteId}
+            onChange={(e) => setSelectedSiteId(e.target.value)}
+          >
+            <option value="">All Sites</option>
+            {sites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+        </div>
       </div>
 
       <div className="grid grid-cols-3 gap-2">

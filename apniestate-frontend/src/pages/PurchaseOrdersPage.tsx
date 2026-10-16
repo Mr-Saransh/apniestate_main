@@ -7,6 +7,8 @@ import { apiClient } from '@/api/client';
 import Modal from '@/components/shared/Modal';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { useProject } from '@/context/ProjectContext';
+import DateRangeFilter from '@/components/shared/DateRangeFilter';
+import { isWithinDateRange } from '@/utils/dateFilter';
 
 export default function PurchaseOrdersPage() {
   const { activeProjectId } = useProject();
@@ -120,10 +122,17 @@ export default function PurchaseOrdersPage() {
     }
   };
 
-  const filtered = pos.filter(p => 
-    p.po_number.toLowerCase().includes(search.toLowerCase()) || 
-    (p.vendor?.name || '').toLowerCase().includes(search.toLowerCase())
-  );
+  // Date filter state
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+
+  const filtered = pos.filter(p => {
+    const matchesSearch = 
+      p.po_number.toLowerCase().includes(search.toLowerCase()) || 
+      (p.vendor?.name || '').toLowerCase().includes(search.toLowerCase());
+    if (!matchesSearch) return false;
+    return isWithinDateRange(p.created_at, fromDate, toDate);
+  });
 
   const formatMoney = (val: number) => {
     if (val >= 100000) return `₹ ${(val / 100000).toFixed(2)}L`;
@@ -152,6 +161,16 @@ export default function PurchaseOrdersPage() {
           <ShoppingCart size={14} /> Create PO
         </button>
       </div>
+
+      <DateRangeFilter
+        fromDate={fromDate}
+        toDate={toDate}
+        onChange={(from, to) => {
+          setFromDate(from);
+          setToDate(to);
+        }}
+        label="Filter Purchase Orders by Date"
+      />
 
       {filtered.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-500 mt-4">

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useProject } from '@/context/ProjectContext';
-import { Save, Plus, Minus, Calendar, AlertTriangle, Edit2, RotateCcw, Trash2, Download } from 'lucide-react';
+import { Save, Plus, Minus, Calendar, AlertTriangle, Edit2, RotateCcw, Trash2, Download, ChevronLeft, ChevronRight } from 'lucide-react';
 import { apiClient } from '@/api/client';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -256,15 +256,50 @@ export default function LabourRegister() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-5 space-y-6 pb-24">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border border-border shadow-sm">
-          <Calendar size={15} className="text-[#2648E7]" />
-          <input
-            type="date"
-            value={date}
-            onChange={e => setDate(e.target.value)}
-            className="text-sm font-bold text-foreground focus:outline-none bg-transparent"
-          />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-border shadow-2xs">
+          <button
+            type="button"
+            onClick={() => {
+              const d = new Date(date);
+              d.setDate(d.getDate() - 1);
+              setDate(d.toISOString().split('T')[0]);
+            }}
+            className="p-1.5 hover:bg-muted rounded-lg text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+            title="Previous Day"
+          >
+            <ChevronLeft size={14} />
+          </button>
+          <div className="flex items-center gap-1.5 px-2">
+            <Calendar size={14} className="text-[#2648E7]" />
+            <input
+              type="date"
+              value={date}
+              onChange={e => setDate(e.target.value)}
+              className="text-xs font-bold text-foreground focus:outline-none bg-transparent cursor-pointer"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              const d = new Date(date);
+              d.setDate(d.getDate() + 1);
+              setDate(d.toISOString().split('T')[0]);
+            }}
+            className="p-1.5 hover:bg-muted rounded-lg text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+            title="Next Day"
+          >
+            <ChevronRight size={14} />
+          </button>
+          {date !== new Date().toISOString().split('T')[0] && (
+            <button
+              type="button"
+              onClick={() => setDate(new Date().toISOString().split('T')[0])}
+              className="text-[10px] font-bold px-2 py-1 bg-primary/10 text-primary hover:bg-primary/20 rounded-md transition-colors cursor-pointer"
+            >
+              Today
+            </button>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <p className="text-xs font-bold text-muted-foreground">

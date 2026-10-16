@@ -32,6 +32,8 @@ import { apiClient } from '@/api/client';
 import { milestonesApi, type Milestone } from '@/api/milestones';
 import { PH, Card, Badge, SrchBar, Button } from '@/components/shared/FigmaComponents';
 import AttachmentUploader from '@/components/shared/AttachmentUploader';
+import DateRangeFilter from '@/components/shared/DateRangeFilter';
+import { isWithinDateRange } from '@/utils/dateFilter';
 
 interface Project {
   id: string;
@@ -198,6 +200,8 @@ export default function DprPage() {
   const [formQuality, setFormQuality] = useState('');
   const [formRemarks, setFormRemarks] = useState('');
   const [formMilestoneId, setFormMilestoneId] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
 
   // Smart DPR Input states
   const [inputMode, setInputMode] = useState<'voice' | 'text'>('voice');
@@ -772,11 +776,13 @@ export default function DprPage() {
     }
   };
 
-  const filteredDprs = dprs.filter(
-    (d) =>
+  const filteredDprs = dprs.filter((d) => {
+    const matchesSearch =
       d.summary?.toLowerCase().includes(search.toLowerCase()) ||
-      d.work_completed?.toLowerCase().includes(search.toLowerCase())
-  );
+      d.work_completed?.toLowerCase().includes(search.toLowerCase());
+    if (!matchesSearch) return false;
+    return isWithinDateRange(d.report_date || d.created_at, fromDate, toDate);
+  });
 
   const invalidStockItems = checkStockValidation();
   const hasInsufficientStock = invalidStockItems.length > 0;
@@ -836,6 +842,17 @@ export default function DprPage() {
             ))}
         </select>
       </Card>
+
+      {/* Date Range Filter for DPRs */}
+      <DateRangeFilter
+        fromDate={fromDate}
+        toDate={toDate}
+        onChange={(from, to) => {
+          setFromDate(from);
+          setToDate(to);
+        }}
+        label="Filter Daily Progress Reports by Date"
+      />
 
       {/* Timeline View */}
       <div className="space-y-6">

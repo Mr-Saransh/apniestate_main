@@ -3,6 +3,8 @@ import { apiClient } from '@/api/client';
 import { useAuth } from '@/context/AuthContext';
 import { useProject } from '@/context/ProjectContext';
 import { Package, Plus, CheckCircle2 } from 'lucide-react';
+import DateRangeFilter from '@/components/shared/DateRangeFilter';
+import { isWithinDateRange } from '@/utils/dateFilter';
 
 interface MaterialRequest {
   id: string;
@@ -29,6 +31,8 @@ export default function MaterialRequestsPage() {
   const [loading, setLoading] = useState(true);
   const [showNewModal, setShowNewModal] = useState(false);
   const [newReq, setNewReq] = useState({ materialName: '', quantity: 1, unit: '', priority: 'NORMAL', site_id: '', material_id: '' });
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
 
   const fetchRequests = () => {
     if (!activeProjectId) {
@@ -94,6 +98,10 @@ export default function MaterialRequestsPage() {
     );
   }
 
+  const filteredRequests = requests.filter(r =>
+    isWithinDateRange(r.created_at, fromDate, toDate)
+  );
+
   return (
     <div className="space-y-4 pb-12">
       <div className="flex items-center justify-between mb-2">
@@ -109,13 +117,23 @@ export default function MaterialRequestsPage() {
         )}
       </div>
 
+      <DateRangeFilter
+        fromDate={fromDate}
+        toDate={toDate}
+        onChange={(from, to) => {
+          setFromDate(from);
+          setToDate(to);
+        }}
+        label="Filter Material Requests by Date"
+      />
+
       <div className="space-y-3">
-        {requests.length === 0 ? (
+        {filteredRequests.length === 0 ? (
           <div className="p-8 text-center text-muted-foreground text-sm bg-white rounded-2xl border border-border border-dashed">
-            No material requests found.
+            {requests.length === 0 ? 'No material requests found.' : 'No requests match the selected date range.'}
           </div>
         ) : (
-          requests.map((r, i) => {
+          filteredRequests.map((r, i) => {
             const itemName = r.material?.name || 'Unknown Material';
             const qty = `${r.quantity} ${r.material?.unit || 'units'}`;
             const date = new Date(r.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });

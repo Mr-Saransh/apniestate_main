@@ -4,11 +4,14 @@ import { PH, Card } from '@/components/shared/FigmaComponents';
 import { Download } from 'lucide-react';
 import { useProject } from '@/context/ProjectContext';
 import { apiClient } from '@/api/client';
+import DateRangeFilter from '@/components/shared/DateRangeFilter';
+import { getDatePresetRange } from '@/utils/dateFilter';
 
 export default function ExportAttendancePage() {
   const { activeProject } = useProject();
-  const [startDate, setStartDate] = useState(new Date(new Date().setDate(1)).toISOString().split('T')[0]);
-  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+  const initialMonth = getDatePresetRange('this_month');
+  const [startDate, setStartDate] = useState(initialMonth.from);
+  const [endDate, setEndDate] = useState(initialMonth.to);
   const [sites, setSites] = useState<any[]>([]);
   const [selectedSite, setSelectedSite] = useState<string>('all');
   
@@ -36,7 +39,7 @@ export default function ExportAttendancePage() {
         const _url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = _url;
-        link.setAttribute('download', 'labour_attendance_report.csv');
+        link.setAttribute('download', `labour_attendance_${startDate}_to_${endDate}.csv`);
         document.body.appendChild(link);
         link.click();
         link.remove();
@@ -44,23 +47,25 @@ export default function ExportAttendancePage() {
   };
 
   return (
-    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-2xl mx-auto">
       <PH title="Export Attendance" sub="Download labor spreadsheets for corporate audit" />
       
       <Card title="Export Configuration">
         <div className="space-y-4">
-          <div>
-            <label className="block text-[11px] font-semibold text-muted-foreground mb-1 uppercase tracking-wide">Date From</label>
-            <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20" />
-          </div>
-          <div>
-            <label className="block text-[11px] font-semibold text-muted-foreground mb-1 uppercase tracking-wide">Date To</label>
-            <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20" />
-          </div>
+          <DateRangeFilter
+            fromDate={startDate}
+            toDate={endDate}
+            onChange={(from, to) => {
+              setStartDate(from);
+              setEndDate(to);
+            }}
+            label="Attendance Date Range"
+            allowedPresets={['today', 'yesterday', 'this_week', 'this_month', 'last_month', 'last_30_days', 'custom']}
+          />
           
           <div>
             <label className="block text-[11px] font-semibold text-muted-foreground mb-1 uppercase tracking-wide">Site Filter</label>
-            <select value={selectedSite} onChange={e => setSelectedSite(e.target.value)} className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20">
+            <select value={selectedSite} onChange={e => setSelectedSite(e.target.value)} className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer">
               <option value="all">All Sites in Project</option>
               {sites.map(s => (
                 <option key={s.id} value={s.id}>{s.name}</option>
@@ -80,8 +85,8 @@ export default function ExportAttendancePage() {
         </div>
       </Card>
       
-      <button onClick={handleDownload} className="w-full py-3.5 bg-amber-400 text-black rounded-xl text-sm font-bold flex items-center justify-center gap-2 shadow-sm hover:brightness-95 transition-all">
-        <Download className="w-4 h-4" /> Download Attendance Report
+      <button onClick={handleDownload} className="w-full py-3.5 bg-amber-400 text-black rounded-xl text-sm font-bold flex items-center justify-center gap-2 shadow-sm hover:brightness-95 transition-all cursor-pointer">
+        <Download className="w-4 h-4" /> Download Attendance Report ({startDate} to {endDate})
       </button>
     </div>
   );

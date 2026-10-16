@@ -19,6 +19,8 @@ import { duesApi } from '@/api/dues';
 import { useProject } from '@/context/ProjectContext';
 import { PH, Card, Chip, SrchBar } from '@/components/shared/FigmaComponents';
 import UploadInvoiceModal from '@/components/finance/UploadInvoiceModal';
+import DateRangeFilter from '@/components/shared/DateRangeFilter';
+import { isWithinDateRange } from '@/utils/dateFilter';
 
 export default function InvoicesPage() {
   const { activeProjectId, activeProject } = useProject();
@@ -27,6 +29,8 @@ export default function InvoicesPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'PAID'>('ALL');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
 
   // Modals
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -245,6 +249,9 @@ export default function InvoicesPage() {
 
     if (!matchesSearch) return false;
 
+    const matchesDate = isWithinDateRange(inv.due_date || (inv as any).created_at, fromDate, toDate);
+    if (!matchesDate) return false;
+
     if (statusFilter === 'PENDING') {
       return inv.status === 'PENDING' || inv.status === 'DRAFT';
     }
@@ -385,6 +392,17 @@ export default function InvoicesPage() {
           ))}
         </div>
       </div>
+
+      {/* Date Range Filter */}
+      <DateRangeFilter
+        fromDate={fromDate}
+        toDate={toDate}
+        onChange={(from, to) => {
+          setFromDate(from);
+          setToDate(to);
+        }}
+        label="Filter Invoices by Due Date / Issue Date"
+      />
 
       {/* Invoice List / Empty State */}
       {loading ? (

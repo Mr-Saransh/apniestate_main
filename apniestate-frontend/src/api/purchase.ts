@@ -42,6 +42,7 @@ export interface MaterialRequestSummary {
   isLocked?: boolean;
   unit?: string;
   date: string;
+  createdAt?: string;
   priority?: string;
   notes?: string | null;
 }
@@ -68,6 +69,8 @@ export interface OrderSummary {
   numericAmount?: number;
   status: string;
   date: string;
+  createdAt?: string;
+  deliveryDate?: string | null;
   eta: string;
   items?: OrderItemSummary[];
   quotationId?: string | null;
@@ -92,6 +95,7 @@ export interface ReceivedSummary {
   vendorId?: string;
   amount: string;
   received: string;
+  receivedAt?: string;
   receivedTime?: string;
   deliverySpeed?: 'ON_TIME' | 'SLOW' | 'DELAYED' | string;
   remarks?: string | null;
@@ -138,6 +142,7 @@ export interface ConsumptionLog {
   material: string;
   qty: string;
   date: string;
+  dateRaw?: string;
   time: string;
 }
 
